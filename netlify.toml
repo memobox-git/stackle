@@ -1,13 +1,13 @@
 # Netlify config for Stackle.
 #
-# Default function timeout is 10s — too short for LLM writer + synthesis
-# calls that can run 15-45s. Bumps to 60s for every Next.js API route.
-# Requires Netlify Pro plan for timeouts over 10s on standard functions.
+# Function timeout is set by your Netlify plan, not this file:
+#   - Free:    10s  (too short for most LLM calls — expect timeouts on Fix)
+#   - Pro:     26s  (covers most cases; heavy Fix All may still cut off)
+#   - Enterprise: configurable
+#
+# If free-plan timeouts cause issues, either upgrade to Pro or migrate to
+# Vercel Hobby (free, 60s default).
 
 [build]
   command = "npm run build"
   publish = ".next"
-
-[functions]
-  # Applies to all Next.js API routes compiled as Netlify Functions.
-  timeout = 60
