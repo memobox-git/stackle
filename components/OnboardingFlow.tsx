@@ -1,0 +1,606 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Camera, Upload, X } from "lucide-react";
+import { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
+import { ResumeAnalysis } from "@/lib/agents/schemas/resumeIntelligence";
+
+function useTypewriter(text: string, speed = 28) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setDisplayed("");
+    setDone(false);
+    if (!text) return;
+    let i = 0;
+    const interval = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) { clearInterval(interval); setDone(true); }
+    }, speed);
+    return () => clearInterval(interval);
+  }, [text, speed]);
+  return { displayed, done };
+}
+
+// Animate a value into an input one character at a time
+function useFieldTypewriter(value: string, delay = 0, speed = 22) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    setDisplayed("");
+    setDone(false);
+    if (!value) { setDone(true); return; }
+    const timeout = setTimeout(() => {
+      let i = 0;
+      const interval = setInterval(() => {
+        i++;
+        setDisplayed(value.slice(0, i));
+        if (i >= value.length) { clearInterval(interval); setDone(true); }
+      }, speed);
+      return () => clearInterval(interval);
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [value, delay, speed]);
+  return { displayed, done };
+}
+
+type ContactInfo = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  city: string;
+  state: string;
+};
+
+type Props = {
+  onComplete: (profile: {
+    avatarUrl?: string;
+    resumeText?: string;
+    resumeFilename?: string;
+    contact?: ContactInfo;
+    resumeExtraction?: ResumeExtraction | null;
+    resumeAnalysis?: ResumeAnalysis | null;
+  }) => void;
+};
+
+export default function OnboardingFlow({ onComplete }: Props) {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  // Editor state — shown after upload, before the user hits "Use this photo".
+  // We keep `rawAvatarUrl` alive even after the user saves so they can click
+  // the small avatar to re-open the editor with their previous framing.
+  const [rawAvatarUrl, setRawAvatarUrl] = useState<string | null>(null);
+  const [isEditingAvatar, setIsEditingAvatar] = useState(false);
+  const [avatarScale, setAvatarScale] = useState(1);
+  const [avatarOffset, setAvatarOffset] = useState({ x: 0, y: 0 });
+  const [avatarDragging, setAvatarDragging] = useState(false);
+  const avatarDragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
+  const rawImgRef = useRef<HTMLImageElement>(null);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [uploading, setUploading] = useState(false);
+  const [resumeFilename, setResumeFilename] = useState("");
+  const [resumeText, setResumeText] = useState("");
+  const [extracting, setExtracting] = useState(false);
+  const [resumeExtraction, setResumeExtraction] = useState<ResumeExtraction | null>(null);
+  const resumeAnalysisRef = useRef<ResumeAnalysis | null>(null);
+  const analysisInFlightRef = useRef<Promise<ResumeAnalysis | null> | null>(null);
+
+  // Step 3 — extracted contact, editable by user
+  const [contact, setContact] = useState<ContactInfo>({
+    firstName: "", lastName: "", email: "", phone: "", city: "", state: "",
+  });
+  // Typewriter-filled versions (shown before user edits)
+  const [fieldsReady, setFieldsReady] = useState(false);
+
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  const q1 = useTypewriter("Add a profile photo");
+  const q2 = useTypewriter(step >= 2 ? "Upload your resume" : "");
+  const q3 = useTypewriter(step >= 3 ? "Here's what I found — update anything that looks off." : "");
+
+  // Typewriter for each field value (starts only after q3 finishes)
+  const fnTW = useFieldTypewriter(step === 3 && q3.done ? contact.firstName : "", 0);
+  const lnTW = useFieldTypewriter(step === 3 && q3.done ? contact.lastName : "", 200);
+  const emTW = useFieldTypewriter(step === 3 && q3.done ? contact.email : "", 400);
+  const phTW = useFieldTypewriter(step === 3 && q3.done ? contact.phone : "", 600);
+  const ciTW = useFieldTypewriter(step === 3 && q3.done ? contact.city : "", 800);
+  const stTW = useFieldTypewriter(step === 3 && q3.done ? contact.state : "", 1000);
+
+  useEffect(() => {
+    if (step === 3 && stTW.done) setFieldsReady(true);
+  }, [step, stTW.done]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [step, fieldsReady]);
+
+  function handleAvatarChange(file: File) {
+    // New file picked — revoke the old raw URL if any, reset framing
+    if (rawAvatarUrl) URL.revokeObjectURL(rawAvatarUrl);
+    if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+    const url = URL.createObjectURL(file);
+    setRawAvatarUrl(url);
+    setIsEditingAvatar(true);
+    setAvatarScale(1);
+    setAvatarOffset({ x: 0, y: 0 });
+    setAvatarUrl(null);
+  }
+
+  function handleAvatarCancel() {
+    if (rawAvatarUrl) URL.revokeObjectURL(rawAvatarUrl);
+    if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+    setRawAvatarUrl(null);
+    setAvatarUrl(null);
+    setIsEditingAvatar(false);
+    setAvatarScale(1);
+    setAvatarOffset({ x: 0, y: 0 });
+  }
+
+  // Close the editor without discarding — if the user has already saved an
+  // avatar, clicking X on the editor just reverts to the saved one.
+  function handleAvatarEditorClose() {
+    if (avatarUrl) {
+      setIsEditingAvatar(false); // keep rawAvatarUrl + scale/offset for next time
+    } else {
+      handleAvatarCancel();
+    }
+  }
+
+  function handleReEditAvatar() {
+    if (!rawAvatarUrl) return;
+    setIsEditingAvatar(true);
+  }
+
+  function handleAvatarSave() {
+    const img = rawImgRef.current;
+    if (!img || !rawAvatarUrl) return;
+    const size = 256; // output avatar size in px
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    // The editor shows the image inside a 192px-wide circle frame. We render
+    // to the canvas at exactly that aspect ratio.
+    const frame = 192;
+    const ratio = size / frame;
+
+    // Base image fit: cover the frame (scale=1). Compute the base size so the
+    // shorter side = frame, then apply user scale.
+    const natW = img.naturalWidth;
+    const natH = img.naturalHeight;
+    const coverScale = Math.max(frame / natW, frame / natH);
+    const scaledW = natW * coverScale * avatarScale;
+    const scaledH = natH * coverScale * avatarScale;
+    // Offset positions the image relative to frame center.
+    const drawX = (frame / 2 - scaledW / 2 + avatarOffset.x) * ratio;
+    const drawY = (frame / 2 - scaledH / 2 + avatarOffset.y) * ratio;
+
+    // Round-clip to produce a circular output
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.clip();
+    ctx.drawImage(img, drawX, drawY, scaledW * ratio, scaledH * ratio);
+    ctx.restore();
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          console.error("[avatar] canvas.toBlob returned null — keeping editor open");
+          // Leave the editor state intact so the user can retry — don't silently
+          // close with no avatar saved.
+          return;
+        }
+        // Revoke the previous cropped URL if we're re-saving
+        if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+        const url = URL.createObjectURL(blob);
+        setAvatarUrl(url);
+        setIsEditingAvatar(false); // leave edit mode, keep rawAvatarUrl alive
+      },
+      "image/png",
+      0.92
+    );
+  }
+
+  function handleAvatarPointerDown(e: React.PointerEvent) {
+    if (!rawAvatarUrl) return;
+    setAvatarDragging(true);
+    avatarDragStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      startX: avatarOffset.x,
+      startY: avatarOffset.y,
+    };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  }
+  function handleAvatarPointerMove(e: React.PointerEvent) {
+    if (!avatarDragging) return;
+    const { x, y, startX, startY } = avatarDragStartRef.current;
+    setAvatarOffset({ x: startX + (e.clientX - x), y: startY + (e.clientY - y) });
+  }
+  function handleAvatarPointerUp() { setAvatarDragging(false); }
+
+  async function handleResumeUpload(file: File) {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/parse-file", { method: "POST", body: formData });
+      const data = await res.json();
+      setResumeText(data.text ?? "");
+      setResumeFilename(file.name);
+    } catch {
+      setResumeFilename(file.name);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleResumeConfirm() {
+    // Resume is mandatory; button is disabled until upload completes and
+    // returns text. This guard is just a safety net.
+    if (!resumeText) return;
+    setExtracting(true);
+    try {
+      const res = await fetch("/api/agents/resume/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText }),
+      });
+      const ext: ResumeExtraction = await res.json();
+      setResumeExtraction(ext);
+
+      // Kick off full analysis in the background — don't block the user.
+      analysisInFlightRef.current = fetch("/api/agents/resume/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText }),
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((a: ResumeAnalysis | null) => {
+          resumeAnalysisRef.current = a;
+          // If onboarding is already complete, update localStorage so the
+          // main page can pick it up on next mount.
+          try {
+            const saved = localStorage.getItem("stackle_onboarding");
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (parsed.completed && !parsed.resumeAnalysis && a) {
+                localStorage.setItem(
+                  "stackle_onboarding",
+                  JSON.stringify({ ...parsed, resumeAnalysis: a })
+                );
+              }
+            }
+          } catch { /* ignore */ }
+          return a;
+        })
+        .catch(() => null);
+
+      const fullName: string = ext.name ?? "";
+      const parts = fullName.trim().split(/\s+/);
+      const firstName = parts[0] ?? "";
+      const lastName = parts.slice(1).join(" ");
+      // Parse city/state from location like "Austin, TX" or "Austin, Texas"
+      const loc: string = ext.location ?? "";
+      const locParts = loc.split(",").map((s: string) => s.trim());
+      const city = locParts[0] ?? "";
+      const state = locParts[1] ?? "";
+      setContact({
+        firstName,
+        lastName,
+        email: ext.email ?? "",
+        phone: ext.phone ?? "",
+        city,
+        state,
+      });
+      setStep(3);
+    } catch {
+      // Extraction failed — still advance so the user can hand-enter details.
+      setStep(3);
+    } finally {
+      setExtracting(false);
+    }
+  }
+
+  // Writes the onboarding payload to localStorage. Separate from `onComplete`
+  // so the profile lands in localStorage the moment the user clicks through
+  // each step — if they reload or return later, their progress is intact.
+  function persistProfile(overrides: Partial<ContactInfo> = {}) {
+    const finalContact = { ...contact, ...overrides };
+    const analysisSoFar = resumeAnalysisRef.current;
+    const profile = {
+      avatarUrl: avatarUrl ?? undefined,
+      resumeText: resumeText || undefined,
+      resumeFilename: resumeFilename || undefined,
+      contact: finalContact,
+      resumeExtraction: resumeExtraction ?? null,
+      resumeAnalysis: analysisSoFar ?? null,
+    };
+    localStorage.setItem(
+      "stackle_onboarding",
+      JSON.stringify({
+        ...profile,
+        completed: true,
+        resumeAnalysisPending: !!(resumeText && !analysisSoFar && analysisInFlightRef.current),
+      })
+    );
+    return profile;
+  }
+
+  // User confirmed their contact details — persist and drop into the app.
+  function handleContactContinue() {
+    const profile = persistProfile();
+    onComplete(profile);
+  }
+
+  return (
+    <div className="min-h-screen bg-white flex flex-col items-center py-16 px-6">
+      {/* Logo */}
+      <div
+        className="w-9 h-9 rounded-xl flex items-center justify-center text-black text-sm font-bold mb-14 flex-shrink-0"
+        style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
+      >
+        S
+      </div>
+
+      <div className="w-full max-w-sm flex flex-col gap-12">
+
+        {/* Step 1 — Profile photo */}
+        <div className="animate-fadein flex flex-col items-center gap-4">
+          <p className="text-xl font-semibold text-gray-900 text-center">
+            {q1.displayed}
+            <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q1.done ? "opacity-0" : "animate-pulse"}`} />
+          </p>
+
+          {/* Empty state — no photo chosen yet */}
+          {!rawAvatarUrl && !avatarUrl && (
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              className="w-24 h-24 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center hover:border-gray-400 transition-colors overflow-hidden bg-gray-50"
+            >
+              <Camera className="w-6 h-6 text-gray-400" />
+            </button>
+          )}
+
+          {/* Editor — user picks a photo, now adjusts framing */}
+          {rawAvatarUrl && isEditingAvatar && (
+            <div className="flex flex-col items-center gap-4">
+              <div className="relative">
+                <div
+                  onPointerDown={handleAvatarPointerDown}
+                  onPointerMove={handleAvatarPointerMove}
+                  onPointerUp={handleAvatarPointerUp}
+                  onPointerCancel={handleAvatarPointerUp}
+                  className="relative w-48 h-48 rounded-full overflow-hidden bg-gray-100 touch-none select-none"
+                  style={{ cursor: avatarDragging ? "grabbing" : "grab" }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    ref={rawImgRef}
+                    src={rawAvatarUrl}
+                    alt="avatar preview"
+                    draggable={false}
+                    className="absolute inset-0 w-full h-full pointer-events-none"
+                    style={{
+                      objectFit: "cover",
+                      objectPosition: "center",
+                      transform: `translate(${avatarOffset.x}px, ${avatarOffset.y}px) scale(${avatarScale})`,
+                      transformOrigin: "center center",
+                    }}
+                  />
+                </div>
+                {/* X on editor: close without discarding if a saved avatar exists */}
+                <button
+                  type="button"
+                  onClick={handleAvatarEditorClose}
+                  aria-label={avatarUrl ? "Cancel editing" : "Remove photo"}
+                  className="absolute -top-1 -right-1 w-7 h-7 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:bg-gray-50 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5 text-gray-500" strokeWidth={2.25} />
+                </button>
+              </div>
+
+              {/* Zoom slider */}
+              <div className="flex items-center gap-3 w-56">
+                <span className="text-xs text-gray-400">Zoom</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={3}
+                  step={0.01}
+                  value={avatarScale}
+                  onChange={(e) => setAvatarScale(parseFloat(e.target.value))}
+                  className="flex-1 accent-gray-900"
+                />
+              </div>
+
+              <p className="text-xs text-gray-400">Drag to reposition</p>
+
+              <button
+                onClick={() => {
+                  handleAvatarSave();
+                  // Only auto-advance on first save during step 1. Re-edits
+                  // from step 2+ just close the editor.
+                  if (step === 1) setStep(2);
+                }}
+                className="px-6 py-2 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
+              >
+                {step === 1 ? "Continue" : "Use this photo"}
+              </button>
+            </div>
+          )}
+
+          {/* Saved state — editor closed, final cropped avatar shown */}
+          {avatarUrl && !isEditingAvatar && (
+            <div className="relative group">
+              <button
+                type="button"
+                onClick={handleReEditAvatar}
+                aria-label="Adjust photo"
+                className="w-24 h-24 rounded-full overflow-hidden bg-gray-50 ring-0 hover:ring-2 hover:ring-gray-300 transition-all cursor-pointer relative"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-medium">
+                  Adjust
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={handleAvatarCancel}
+                aria-label="Remove photo"
+                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-white border border-gray-200 shadow-sm flex items-center justify-center hover:bg-gray-50 transition-colors"
+              >
+                <X className="w-3 h-3 text-gray-500" strokeWidth={2.25} />
+              </button>
+            </div>
+          )}
+
+          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarChange(f); }} />
+        </div>
+
+        {/* Step 2 — Resume upload */}
+        {step >= 2 && (
+          <div className="animate-fadein flex flex-col gap-4">
+            <p className="text-xl font-semibold text-gray-900">
+              {q2.displayed}
+              <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q2.done ? "opacity-0" : "animate-pulse"}`} />
+            </p>
+            <p className="text-sm text-gray-400 -mt-2">
+              I&apos;ll pull your details from it automatically.
+            </p>
+
+            {resumeFilename ? (
+              <div className="flex flex-col gap-3">
+                <div className="px-4 py-3 rounded-xl border border-green-200 bg-green-50 text-sm text-green-700">
+                  {resumeFilename} — ready
+                </div>
+                {step === 2 && (
+                  <button onClick={handleResumeConfirm} disabled={uploading || extracting}
+                    className="w-full py-3 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-50">
+                    {extracting ? "Reading your resume..." : "Continue"}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3">
+                <button onClick={() => resumeInputRef.current?.click()} disabled={uploading}
+                  className="w-full px-5 py-10 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center gap-2 hover:border-gray-400 transition-colors">
+                  <Upload className="w-5 h-5 text-gray-400" />
+                  <span className="text-sm text-gray-400">{uploading ? "Uploading..." : "PDF or DOCX"}</span>
+                </button>
+                <input ref={resumeInputRef} type="file" accept=".pdf,.docx" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleResumeUpload(f); }} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 3 — Review extracted contact */}
+        {step === 3 && (
+          <div className="animate-fadein flex flex-col gap-5">
+            <p className="text-xl font-semibold text-gray-900">
+              {q3.displayed}
+              <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q3.done ? "opacity-0" : "animate-pulse"}`} />
+            </p>
+
+            {q3.done && <div className="flex flex-col gap-3">
+              <div className="flex gap-3">
+                <div className="flex-1 flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">First name</label>
+                  <input
+                    type="text"
+                    value={fieldsReady ? contact.firstName : fnTW.displayed}
+                    onChange={(e) => setContact(c => ({ ...c, firstName: e.target.value }))}
+                    readOnly={!fieldsReady}
+                    className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors bg-white"
+                  />
+                </div>
+                <div className="flex-1 flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">Last name</label>
+                  <input
+                    type="text"
+                    value={fieldsReady ? contact.lastName : lnTW.displayed}
+                    onChange={(e) => setContact(c => ({ ...c, lastName: e.target.value }))}
+                    readOnly={!fieldsReady}
+                    className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors bg-white"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-400">Email</label>
+                <input
+                  type="email"
+                  value={fieldsReady ? contact.email : emTW.displayed}
+                  onChange={(e) => setContact(c => ({ ...c, email: e.target.value }))}
+                  readOnly={!fieldsReady}
+                  className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors bg-white"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-gray-400">Phone</label>
+                <input
+                  type="text"
+                  value={fieldsReady ? contact.phone : phTW.displayed}
+                  onChange={(e) => setContact(c => ({ ...c, phone: e.target.value }))}
+                  readOnly={!fieldsReady}
+                  className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors bg-white"
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-1 flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">City</label>
+                  <input
+                    type="text"
+                    value={fieldsReady ? contact.city : ciTW.displayed}
+                    onChange={(e) => setContact(c => ({ ...c, city: e.target.value }))}
+                    readOnly={!fieldsReady}
+                    className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors bg-white"
+                  />
+                </div>
+                <div className="flex-1 flex flex-col gap-1">
+                  <label className="text-xs text-gray-400">State</label>
+                  <input
+                    type="text"
+                    value={fieldsReady ? contact.state : stTW.displayed}
+                    onChange={(e) => setContact(c => ({ ...c, state: e.target.value }))}
+                    readOnly={!fieldsReady}
+                    className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors bg-white"
+                  />
+                </div>
+              </div>
+            </div>}
+
+            {fieldsReady && (
+              <button onClick={handleContactContinue}
+                className="w-full py-3 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors animate-fadein">
+                Looks good, let&apos;s go
+              </button>
+            )}
+          </div>
+        )}
+
+        <div ref={bottomRef} />
+      </div>
+
+      <style>{`
+        @keyframes fadein {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadein { animation: fadein 0.35s ease-out; }
+      `}</style>
+    </div>
+  );
+}
