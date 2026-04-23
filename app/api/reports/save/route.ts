@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// Lazy client — creating at module-load crashes the build step when
+// NEXT_PUBLIC_SUPABASE_URL isn't present at "collect page data" time
+// (e.g. first Netlify build before env vars are wired up).
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -13,6 +18,11 @@ export async function POST(req: NextRequest) {
 
     if (!report_data) {
       return NextResponse.json({ error: "report_data required" }, { status: 400 });
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+      return NextResponse.json({ error: "Supabase not configured on server" }, { status: 503 });
     }
 
     const { data, error } = await supabase
