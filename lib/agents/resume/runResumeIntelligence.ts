@@ -74,7 +74,12 @@ export async function runResumeIntelligence({
 
   try {
     const response = await client.messages.create({
-      model: "claude-sonnet-4-5",
+      // Opus here — resume analysis is the single most visible output in
+      // the app and Opus produces noticeably sharper priority lists and
+      // weakness observations than Sonnet. Cost delta (~$0.30/call) is
+      // trivial; latency rises to ~150s, comfortably inside our 300s
+      // Vercel Pro function budget.
+      model: "claude-opus-4-5",
       max_tokens: 8192,
       system: RESUME_INTELLIGENCE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContext }],
