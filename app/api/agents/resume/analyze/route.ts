@@ -1,5 +1,5 @@
-// Bumped from default 10s to 60s — LLM calls routinely take 15-45s.
-export const maxDuration = 60;
+// Vercel Pro allows up to 300s — gives Sonnet room to finish full analyses without cutoff.
+export const maxDuration = 300;
 
 import { NextRequest, NextResponse } from "next/server";
 import { runResumeIntelligence } from "@/lib/agents/resume/runResumeIntelligence";
