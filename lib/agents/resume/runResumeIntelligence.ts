@@ -105,7 +105,14 @@ export async function runResumeIntelligence({
     }
     return JSON.parse(rawText) as ResumeAnalysis;
   } catch (err) {
+    // Surface the real error upstream instead of silently returning a blank
+    // fallback. The route handler will translate this into a 500 the client
+    // can actually show to the user (and that we can see in Network tab).
     console.error("[intelligence] Error:", err);
-    return FALLBACK_ANALYSIS;
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Resume analysis failed: ${msg}`);
   }
 }
+
+// Kept for backwards-compat — no longer returned silently.
+void FALLBACK_ANALYSIS;
