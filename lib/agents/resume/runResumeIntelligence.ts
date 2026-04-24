@@ -74,7 +74,10 @@ export async function runResumeIntelligence({
 
   try {
     const response = await client.messages.create({
-      model: "claude-opus-4-6",
+      // Sonnet 4.5 for consistency with the rest of the pipeline and
+      // because not all API keys have Opus access on their tier. Produces
+      // the same JSON shape; analysis quality is strong.
+      model: "claude-sonnet-4-5",
       max_tokens: 8192,
       system: RESUME_INTELLIGENCE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContext }],
