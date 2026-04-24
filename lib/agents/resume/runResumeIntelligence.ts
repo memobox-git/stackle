@@ -74,11 +74,13 @@ export async function runResumeIntelligence({
 
   try {
     const response = await client.messages.create({
-      // Sonnet 4.5 for consistency with the rest of the pipeline and
-      // because not all API keys have Opus access on their tier. Produces
-      // the same JSON shape; analysis quality is strong.
+      // Sonnet 4.5 for consistency with the rest of the pipeline.
+      // max_tokens dropped from 8192 → 4096 because Vercel Hobby caps
+      // function duration at 60s and 8k-token generations were running
+      // FUNCTION_INVOCATION_TIMEOUT. 4k covers the full analysis JSON
+      // comfortably and finishes in ~30-45s.
       model: "claude-sonnet-4-5",
-      max_tokens: 8192,
+      max_tokens: 4096,
       system: RESUME_INTELLIGENCE_SYSTEM_PROMPT,
       messages: [{ role: "user", content: userContext }],
     });
