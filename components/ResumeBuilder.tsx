@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { X, ChevronLeft, ChevronDown, FileText, ClipboardList, Pencil, Download, Link2, Share2, Check, Mail } from "lucide-react";
+import { X, ChevronLeft, ChevronDown, FileText, ClipboardList, Pencil, Download, Link2, Share2, Check, Mail, Target } from "lucide-react";
 import dynamic from "next/dynamic";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
@@ -11,6 +11,7 @@ const DocxViewer = dynamic(() => import("@/components/DocxViewer"), { ssr: false
 import LiveEditableResume from "@/components/LiveEditableResume";
 import ResumeCompletionModal from "@/components/ResumeCompletionModal";
 import CoverLetterModal from "@/components/CoverLetterModal";
+import JDMatchModal from "@/components/JDMatchModal";
 import ResumeReportCard from "@/components/ResumeReportCard";
 import { ChatMessage } from "@/components/Message";
 import { ResumeExtraction, SkillGroup } from "@/lib/agents/schemas/resumeExtraction";
@@ -1136,6 +1137,14 @@ export default function ResumeBuilder({
   const [shareOpen, setShareOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [coverLetterOpen, setCoverLetterOpen] = useState(false);
+  // When the cover letter is opened from JD-match, we pre-fill these so the
+  // modal lands on a populated state. Reset to null on close.
+  const [coverLetterPrefill, setCoverLetterPrefill] = useState<{
+    companyName?: string;
+    roleTitle?: string;
+    jobDescription?: string;
+  } | null>(null);
+  const [jdMatchOpen, setJdMatchOpen] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   function deriveScore(a: typeof resumeAnalysis): number {
@@ -1576,7 +1585,28 @@ export default function ResumeBuilder({
         <CoverLetterModal
           extraction={editedExtraction ?? resumeExtraction ?? null}
           defaultRole={resumeAnalysis?.likelyTargetRole ?? null}
-          onClose={() => setCoverLetterOpen(false)}
+          prefillCompany={coverLetterPrefill?.companyName}
+          prefillRole={coverLetterPrefill?.roleTitle}
+          prefillJobDescription={coverLetterPrefill?.jobDescription}
+          onClose={() => { setCoverLetterOpen(false); setCoverLetterPrefill(null); }}
+        />
+      )}
+
+      {jdMatchOpen && (
+        <JDMatchModal
+          extraction={editedExtraction ?? resumeExtraction ?? null}
+          onClose={() => setJdMatchOpen(false)}
+          onApplyRewrite={(sectionKey, instruction) => {
+            // Route the targeted rewrite into the existing fix flow with the
+            // section locked so the writer can't drift. Same path as the
+            // chat's "Apply in Resume Builder" sentinel.
+            runFixForAction(instruction, -1, undefined, { lockedSectionKey: sectionKey });
+          }}
+          onOpenCoverLetter={(input) => {
+            setCoverLetterPrefill(input);
+            setJdMatchOpen(false);
+            setCoverLetterOpen(true);
+          }}
         />
       )}
 
@@ -1901,6 +1931,27 @@ export default function ResumeBuilder({
 
             {activeTab === "report" && effectiveAnalysis && (
               <div className="p-4" style={{ animation: "fadeIn 200ms ease" }} ref={reportRef}>
+                {/* JD match CTA — sits above the general report. The general
+                    report is role-agnostic; this is the JD-specific one. */}
+                <div className="mb-4 rounded-xl border border-[#2a2a2a] bg-[#0d0d0d] px-4 py-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center flex-shrink-0">
+                    <Target className="w-4 h-4 text-gray-300" strokeWidth={1.75} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white">Match against a specific job</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Paste, upload, or link a JD. Get a fit score + targeted rewrites.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setJdMatchOpen(true)}
+                    disabled={!editedExtraction && !resumeExtraction}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-black disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  >
+                    Match a JD →
+                  </button>
+                </div>
+
                 <ResumeReportCard
                   analysis={effectiveAnalysis}
                   candidateName={resumeExtraction?.name}

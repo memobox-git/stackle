@@ -9,17 +9,25 @@ interface CoverLetterModalProps {
   // Optional defaults — auto-fill the role field when open if the user has
   // a target role on file (e.g. from the analysis).
   defaultRole?: string | null;
+  // Strong prefills handed in by upstream flows (e.g. JD match clicked
+  // "Cover letter for this" — gives us company/role/JD all at once).
+  prefillCompany?: string;
+  prefillRole?: string;
+  prefillJobDescription?: string;
   onClose: () => void;
 }
 
 export default function CoverLetterModal({
   extraction,
   defaultRole,
+  prefillCompany,
+  prefillRole,
+  prefillJobDescription,
   onClose,
 }: CoverLetterModalProps) {
-  const [companyName, setCompanyName] = useState("");
-  const [roleTitle, setRoleTitle] = useState(defaultRole?.trim() ?? "");
-  const [jobDescription, setJobDescription] = useState("");
+  const [companyName, setCompanyName] = useState(prefillCompany ?? "");
+  const [roleTitle, setRoleTitle] = useState(prefillRole ?? defaultRole?.trim() ?? "");
+  const [jobDescription, setJobDescription] = useState(prefillJobDescription ?? "");
   const [letter, setLetter] = useState("");
   // Previous letters the user has rejected this session. Passed back to the
   // writer so Regenerate produces a genuinely different angle instead of a
