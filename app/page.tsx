@@ -38,6 +38,7 @@ import DriveVersionPanel from "@/components/DriveVersionPanel";
 import { IntakeData } from "@/components/IntakeForm";
 import type { User } from "@supabase/supabase-js";
 import OnboardingFlow from "@/components/OnboardingFlow";
+import AuthModal from "@/components/AuthModal";
 import LandingPage from "@/components/LandingPage";
 
 type ActiveView = "chat" | "resume-builder" | "drive";
@@ -94,6 +95,7 @@ export default function Page() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
 
   // ── Messages ──────────────────────────────────────────
@@ -1401,28 +1403,32 @@ export default function Page() {
   // ── Onboarding ────────────────────────────────────────
   if (!onboardingCompleted) {
     return (
-      <OnboardingFlow
-        onComplete={({ resumeText: rt, resumeFilename: rf, resumeExtraction: re, resumeAnalysis: ra, contact }) => {
-          if (rt) { setResumeText(rt); setResumeFilename(rf ?? undefined); }
-          // Merge contact fields back into the extraction so downstream consumers
-          // (synthesis prompt, Drive, chat) see the user-confirmed values.
-          if (contact && re) {
-            const name = `${contact.firstName} ${contact.lastName}`.trim();
-            const location = [contact.city, contact.state].filter(Boolean).join(", ");
-            setResumeExtraction({
-              ...re,
-              name: name || re.name,
-              email: contact.email || re.email,
-              phone: contact.phone || re.phone,
-              location: location || re.location,
-            });
-          } else if (re) {
-            setResumeExtraction(re);
-          }
-          if (ra) setResumeAnalysis(ra);
-          setOnboardingCompleted(true);
-        }}
-      />
+      <>
+        <OnboardingFlow
+          onComplete={({ resumeText: rt, resumeFilename: rf, resumeExtraction: re, resumeAnalysis: ra, contact }) => {
+            if (rt) { setResumeText(rt); setResumeFilename(rf ?? undefined); }
+            // Merge contact fields back into the extraction so downstream consumers
+            // (synthesis prompt, Drive, chat) see the user-confirmed values.
+            if (contact && re) {
+              const name = `${contact.firstName} ${contact.lastName}`.trim();
+              const location = [contact.city, contact.state].filter(Boolean).join(", ");
+              setResumeExtraction({
+                ...re,
+                name: name || re.name,
+                email: contact.email || re.email,
+                phone: contact.phone || re.phone,
+                location: location || re.location,
+              });
+            } else if (re) {
+              setResumeExtraction(re);
+            }
+            if (ra) setResumeAnalysis(ra);
+            setOnboardingCompleted(true);
+          }}
+          onSignIn={() => setShowAuthModal(true)}
+        />
+        {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      </>
     );
   }
 

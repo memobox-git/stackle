@@ -63,9 +63,12 @@ type Props = {
     resumeExtraction?: ResumeExtraction | null;
     resumeAnalysis?: ResumeAnalysis | null;
   }) => void;
+  // Returning user clicked "Sign in" — parent opens the AuthModal so they
+  // can sign in with magic link / Google instead of redoing onboarding.
+  onSignIn?: () => void;
 };
 
-export default function OnboardingFlow({ onComplete }: Props) {
+export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   // Editor state — shown after upload, before the user hits "Use this photo".
   // We keep `rawAvatarUrl` alive even after the user saves so they can click
@@ -341,7 +344,21 @@ export default function OnboardingFlow({ onComplete }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center py-16 px-6">
+    <div className="min-h-screen bg-white flex flex-col items-center py-16 px-6 relative">
+      {/* "Already have an account? Sign in" — top-right corner so returning
+          users have a way out of this onboarding flow without redoing it. */}
+      {onSignIn && (
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 text-xs text-gray-500">
+          Already have an account?{" "}
+          <button
+            onClick={onSignIn}
+            className="font-semibold text-gray-900 hover:text-black underline-offset-4 hover:underline"
+          >
+            Sign in
+          </button>
+        </div>
+      )}
+
       {/* Logo */}
       <div
         className="w-9 h-9 rounded-xl flex items-center justify-center text-black text-sm font-bold mb-14 flex-shrink-0"
