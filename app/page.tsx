@@ -105,6 +105,10 @@ export default function Page() {
   // mid-stream. Attached to orchestrate + synthesize — the two main fetches
   // kicked off from the user pressing Send in the chat input.
   const agentAbortRef = useRef<AbortController | null>(null);
+  // Ref mirrors the latest sendMessage closure so edit-and-resend can invoke
+  // the fresh version after a truncate-state update commits. Populated by the
+  // useEffect further down.
+  const sendMessageRef = useRef<((text: string) => void) | null>(null);
 
   // ── Resume state ──────────────────────────────────────
   const [resumeText, setResumeText] = useState<string | null>(null);
@@ -183,6 +187,19 @@ export default function Page() {
   const setMessages = isResumeMode ? setResumeMessages : setChatMessages;
   const input = isResumeMode ? resumeInput : chatInput;
   const setInput = isResumeMode ? setResumeInput : setChatInput;
+
+  // Edit a user message: truncate everything from that index onwards (the old
+  // reply is now stale), then resend the edited content through the normal
+  // sendMessage pipeline so the agent regenerates a fresh reply.
+  // sendMessage closes over the current messages array; after the truncate
+  // state update, the next render re-creates sendMessage. We access that
+  // fresh version via a ref (updated below) so the send actually uses the
+  // truncated history, not the stale one from this render's closure.
+  function handleEditUserMessage(index: number, newContent: string) {
+    const setMsgs = isResumeMode ? setResumeMessages : setChatMessages;
+    setMsgs((prev) => prev.slice(0, index));
+    setTimeout(() => sendMessageRef.current?.(newContent), 0);
+  }
 
   // ── Auth init ─────────────────────────────────────────
   useEffect(() => {
@@ -1200,6 +1217,9 @@ export default function Page() {
     [messages, setMessages, isLoading, isResumeMode, resumeText, resumeFilename, resumeExtraction, resumeAnalysis, intakeData, intakeStep, intakeAnswers, marketAnalysis, analyzedMarketKey, interviewPrepPlan]
   );
 
+  // Keep the edit-and-resend ref current with the latest sendMessage closure.
+  useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
+
   // ── Intake form submit ────────────────────────────────
 
   // ── Computed ──────────────────────────────────────────
@@ -1485,6 +1505,7 @@ export default function Page() {
                   setPendingBuilderInstruction(instruction);
                   setActiveView("resume-builder");
                 }}
+                onEditUserMessage={handleEditUserMessage}
               />
             )}
             <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-[#0d0d0d]">
@@ -1685,6 +1706,7 @@ export default function Page() {
             }}
             pendingInstruction={pendingBuilderInstruction}
             onPendingInstructionConsumed={() => setPendingBuilderInstruction(null)}
+            onEditUserMessage={handleEditUserMessage}
             onPushAssistantMessage={(text) => {
               const ts = now();
               setResumeMessages((prev) => {

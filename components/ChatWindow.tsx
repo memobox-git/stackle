@@ -45,6 +45,10 @@ interface ChatWindowProps {
   // Click the "Apply in Resume Builder →" button in main chat: switches view
   // and queues the instruction to auto-fire once Resume Builder mounts.
   onApplyInBuilder?: (instruction: string) => void;
+  // When provided, user messages show an edit pencil. Callback receives the
+  // index of the edited message + new content; parent is expected to truncate
+  // the conversation from that point and resend.
+  onEditUserMessage?: (index: number, newContent: string) => void;
 }
 
 function PrioritiesCard({
@@ -432,6 +436,7 @@ export default function ChatWindow({
   onStarterPromptClick,
   onChatEditPrompt,
   onApplyInBuilder,
+  onEditUserMessage,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -674,7 +679,14 @@ export default function ChatWindow({
 
         return (
           <div key={i}>
-            <Message message={displayMsg} />
+            <Message
+              message={displayMsg}
+              onEdit={
+                onEditUserMessage && msg.role === "user" && !msg.content.startsWith("__FILE_UPLOAD__:")
+                  ? (newContent) => onEditUserMessage(i, newContent)
+                  : undefined
+              }
+            />
             {applyInstruction && onApplyInBuilder && (
               <div className="w-full max-w-3xl mx-auto px-4 -mt-2 mb-4">
                 <button

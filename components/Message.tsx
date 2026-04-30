@@ -1,6 +1,7 @@
 "use client";
 
-import { MessageSquare } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { MessageSquare, Pencil, Check, X } from "lucide-react";
 
 export type MessageRole = "user" | "assistant";
 
@@ -12,6 +13,11 @@ export interface ChatMessage {
 
 interface MessageProps {
   message: ChatMessage;
+  // When provided on a user message, a pencil appears on hover. Clicking it
+  // opens inline-edit; on save the parent is expected to replace this
+  // message's content AND drop all subsequent messages (stale replies), then
+  // re-run the agent against the edited content.
+  onEdit?: (newContent: string) => void;
 }
 
 function inlineFormat(text: string): React.ReactNode {
@@ -207,9 +213,42 @@ function renderContent(content: string) {
   return elements;
 }
 
-export default function Message({ message }: MessageProps) {
+export default function Message({ message, onEdit }: MessageProps) {
   const isUser = message.role === "user";
   const ts = message.timestamp;
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(message.content);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (editing) {
+      textareaRef.current?.focus();
+      // Auto-grow once on open
+      const el = textareaRef.current;
+      if (el) {
+        el.style.height = "auto";
+        el.style.height = `${Math.min(el.scrollHeight, 300)}px`;
+      }
+    }
+  }, [editing]);
+
+  function startEdit() {
+    setDraft(message.content);
+    setEditing(true);
+  }
+  function cancelEdit() {
+    setEditing(false);
+    setDraft(message.content);
+  }
+  function commitEdit() {
+    const trimmed = draft.trim();
+    if (!trimmed || trimmed === message.content.trim()) {
+      setEditing(false);
+      return;
+    }
+    onEdit?.(trimmed);
+    setEditing(false);
+  }
 
   if (isUser) {
     return (
@@ -221,13 +260,64 @@ export default function Message({ message }: MessageProps) {
               {ts}
             </span>
           )}
+          {onEdit && !editing && (
+            <button
+              type="button"
+              onClick={startEdit}
+              title="Edit message"
+              aria-label="Edit message"
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white w-6 h-6 rounded-md flex items-center justify-center hover:bg-[#1a1a1a] mr-0.5"
+            >
+              <Pencil className="w-3 h-3" strokeWidth={1.75} />
+            </button>
+          )}
           <span className="text-xs text-gray-500 font-medium">You</span>
           <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-black text-[11px] font-bold">U</div>
         </div>
         {/* Bubble */}
-        <div className="max-w-[78%] bg-[#1e1e1e] border border-[#2a2a2a] text-gray-100 rounded-2xl rounded-tr-md px-5 py-3.5 text-base leading-7">
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        </div>
+        {editing ? (
+          <div className="max-w-[78%] w-full bg-[#1e1e1e] border border-[#3a3a3a] text-gray-100 rounded-2xl rounded-tr-md px-4 py-3 text-base leading-7"
+               style={{ boxShadow: "0 0 0 2px rgba(169, 154, 249, 0.25)" }}>
+            <textarea
+              ref={textareaRef}
+              value={draft}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                const el = e.currentTarget;
+                el.style.height = "auto";
+                el.style.height = `${Math.min(el.scrollHeight, 300)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commitEdit(); }
+                else if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
+              }}
+              className="w-full bg-transparent outline-none resize-none text-gray-100 leading-7"
+              rows={1}
+            />
+            <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-[#2a2a2a]">
+              <span className="text-[10px] text-gray-600 mr-auto">⌘↩ to save · Esc to cancel</span>
+              <button
+                type="button"
+                onClick={cancelEdit}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2.5 py-1.5 rounded-md hover:bg-[#2a2a2a] transition-colors"
+              >
+                <X className="w-3 h-3" strokeWidth={2} /> Cancel
+              </button>
+              <button
+                type="button"
+                onClick={commitEdit}
+                disabled={!draft.trim() || draft.trim() === message.content.trim()}
+                className="flex items-center gap-1 text-xs font-semibold text-black bg-white hover:bg-gray-100 disabled:bg-[#2a2a2a] disabled:text-gray-600 disabled:cursor-not-allowed px-3 py-1.5 rounded-md transition-colors"
+              >
+                <Check className="w-3 h-3" strokeWidth={2.25} /> Save & resend
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="max-w-[78%] bg-[#1e1e1e] border border-[#2a2a2a] text-gray-100 rounded-2xl rounded-tr-md px-5 py-3.5 text-base leading-7">
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          </div>
+        )}
       </div>
     );
   }

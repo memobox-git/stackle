@@ -10,6 +10,7 @@ const PDFViewer = dynamic(() => import("@/components/PDFViewer"), { ssr: false }
 const DocxViewer = dynamic(() => import("@/components/DocxViewer"), { ssr: false });
 import LiveEditableResume from "@/components/LiveEditableResume";
 import ResumeCompletionModal from "@/components/ResumeCompletionModal";
+import CoverLetterModal from "@/components/CoverLetterModal";
 import ResumeReportCard from "@/components/ResumeReportCard";
 import { ChatMessage } from "@/components/Message";
 import { ResumeExtraction, SkillGroup } from "@/lib/agents/schemas/resumeExtraction";
@@ -76,6 +77,7 @@ interface ResumeBuilderProps {
   // can clear the state (so refreshing or returning later doesn't re-fire).
   pendingInstruction?: string | null;
   onPendingInstructionConsumed?: () => void;
+  onEditUserMessage?: (index: number, newContent: string) => void;
   // Push a non-synthesis assistant message directly into the Resume Builder
   // chat (used for skills-gap surfacing and similar system prompts).
   onPushAssistantMessage?: (text: string) => void;
@@ -106,6 +108,7 @@ export default function ResumeBuilder({
   onStopAgent,
   pendingInstruction,
   onPendingInstructionConsumed,
+  onEditUserMessage,
   onPushAssistantMessage,
   onFileUpload,
   onUpdateExtraction,
@@ -1132,6 +1135,7 @@ export default function ResumeBuilder({
   const [copiedLink, setCopiedLink] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [downloadOpen, setDownloadOpen] = useState(false);
+  const [coverLetterOpen, setCoverLetterOpen] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
   function deriveScore(a: typeof resumeAnalysis): number {
@@ -1475,6 +1479,7 @@ export default function ResumeBuilder({
           resumeBuilderMode
           onStarterPromptClick={onInputChange}
           onChatEditPrompt={(text) => runFixForAction(text, -1)}
+          onEditUserMessage={onEditUserMessage}
         />
       )}
 
@@ -1567,6 +1572,14 @@ export default function ResumeBuilder({
       </div>
 
       {/* Completion modal — fires once the Fix cycle exhausts with ≥3 accepted */}
+      {coverLetterOpen && (
+        <CoverLetterModal
+          extraction={editedExtraction ?? resumeExtraction ?? null}
+          defaultRole={resumeAnalysis?.likelyTargetRole ?? null}
+          onClose={() => setCoverLetterOpen(false)}
+        />
+      )}
+
       {showCompletionModal && resumeAnalysis && (
         <ResumeCompletionModal
           baseScore={completionBaseScore || deriveScore(resumeAnalysis)}
@@ -1623,6 +1636,10 @@ export default function ResumeBuilder({
           }}
           onCopyShareLink={() => {
             handleShareReviewLink();
+          }}
+          onWriteCoverLetter={() => {
+            setShowCompletionModal(false);
+            setCoverLetterOpen(true);
           }}
           onKeepEditing={() => {
             setShowCompletionModal(false);
@@ -1798,7 +1815,15 @@ export default function ResumeBuilder({
                   {shareOpen && (
                     <>
                       <div className="fixed inset-0 z-30" onClick={() => setShareOpen(false)} />
-                      <div className="absolute right-0 top-full mt-1 z-40 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg overflow-hidden min-w-[200px]">
+                      <div className="absolute right-0 top-full mt-1 z-40 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg overflow-hidden min-w-[220px]">
+                        <button
+                          onClick={() => { setShareOpen(false); setCoverLetterOpen(true); }}
+                          disabled={!editedExtraction}
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-[#252525] hover:text-white transition-colors border-b border-[#2a2a2a] disabled:opacity-50"
+                        >
+                          <Mail className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
+                          <span>Generate cover letter</span>
+                        </button>
                         <button
                           onClick={() => { setShareOpen(false); handleCopyLink(); }}
                           disabled={isCopying}

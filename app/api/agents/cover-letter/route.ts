@@ -30,6 +30,9 @@ interface CoverLetterRequest {
   jobDescription?: string;
   companyName?: string;
   roleTitle?: string;
+  // Previous letter drafts the user rejected via Regenerate. Feed them back
+  // so the next attempt picks a different angle / opening / emphasis.
+  previousAttempts?: string[];
 }
 
 function summarizeExtraction(ext: ResumeExtraction): string {
@@ -63,8 +66,11 @@ export async function POST(req: NextRequest) {
       : "";
     const companyBlock = body.companyName ? `\nCompany: ${body.companyName}` : "";
     const roleBlock = body.roleTitle ? `\nRole: ${body.roleTitle}` : "";
+    const previousBlock = body.previousAttempts && body.previousAttempts.length > 0
+      ? `\n\nPrevious drafts the user REJECTED. Produce something substantively different — different opening angle, different emphasis, different tone. Do not paraphrase these:\n${body.previousAttempts.map((p, i) => `  [${i + 1}] ${p}`).join("\n\n")}`
+      : "";
 
-    const userMessage = `Resume:\n${summarizeExtraction(body.extraction)}${companyBlock}${roleBlock}${jdBlock}
+    const userMessage = `Resume:\n${summarizeExtraction(body.extraction)}${companyBlock}${roleBlock}${jdBlock}${previousBlock}
 
 Write the cover letter.`;
 

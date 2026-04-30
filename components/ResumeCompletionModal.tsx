@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Link2, CheckCircle2, X } from "lucide-react";
+import { Download, Link2, Mail, CheckCircle2, X } from "lucide-react";
 
 interface ResumeCompletionModalProps {
   baseScore: number;
@@ -23,6 +23,9 @@ interface ResumeCompletionModalProps {
   onSaveAsVersion: (name: string) => void;
   onDownloadPdf: () => void;
   onCopyShareLink: () => void;
+  // Optional: opens the cover letter modal pre-filled with the finalized
+  // resume. Third secondary CTA; hidden if not provided.
+  onWriteCoverLetter?: () => void;
   onKeepEditing: () => void;
   isSaving?: boolean;
 }
@@ -47,6 +50,7 @@ export default function ResumeCompletionModal({
   onSaveAsVersion,
   onDownloadPdf,
   onCopyShareLink,
+  onWriteCoverLetter,
   onKeepEditing,
   isSaving,
 }: ResumeCompletionModalProps) {
@@ -171,7 +175,7 @@ export default function ResumeCompletionModal({
           >
             {isSaving ? "Saving…" : `Save as "${(name.trim() || suggestedName).slice(0, 34)}"`}
           </button>
-          <div className="grid grid-cols-2 gap-2">
+          <div className={`grid ${onWriteCoverLetter ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
             <button
               onClick={onDownloadPdf}
               className="py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
@@ -184,6 +188,14 @@ export default function ResumeCompletionModal({
             >
               <Link2 className="w-3 h-3" strokeWidth={1.75} /> Share link
             </button>
+            {onWriteCoverLetter && (
+              <button
+                onClick={onWriteCoverLetter}
+                className="py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+              >
+                <Mail className="w-3 h-3" strokeWidth={1.75} /> Cover letter
+              </button>
+            )}
           </div>
           <button
             onClick={onKeepEditing}
