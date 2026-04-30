@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Plus_Jakarta_Sans, Geist_Mono, Montserrat } from "next/font/google";
 import "./globals.css";
+import FeedbackButton from "@/components/FeedbackButton";
 
 const jakartaSans = Plus_Jakarta_Sans({
   variable: "--font-jakarta-sans",
@@ -34,7 +35,13 @@ export default function RootLayout({
       lang="en"
       className={`${jakartaSans.variable} ${geistMono.variable} ${montserrat.variable} h-full antialiased`}
     >
-      <body className="h-full flex flex-col">{children}</body>
+      <body className="h-full flex flex-col">
+        {children}
+        {/* Floating "Send feedback" pill — pinned bottom-right on every
+            page. Captures URL + UA automatically; users only type their
+            note. POSTs to /api/feedback → Supabase `feedback` table. */}
+        <FeedbackButton />
+      </body>
     </html>
   );
 }
