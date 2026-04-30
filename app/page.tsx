@@ -93,6 +93,7 @@ export default function Page() {
   const [activeView, setActiveView] = useState<ActiveView>("resume-builder");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
 
   // ── Messages ──────────────────────────────────────────
@@ -614,7 +615,25 @@ export default function Page() {
 
   async function handleSignOut() {
     const supabase = getSupabaseClient();
-    await supabase.auth.signOut();
+    try { await supabase.auth.signOut(); } catch { /* ignore — we'll force-clear anyway */ }
+    // Nuke everything stackle-owned in localStorage. The Supabase signOut
+    // alone leaves chats / drive / onboarding behind, which means the next
+    // user to land here re-hydrates the previous user's resume.
+    if (typeof window !== "undefined") {
+      try {
+        const keysToKill: string[] = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const k = window.localStorage.key(i);
+          if (k && (k.startsWith("stackle") || k.startsWith("sb-") || k.includes("supabase"))) {
+            keysToKill.push(k);
+          }
+        }
+        keysToKill.forEach((k) => window.localStorage.removeItem(k));
+      } catch { /* ignore quota / private-mode errors */ }
+      // Hard reload to root — flushes every in-memory state, every cached
+      // chat, every reachable bit of the previous identity. Belt + braces.
+      window.location.href = "/";
+    }
   }
 
   // ── Chat session actions ───────────────────────────────
@@ -1459,6 +1478,40 @@ export default function Page() {
               <span className="text-xs font-medium px-2.5 py-1 rounded-full border text-[#e0e0e0] bg-[#1e1e1e] border-[#2a2a2a]">
                 {MODE_LABELS[activeMode] ?? activeMode}
               </span>
+            )}
+            {/* User pill — reachable from anywhere, including mobile and
+                collapsed-sidebar layouts. Hover/click reveals sign out. */}
+            {isSignedUp && (
+              <div className="relative group">
+                <button
+                  onClick={() => setUserMenuOpen((v) => !v)}
+                  title={user?.email ?? "Account"}
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-[#2a2a2a] bg-[#1a1a1a] text-gray-300 hover:bg-[#252525] hover:text-white transition-colors max-w-[180px]"
+                >
+                  <span className="w-5 h-5 rounded-full bg-white text-black text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                    {(user?.email ?? "?").slice(0, 1).toUpperCase()}
+                  </span>
+                  <span className="truncate">{user?.email ?? "Account"}</span>
+                </button>
+                {userMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
+                    <div className="absolute right-0 top-full mt-1 z-40 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg overflow-hidden min-w-[200px]">
+                      <div className="px-3 py-2 border-b border-[#2a2a2a]">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-600">Signed in as</p>
+                        <p className="text-xs text-gray-300 truncate mt-0.5">{user?.email ?? "—"}</p>
+                      </div>
+                      <button
+                        onClick={() => { setUserMenuOpen(false); handleSignOut(); }}
+                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-rose-400 hover:bg-rose-950/30 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" strokeWidth={1.75} />
+                        Sign out
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
           </div>
         </header>
