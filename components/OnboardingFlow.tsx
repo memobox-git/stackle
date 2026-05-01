@@ -62,6 +62,10 @@ type Props = {
     contact?: ContactInfo;
     resumeExtraction?: ResumeExtraction | null;
     resumeAnalysis?: ResumeAnalysis | null;
+    // The user's stated goal from the new step 3. Free-form string,
+    // typically one of the preset chips. Drives the Career Profile
+    // CTA emphasis + gets injected into the synthesis system prompt.
+    careerGoal?: string | null;
   }) => void;
   // Returning user clicked "Sign in" — parent opens the AuthModal so they
   // can sign in with magic link / Google instead of redoing onboarding.
@@ -80,7 +84,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   const [avatarDragging, setAvatarDragging] = useState(false);
   const avatarDragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
   const rawImgRef = useRef<HTMLImageElement>(null);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [uploading, setUploading] = useState(false);
   const [resumeFilename, setResumeFilename] = useState("");
   const [resumeText, setResumeText] = useState("");
@@ -89,7 +93,10 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   const resumeAnalysisRef = useRef<ResumeAnalysis | null>(null);
   const analysisInFlightRef = useRef<Promise<ResumeAnalysis | null> | null>(null);
 
-  // Step 3 — extracted contact, editable by user
+  // Step 3 — Career Goal
+  const [careerGoal, setCareerGoal] = useState<string | null>(null);
+
+  // Step 4 — extracted contact, editable by user
   const [contact, setContact] = useState<ContactInfo>({
     firstName: "", lastName: "", email: "", phone: "", city: "", state: "",
   });
@@ -102,18 +109,21 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
   const q1 = useTypewriter("Add a profile photo");
   const q2 = useTypewriter(step >= 2 ? "Upload your resume" : "");
-  const q3 = useTypewriter(step >= 3 ? "Here's what I found — update anything that looks off." : "");
+  // Step 3 — Career Goal question (NEW). Personalises later screens.
+  const q3 = useTypewriter(step >= 3 ? "What are you trying to do?" : "");
+  // Step 4 — Confirm extracted contact (was step 3 pre-feature).
+  const q4 = useTypewriter(step >= 4 ? "Here's what I found — update anything that looks off." : "");
 
-  // Typewriter for each field value (starts only after q3 finishes)
-  const fnTW = useFieldTypewriter(step === 3 && q3.done ? contact.firstName : "", 0);
-  const lnTW = useFieldTypewriter(step === 3 && q3.done ? contact.lastName : "", 200);
-  const emTW = useFieldTypewriter(step === 3 && q3.done ? contact.email : "", 400);
-  const phTW = useFieldTypewriter(step === 3 && q3.done ? contact.phone : "", 600);
-  const ciTW = useFieldTypewriter(step === 3 && q3.done ? contact.city : "", 800);
-  const stTW = useFieldTypewriter(step === 3 && q3.done ? contact.state : "", 1000);
+  // Typewriter for each field value (starts only after q4 finishes)
+  const fnTW = useFieldTypewriter(step === 4 && q4.done ? contact.firstName : "", 0);
+  const lnTW = useFieldTypewriter(step === 4 && q4.done ? contact.lastName : "", 200);
+  const emTW = useFieldTypewriter(step === 4 && q4.done ? contact.email : "", 400);
+  const phTW = useFieldTypewriter(step === 4 && q4.done ? contact.phone : "", 600);
+  const ciTW = useFieldTypewriter(step === 4 && q4.done ? contact.city : "", 800);
+  const stTW = useFieldTypewriter(step === 4 && q4.done ? contact.state : "", 1000);
 
   useEffect(() => {
-    if (step === 3 && stTW.done) setFieldsReady(true);
+    if (step === 4 && stTW.done) setFieldsReady(true);
   }, [step, stTW.done]);
 
   useEffect(() => {
@@ -325,6 +335,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
       contact: finalContact,
       resumeExtraction: resumeExtraction ?? null,
       resumeAnalysis: analysisSoFar ?? null,
+      careerGoal: careerGoal ?? null,
     };
     localStorage.setItem(
       "stackle_onboarding",
@@ -343,9 +354,8 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
     onComplete(profile);
   }
 
-  // Step indicator — labelled dots at the top show the user where they are
-  // in the 3-step onboarding so it doesn't feel infinite.
-  const STEP_LABELS = ["Photo", "Resume", "Confirm"] as const;
+  // Step indicator — labelled dots at the top.
+  const STEP_LABELS = ["Photo", "Resume", "Goal", "Confirm"] as const;
 
   return (
     <div className="min-h-screen flex flex-col items-center py-12 sm:py-16 px-6 relative overflow-hidden">
@@ -631,15 +641,72 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
           </div>
         )}
 
-        {/* Step 3 — Review extracted contact */}
+        {/* Step 3 — Career Goal */}
         {step === 3 && (
-          <div className="animate-fadein flex flex-col gap-5">
+          <div className="animate-fadein flex flex-col gap-4">
             <p className="text-xl font-semibold text-gray-900">
               {q3.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q3.done ? "opacity-0" : "animate-pulse"}`} />
             </p>
 
-            {q3.done && <div className="flex flex-col gap-3">
+            {q3.done && (() => {
+              const targetRole = resumeAnalysisRef.current?.likelyTargetRole?.trim();
+              // Personalised top option when we know the target role.
+              const topOption = targetRole
+                ? `Land a ${targetRole} role`
+                : "Land my next role";
+              const goalOptions = [
+                topOption,
+                "Improve my resume",
+                "Switch into a different role",
+                "Prepare for interviews",
+                "Find projects to build",
+                "Not sure yet",
+              ];
+              return (
+                <div className="flex flex-col gap-2">
+                  {goalOptions.map((opt) => {
+                    const selected = careerGoal === opt;
+                    return (
+                      <button
+                        key={opt}
+                        onClick={() => {
+                          setCareerGoal(opt);
+                          // Defer so the user briefly sees the selected
+                          // state before advancing. ~300ms feels intentional.
+                          setTimeout(() => setStep(4), 300);
+                        }}
+                        className={`text-left px-4 py-3 rounded-xl border text-sm transition-all ${
+                          selected
+                            ? "border-gray-900 bg-gray-900 text-white"
+                            : "border-gray-200 bg-white text-gray-800 hover:border-gray-400 hover:bg-gray-50"
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                  <button
+                    onClick={() => { setCareerGoal(null); setStep(4); }}
+                    className="text-xs text-gray-400 hover:text-gray-600 mt-1 self-start"
+                  >
+                    Skip — I'll figure it out as I go
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {/* Step 4 — Review extracted contact */}
+        {step === 4 && (
+          <div className="animate-fadein flex flex-col gap-5">
+            <p className="text-xl font-semibold text-gray-900">
+              {q4.displayed}
+              <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q4.done ? "opacity-0" : "animate-pulse"}`} />
+            </p>
+
+            {q4.done && <div className="flex flex-col gap-3">
               <div className="flex gap-3">
                 <div className="flex-1 flex flex-col gap-1">
                   <label className="text-xs text-gray-400">First name</label>

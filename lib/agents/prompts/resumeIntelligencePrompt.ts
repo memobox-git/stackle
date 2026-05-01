@@ -201,5 +201,20 @@ Return exactly this structure:
     "notes": string[] (min 3, specific issues found, no generic statements)
   },
   "rewritePriorities": string[] (6-10 items, sorted HIGH to LOW priority, format: "HIGH — Fix X because Y"),
-  "suggestedNextSteps": string[] (6-10 ranked actions)
+  "suggestedNextSteps": string[] (6-10 ranked actions),
+  "bestFitRoles": [
+    {
+      "title": string,       // e.g. "Data Engineer"
+      "matchPct": number,    // 0-100, calibrated honestly
+      "reason": string       // ONE sentence on why this role fits
+    }
+    // Exactly 3 entries, ordered by matchPct desc. The top entry should
+    // mirror likelyTargetRole. The next two are ADJACENT roles the
+    // candidate could plausibly aim at given current experience — not
+    // wildly different ones. Calibration:
+    //   85-100  Strong fit — resume already reads as this role.
+    //   70-84   Good fit — needs minor positioning to land it.
+    //   55-69   Stretch — possible with deliberate skill-up.
+    //   <55     Don't list. Pick a different adjacent role instead.
+  ]
 }`;

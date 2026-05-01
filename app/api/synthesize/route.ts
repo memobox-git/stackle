@@ -9,7 +9,7 @@ import { rateLimit } from "@/lib/rateLimit";
 export async function POST(req: NextRequest) {
   const __rl = rateLimit(req, { limit: 40, windowMs: 60000 });
   if (__rl.blocked) return __rl.response;
-  const { messages, resumeText, resumeExtraction, resumeAnalysis, marketAnalysis, orchestratorDecision, interviewPrepPlan, mode } = await req.json();
+  const { messages, resumeText, resumeExtraction, resumeAnalysis, marketAnalysis, orchestratorDecision, interviewPrepPlan, mode, careerGoal } = await req.json();
 
   const workspace: WorkspaceViewModel = {
     conversationHistory: messages ?? [],
@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
     marketAnalysis: marketAnalysis ?? null,
     interviewPrepPlan: interviewPrepPlan ?? null,
     mode: mode ?? "chat",
+    careerGoal: careerGoal ?? null,
   };
 
   const stream = await runFinalSynthesis(workspace);

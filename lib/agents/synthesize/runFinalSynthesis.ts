@@ -63,6 +63,14 @@ Summary: ${(ext.summary ?? "").slice(0, 400)}`);
     parts.push("\nResume text: not uploaded yet.");
   }
 
+  // The user told us their goal during onboarding. Surface it as a hard
+  // constraint on the agent's framing so we don't drift into unrelated
+  // career topics. If they said "Improve my resume", lean toward resume
+  // suggestions; if "Prepare for interviews", lean toward prep tactics.
+  if (workspace.careerGoal && workspace.careerGoal.trim()) {
+    parts.push(`\nUser's stated goal: "${workspace.careerGoal.trim()}". Reference it naturally if relevant; never ignore it.`);
+  }
+
   return parts.join("\n");
 }
 

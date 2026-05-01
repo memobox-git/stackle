@@ -13,4 +13,8 @@ export interface WorkspaceViewModel {
   marketAnalysis: MarketAnalysis | null;
   interviewPrepPlan: InterviewPrepPlan | null;
   mode: "chat" | "resume_builder";
+  // The user's stated goal from the onboarding Career Goal step.
+  // When present, fed into the synthesis prompt so the agent stays
+  // focused on what the user actually came for. Null when not set.
+  careerGoal?: string | null;
 }

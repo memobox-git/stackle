@@ -33,4 +33,13 @@ export interface ResumeAnalysis {
   };
   rewritePriorities: string[];
   suggestedNextSteps: string[];
+  // Three best-fit roles ordered by match. Powers the Career Profile
+  // landing screen. Top role usually mirrors `likelyTargetRole`; the next
+  // two are adjacent roles the resume could plausibly aim at. Optional
+  // for backwards-compat with older analyses cached pre-feature.
+  bestFitRoles?: {
+    title: string;       // e.g. "Data Engineer"
+    matchPct: number;    // 0-100
+    reason: string;      // 1-line justification
+  }[];
 }

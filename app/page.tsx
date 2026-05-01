@@ -40,8 +40,9 @@ import type { User } from "@supabase/supabase-js";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import AuthModal from "@/components/AuthModal";
 import LandingPage from "@/components/LandingPage";
+import CareerProfile from "@/components/CareerProfile";
 
-type ActiveView = "chat" | "resume-builder" | "drive";
+type ActiveView = "chat" | "resume-builder" | "drive" | "career-profile";
 
 // Instant dark tooltip shown to the right of a collapsed sidebar icon.
 // Uses Tailwind's group-hover; must live inside a parent with `relative group`.
@@ -82,6 +83,11 @@ export default function Page() {
   const [authSent, setAuthSent] = useState(false);
   const [authError, setAuthError] = useState("");
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+
+  // ── Career goal (from onboarding step 3) ──────────────
+  // Hoisted to component scope so synthesis prompt + Career Profile
+  // landing screen can both read it.
+  const [careerGoal, setCareerGoal] = useState<string | null>(null);
 
   // ── Chat sessions ─────────────────────────────────────
   const [chatList, setChatList] = useState<SupabaseChat[]>([]);
@@ -505,6 +511,7 @@ export default function Page() {
     const msgs = chat.messages ?? [];
     setChatMessages(msgs);
     setActiveView(chat.mode === "resume_builder" ? "resume-builder" : "chat");
+    setCareerGoal(chat.career_goal ?? null);
     // If the restored chat already has messages, mark the welcome as fired
     // so we don't seed a new welcome on top of the existing thread.
     if (msgs.length > 0) welcomeFiredRef.current.add(chat.id);
@@ -603,6 +610,8 @@ export default function Page() {
       resumeFilename?: string;
       resumeExtraction?: ResumeExtraction | null;
       resumeAnalysis?: ResumeAnalysis | null;
+      careerGoal?: string | null;
+      careerProfileSeen?: boolean;
     }
   ) {
     // TEMP diagnostic: confirm every persistChat fires when expected.
@@ -616,6 +625,8 @@ export default function Page() {
       resume_filename: extra?.resumeFilename,
       resume_extraction: extra?.resumeExtraction ?? undefined,
       resume_analysis: extra?.resumeAnalysis ?? undefined,
+      career_goal: extra?.careerGoal ?? undefined,
+      career_profile_seen: extra?.careerProfileSeen ?? undefined,
     }).catch((err) => {
       // Surface persistence failures so silent data loss is at least
       // observable in the console and via a custom event for future toasts.
@@ -1161,6 +1172,7 @@ export default function Page() {
             orchestratorDecision: decision,
             interviewPrepPlan: currentInterviewPlan,
             mode: isResumeMode ? "resume_builder" : "chat",
+            careerGoal,
           }),
         });
 
@@ -1209,6 +1221,7 @@ export default function Page() {
             resumeFilename,
             resumeExtraction,
             resumeAnalysis: finalAnalysis,
+            careerGoal,
           });
         }
 
@@ -1279,6 +1292,7 @@ export default function Page() {
       : null;
 
   const NAV_ITEMS = [
+    { key: "career-profile" as ActiveView, label: "Career Profile", icon: ClipboardList },
     { key: "resume-builder" as ActiveView, label: "Resume Builder", icon: FileText },
     { key: "drive" as ActiveView, label: "Drive", icon: FolderOpen },
   ];
@@ -1434,7 +1448,7 @@ export default function Page() {
     return (
       <>
         <OnboardingFlow
-          onComplete={({ resumeText: rt, resumeFilename: rf, resumeExtraction: re, resumeAnalysis: ra, contact }) => {
+          onComplete={({ resumeText: rt, resumeFilename: rf, resumeExtraction: re, resumeAnalysis: ra, contact, careerGoal: goal }) => {
             if (rt) { setResumeText(rt); setResumeFilename(rf ?? undefined); }
             // Merge contact fields back into the extraction so downstream consumers
             // (synthesis prompt, Drive, chat) see the user-confirmed values.
@@ -1452,6 +1466,10 @@ export default function Page() {
               setResumeExtraction(re);
             }
             if (ra) setResumeAnalysis(ra);
+            if (goal) setCareerGoal(goal);
+            // Land on the Career Profile screen first — the "this knows me"
+            // moment. Skips straight to chat if no extraction was parsed.
+            setActiveView(re ? "career-profile" : "chat");
             setOnboardingCompleted(true);
           }}
           onSignIn={() => setShowAuthModal(true)}
@@ -1552,7 +1570,34 @@ export default function Page() {
         </header>
 
         {/* Content */}
-        {activeView === "chat" ? (
+        {activeView === "career-profile" ? (
+          /* Career Profile landing page — the "this knows me" moment.
+             Shown automatically right after onboarding (when extraction is
+             ready); re-openable any time from the sidebar. */
+          <CareerProfile
+            extraction={resumeExtraction}
+            analysis={resumeAnalysis}
+            careerGoal={careerGoal}
+            onFixResume={() => {
+              if (activeChatId) persistChat(activeChatId, chatMessages, "resume_builder", { careerProfileSeen: true });
+              setActiveView("resume-builder");
+            }}
+            onCompareJD={() => {
+              if (activeChatId) persistChat(activeChatId, chatMessages, "resume_builder", { careerProfileSeen: true });
+              // Land in resume-builder so the JDMatchModal trigger is reachable.
+              // The user opens it via the existing CTA in the Report tab.
+              setActiveView("resume-builder");
+            }}
+            onContinueToChat={() => {
+              if (activeChatId) persistChat(activeChatId, chatMessages, "chat", { careerProfileSeen: true });
+              setActiveView("chat");
+            }}
+            onClose={() => {
+              if (activeChatId) persistChat(activeChatId, chatMessages, isResumeMode ? "resume_builder" : "chat", { careerProfileSeen: true });
+              setActiveView("chat");
+            }}
+          />
+        ) : activeView === "chat" ? (
           /* Chat view */
           <div className="flex flex-col flex-1 min-h-0">
             {chatMessages.length === 0 && !isLoading ? (

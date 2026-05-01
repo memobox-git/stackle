@@ -13,6 +13,12 @@ export interface SupabaseChat {
   resume_filename: string | null;
   resume_extraction: ResumeExtraction | null;
   resume_analysis: ResumeAnalysis | null;
+  // The user's stated goal from onboarding's Career Goal question.
+  // Null when the chat predates the feature OR the user skipped.
+  career_goal: string | null;
+  // Whether the user has already seen the Career Profile landing screen
+  // for this chat. Set on first dismissal so it doesn't keep popping up.
+  career_profile_seen: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -38,7 +44,13 @@ function readLocalChats(): SupabaseChat[] {
   const raw = localStorage.getItem(LOCAL_CHATS_KEY);
   if (!raw) return [];
   try {
-    return JSON.parse(raw) as SupabaseChat[];
+    const parsed = JSON.parse(raw) as Partial<SupabaseChat>[];
+    // Backfill defaults for chats stored before the career_profile fields existed.
+    return parsed.map((c) => ({
+      ...(c as SupabaseChat),
+      career_goal: c.career_goal ?? null,
+      career_profile_seen: c.career_profile_seen ?? false,
+    }));
   } catch (err) {
     console.error("[chats] stackle_chats JSON corrupted, resetting:", err);
     try { localStorage.removeItem(LOCAL_CHATS_KEY); } catch { /* ignore */ }
@@ -73,10 +85,15 @@ export async function loadChats(): Promise<SupabaseChat[]> {
   try {
     const { data, error } = await supabase
       .from("chats")
-      .select("id, title, mode, messages, resume_text, resume_filename, resume_extraction, resume_analysis, created_at, updated_at")
+      .select("id, title, mode, messages, resume_text, resume_filename, resume_extraction, resume_analysis, career_goal, career_profile_seen, created_at, updated_at")
       .order("updated_at", { ascending: false });
     if (error) throw error;
-    return (data ?? []) as SupabaseChat[];
+    // Backfill defaults for older rows that predate the career-profile feature.
+    return (data ?? []).map((row) => ({
+      ...row,
+      career_goal: row.career_goal ?? null,
+      career_profile_seen: row.career_profile_seen ?? false,
+    })) as SupabaseChat[];
   } catch (err) {
     console.error("[chats] loadChats Supabase error, falling back to local:", err);
     return readLocalChats().sort((a, b) => b.updated_at.localeCompare(a.updated_at));
@@ -88,6 +105,7 @@ export interface ChatSeed {
   resumeFilename?: string | null;
   resumeExtraction?: ResumeExtraction | null;
   resumeAnalysis?: ResumeAnalysis | null;
+  careerGoal?: string | null;
 }
 
 export async function createChat(
@@ -108,6 +126,8 @@ export async function createChat(
       resume_filename: seed?.resumeFilename ?? null,
       resume_extraction: seed?.resumeExtraction ?? null,
       resume_analysis: seed?.resumeAnalysis ?? null,
+      career_goal: seed?.careerGoal ?? null,
+      career_profile_seen: false,
       created_at: nowISO(),
       updated_at: nowISO(),
     };
@@ -128,6 +148,7 @@ export async function createChat(
       resume_filename: seed?.resumeFilename ?? null,
       resume_extraction: seed?.resumeExtraction ?? null,
       resume_analysis: seed?.resumeAnalysis ?? null,
+      career_goal: seed?.careerGoal ?? null,
     })
     .select()
     .single();
@@ -137,7 +158,7 @@ export async function createChat(
 
 export async function updateChat(
   id: string,
-  patch: Partial<Pick<SupabaseChat, "title" | "messages" | "mode" | "resume_text" | "resume_filename" | "resume_extraction" | "resume_analysis">>
+  patch: Partial<Pick<SupabaseChat, "title" | "messages" | "mode" | "resume_text" | "resume_filename" | "resume_extraction" | "resume_analysis" | "career_goal" | "career_profile_seen">>
 ): Promise<void> {
   const supabase = getSupabaseClient();
   const { data: { user } } = await supabase.auth.getUser();
