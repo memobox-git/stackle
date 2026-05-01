@@ -40,9 +40,8 @@ import type { User } from "@supabase/supabase-js";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import AuthModal from "@/components/AuthModal";
 import LandingPage from "@/components/LandingPage";
-import CareerProfile from "@/components/CareerProfile";
 
-type ActiveView = "chat" | "resume-builder" | "drive" | "career-profile";
+type ActiveView = "chat" | "resume-builder" | "drive";
 
 // Instant dark tooltip shown to the right of a collapsed sidebar icon.
 // Uses Tailwind's group-hover; must live inside a parent with `relative group`.
@@ -463,24 +462,62 @@ export default function Page() {
     if (!activeChatId) return;
     if (welcomeFiredRef.current.has(activeChatId)) return;
     if (chatMessages.length > 0) return;
+    // Wait for analysis if it's actively loading — the rich welcome
+    // depends on bestFitRoles / strengths / weaknesses. If analysis isn't
+    // running anymore (failed or never started), proceed with header-only.
+    if (isAnalyzingResume && !resumeAnalysis) return;
     welcomeFiredRef.current.add(activeChatId);
 
     const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || "there";
-    // Prefer a real employer — skip self-initiated / academic / project rows
-    // so we don't call a weekend project "a job".
     const realJob = firstRealJob(resumeExtraction);
     const years = resumeExtraction.totalYearsExperience;
+    // Header — punchy, references real role + tenure when we have them.
     let header: string;
     if (realJob) {
-      header = `Hey ${firstName} — saw the resume. ${realJob.title} at ${realJob.company}. What's going on?`;
+      header = `Hey ${firstName} — read through your resume. ${realJob.title} at ${realJob.company}${typeof years === "number" && years > 0 ? `, ${years} years in.` : "."}`;
     } else if (typeof years === "number" && years > 0) {
-      header = `Hey ${firstName} — saw the resume. ${years} years of experience — what's going on?`;
+      header = `Hey ${firstName} — read through your resume. ${years} years of experience.`;
     } else {
-      header = `Hey ${firstName} — saw the resume. What's going on?`;
+      header = `Hey ${firstName} — read through your resume.`;
     }
 
+    // Optional rich profile body — only when analysis has landed. If it's
+    // still in flight, ship just the header now; a follow-up message can
+    // drop in later if we want it.
+    const bodyParts: string[] = [];
+    const bestFit = resumeAnalysis?.bestFitRoles ?? [];
+    if (bestFit.length > 0) {
+      const top = bestFit[0];
+      const adjacent = bestFit.slice(1, 3).map((r) => r.title).filter(Boolean);
+      const adjPart = adjacent.length > 0 ? ` Also adjacent: ${adjacent.join(", ")}.` : "";
+      bodyParts.push(`Closest match: **${top.title}** (${top.matchPct}%).${adjPart}`);
+    } else if (resumeAnalysis?.likelyTargetRole) {
+      bodyParts.push(`Closest match: **${resumeAnalysis.likelyTargetRole}**.`);
+    }
+
+    const strengths = (resumeAnalysis?.strengths ?? []).slice(0, 3);
+    if (strengths.length > 0) {
+      bodyParts.push(`What's working:\n${strengths.map((s) => `- ${s}`).join("\n")}`);
+    }
+
+    const weak = (resumeAnalysis?.weaknesses ?? []).slice(0, 2);
+    const gaps = (resumeAnalysis?.keywordGaps ?? []).slice(0, 3);
+    if (weak.length > 0 || gaps.length > 0) {
+      const lines: string[] = [];
+      weak.forEach((w) => lines.push(`- ${w}`));
+      if (gaps.length > 0) lines.push(`- Missing keywords: ${gaps.join(", ")}`);
+      bodyParts.push(`What's holding you back:\n${lines.join("\n")}`);
+    }
+
+    const closer = careerGoal
+      ? `You said your goal is *${careerGoal}*. Want to start there, or talk about something else?`
+      : `What's going on?`;
+    bodyParts.push(closer);
+
+    const fullBody = bodyParts.length > 0 ? `\n\n${bodyParts.join("\n\n")}` : "";
+
     const greetMsgs: ChatMessage[] = [
-      { role: "assistant", content: header, timestamp: now() },
+      { role: "assistant", content: `${header}${fullBody}`, timestamp: now() },
     ];
     setChatMessages(greetMsgs);
 
@@ -494,7 +531,7 @@ export default function Page() {
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeView, resumeExtraction, chatMessages.length]);
+  }, [activeView, resumeExtraction, resumeAnalysis, isAnalyzingResume, chatMessages.length]);
 
   // ── Timestamp helper ──────────────────────────────────
   function now() {
@@ -1292,7 +1329,6 @@ export default function Page() {
       : null;
 
   const NAV_ITEMS = [
-    { key: "career-profile" as ActiveView, label: "Career Profile", icon: ClipboardList },
     { key: "resume-builder" as ActiveView, label: "Resume Builder", icon: FileText },
     { key: "drive" as ActiveView, label: "Drive", icon: FolderOpen },
   ];
@@ -1467,9 +1503,9 @@ export default function Page() {
             }
             if (ra) setResumeAnalysis(ra);
             if (goal) setCareerGoal(goal);
-            // Land on the Career Profile screen first — the "this knows me"
-            // moment. Skips straight to chat if no extraction was parsed.
-            setActiveView(re ? "career-profile" : "chat");
+            // Drop straight into chat. The welcome message + rich profile
+            // typewrites in there as the opener — no separate page.
+            setActiveView("chat");
             setOnboardingCompleted(true);
           }}
           onSignIn={() => setShowAuthModal(true)}
@@ -1570,34 +1606,7 @@ export default function Page() {
         </header>
 
         {/* Content */}
-        {activeView === "career-profile" ? (
-          /* Career Profile landing page — the "this knows me" moment.
-             Shown automatically right after onboarding (when extraction is
-             ready); re-openable any time from the sidebar. */
-          <CareerProfile
-            extraction={resumeExtraction}
-            analysis={resumeAnalysis}
-            careerGoal={careerGoal}
-            onFixResume={() => {
-              if (activeChatId) persistChat(activeChatId, chatMessages, "resume_builder", { careerProfileSeen: true });
-              setActiveView("resume-builder");
-            }}
-            onCompareJD={() => {
-              if (activeChatId) persistChat(activeChatId, chatMessages, "resume_builder", { careerProfileSeen: true });
-              // Land in resume-builder so the JDMatchModal trigger is reachable.
-              // The user opens it via the existing CTA in the Report tab.
-              setActiveView("resume-builder");
-            }}
-            onContinueToChat={() => {
-              if (activeChatId) persistChat(activeChatId, chatMessages, "chat", { careerProfileSeen: true });
-              setActiveView("chat");
-            }}
-            onClose={() => {
-              if (activeChatId) persistChat(activeChatId, chatMessages, isResumeMode ? "resume_builder" : "chat", { careerProfileSeen: true });
-              setActiveView("chat");
-            }}
-          />
-        ) : activeView === "chat" ? (
+        {activeView === "chat" ? (
           /* Chat view */
           <div className="flex flex-col flex-1 min-h-0">
             {chatMessages.length === 0 && !isLoading ? (
@@ -1639,6 +1648,15 @@ export default function Page() {
                   setActiveView("resume-builder");
                 }}
                 onEditUserMessage={handleEditUserMessage}
+                starterPromptOverride={resumeExtraction ? ["Fix my resume", "What's going on?"] : undefined}
+                onStarterPromptClick={(prompt) => {
+                  if (prompt === "Fix my resume") {
+                    setActiveView("resume-builder");
+                    return;
+                  }
+                  // Anything else — send as a normal chat message.
+                  sendMessage(prompt);
+                }}
               />
             )}
             <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-[#0d0d0d]">
@@ -1843,13 +1861,21 @@ export default function Page() {
             onPushAssistantMessage={(text) => {
               const ts = now();
               setChatMessages((prev) => {
-                // De-dupe: if the exact same assistant message is already the
-                // last one (or anywhere in recent history), don't push again.
-                // Guards against effect re-fires that still sneak through.
+                // De-dupe: bail if any recent assistant message has the same
+                // content OR a near-identical opener. The exact-match check
+                // catches obvious doubles; the prefix check catches LLM
+                // re-runs that produced slightly-rephrased duplicates (e.g.
+                // skills-gap firing twice with mildly different wording).
                 const trimmed = text.trim();
-                if (prev.some((m) => m.role === "assistant" && m.content.trim() === trimmed)) {
-                  return prev;
-                }
+                const head = trimmed.slice(0, 60).toLowerCase();
+                const dupe = prev.some((m) => {
+                  if (m.role !== "assistant") return false;
+                  const a = m.content.trim();
+                  if (a === trimmed) return true;
+                  // Prefix match — same opener almost certainly = same intent
+                  return head.length >= 30 && a.slice(0, 60).toLowerCase() === head;
+                });
+                if (dupe) return prev;
                 return [...prev, { role: "assistant", content: text, timestamp: ts }];
               });
             }}

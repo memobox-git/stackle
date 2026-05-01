@@ -38,6 +38,11 @@ interface ChatWindowProps {
   completedFixes?: Set<number>;
   acceptedFixes?: Set<number>;
   currentFixIndex?: number | null;
+  // When set, replaces the default starter pills with these labels.
+  // Used by the post-onboarding welcome to surface 2 specific actions
+  // ("Fix my resume" + "What's going on?") instead of the generic four.
+  // Also forces pills to render in chat mode (not just resume-builder).
+  starterPromptOverride?: string[];
   onStarterPromptClick?: (text: string) => void;
   // When set, starter pills route directly through the document-edit flow
   // (typewriter + ✓/✗) instead of populating the chat input.
@@ -433,6 +438,7 @@ export default function ChatWindow({
   completedFixes,
   acceptedFixes,
   currentFixIndex,
+  starterPromptOverride,
   onStarterPromptClick,
   onChatEditPrompt,
   onApplyInBuilder,
@@ -494,9 +500,14 @@ export default function ChatWindow({
   const userHasSpoken = messages.some(
     (m) => m.role === "user" && !m.content.startsWith("__FILE_UPLOAD__:") && !SENTINELS.includes(m.content)
   );
-  const showStarterPills = !!resumeBuilderMode && !userHasSpoken && messages.length > 0 && !isLoading;
+  // Override pills work in chat mode too. Default pills only render in
+  // Resume Builder mode (legacy behaviour) and only when the user hasn't
+  // spoken yet.
+  const showStarterPills = !!starterPromptOverride
+    ? starterPromptOverride.length > 0 && !userHasSpoken && messages.length > 0 && !isLoading
+    : !!resumeBuilderMode && !userHasSpoken && messages.length > 0 && !isLoading;
 
-  const starterPrompts: string[] = [
+  const starterPrompts: string[] = starterPromptOverride ?? [
     resumeAnalysis?.likelyTargetRole
       ? `Rewrite my summary for a ${resumeAnalysis.likelyTargetRole} role`
       : `Rewrite my summary for a Senior ${(resumeExtraction?.experience?.[0]?.title ?? "Data Engineer").replace(/^(Senior|Lead|Staff|Principal)\s+/i, "")} role`,
