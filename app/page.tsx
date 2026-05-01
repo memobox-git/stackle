@@ -99,8 +99,13 @@ export default function Page() {
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
 
   // ── Messages ──────────────────────────────────────────
+  // ONE chat thread per session. View switching (chat / resume-builder /
+  // drive) only changes which panel renders on the right — the chat thread
+  // is always the same. Previous architecture had two parallel buckets
+  // gated on activeView which caused messages to be wiped on view switches
+  // and refreshes; this unified store fixes that and unblocks per-tool
+  // panels (interview prep, JD match, etc.) without per-tool chats.
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-  const [resumeMessages, setResumeMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [resumeInput, setResumeInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -185,9 +190,12 @@ export default function Page() {
 
   // ── Derived ───────────────────────────────────────────
   const isSignedUp = user !== null;
+  // isResumeMode kept for callers that want to know which panel is open
+  // (e.g. for sidebar styling, persistChat's mode arg). Crucially: it does
+  // NOT gate which messages are in scope — there's one shared thread.
   const isResumeMode = activeView === "resume-builder";
-  const messages = isResumeMode ? resumeMessages : chatMessages;
-  const setMessages = isResumeMode ? setResumeMessages : setChatMessages;
+  const messages = chatMessages;
+  const setMessages = setChatMessages;
   const input = isResumeMode ? resumeInput : chatInput;
   const setInput = isResumeMode ? setResumeInput : setChatInput;
 
@@ -199,8 +207,7 @@ export default function Page() {
   // fresh version via a ref (updated below) so the send actually uses the
   // truncated history, not the stale one from this render's closure.
   function handleEditUserMessage(index: number, newContent: string) {
-    const setMsgs = isResumeMode ? setResumeMessages : setChatMessages;
-    setMsgs((prev) => prev.slice(0, index));
+    setChatMessages((prev) => prev.slice(0, index));
     setTimeout(() => sendMessageRef.current?.(newContent), 0);
   }
 
@@ -357,15 +364,15 @@ export default function Page() {
 
   // ── Resume Builder welcome experience ────────────────────
   // When the user is in Resume Builder with a parsed resume and no chat
-  // messages yet, push a personalised welcome + welcome-card sentinel. The
-  // guard is purely `resumeMessages.length === 0` — no ref — so that if an
-  // auth reset wipes the chat state, the welcome re-fires (it re-populates
-  // itself; no infinite loop because setting messages flips the guard).
+  // messages yet, push a personalised welcome + welcome-card sentinel.
+  // Writes to the unified `chatMessages` (single thread). The chat welcome
+  // effect below sits on the same bucket; whichever matches activeView
+  // first wins and the other no-ops because chatMessages.length > 0.
   const analysisKickoffRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (activeView !== "resume-builder") return;
     if (!resumeExtraction) return;
-    if (resumeMessages.length > 0) return;
+    if (chatMessages.length > 0) return;
 
     // Pull the most recent finalized version for this chat so the greeting
     // can say "your saved resume is X" on re-entry instead of the generic
@@ -382,7 +389,7 @@ export default function Page() {
       { role: "assistant", content: welcomeText, timestamp: now() },
       { role: "assistant", content: "__RESUME_WELCOME_CARD__" },
     ];
-    setResumeMessages(welcomeMsgs);
+    setChatMessages(welcomeMsgs);
 
     // Persist to the active chat so the welcome doesn't re-fire on reload
     if (activeChatId) {
@@ -428,7 +435,7 @@ export default function Page() {
         .catch(() => { /* non-fatal — card stays in skeleton */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeView, resumeExtraction, resumeMessages.length]);
+  }, [activeView, resumeExtraction, chatMessages.length]);
 
   // ── Main chat welcome greeting ────────────────────────────
   // When the user lands in the main chat view (not Resume Builder) with a
@@ -477,12 +484,17 @@ export default function Page() {
   }
 
   // ── State helpers ─────────────────────────────────────
+  // ONE message bucket. `mode` is now just a hint for which panel to open
+  // first — it doesn't gate where messages live. Existing rows with
+  // mode="resume_builder" still restore correctly; we just open the
+  // resume-builder panel and load their thread into the same shared array
+  // we'd use for any other chat.
   function restoreChatState(chat: SupabaseChat) {
     const msgs = chat.messages ?? [];
+    setChatMessages(msgs);
+    setActiveView(chat.mode === "resume_builder" ? "resume-builder" : "chat");
+
     if (chat.mode === "resume_builder") {
-      setActiveView("resume-builder");
-      setResumeMessages(msgs);
-      setChatMessages([]);
       setResumeText(chat.resume_text ?? null);
       setResumeFilename(chat.resume_filename ?? undefined);
       setResumeExtraction(chat.resume_extraction ?? null);
@@ -492,9 +504,6 @@ export default function Page() {
       // fall back to the profile-level resume (localStorage) so the agent
       // still knows who it's talking to.
       const prof = getProfileResume();
-      setActiveView("chat");
-      setChatMessages(msgs);
-      setResumeMessages([]);
       setResumeText(chat.resume_text ?? prof.resumeText);
       setResumeFilename(chat.resume_filename ?? prof.resumeFilename);
       setResumeExtraction(chat.resume_extraction ?? prof.resumeExtraction);
@@ -542,7 +551,6 @@ export default function Page() {
 
   function resetAllState() {
     setChatMessages([]);
-    setResumeMessages([]);
     setChatInput("");
     setResumeInput("");
     setActiveView("chat");
@@ -702,7 +710,7 @@ export default function Page() {
     // Step 7: guard against incomplete PDF extraction
     if (filename.toLowerCase().endsWith('.pdf') && text.length < 500) {
       setActiveView("chat");
-      setResumeMessages([{
+      setChatMessages((prev) => [...prev, {
         role: "assistant",
         content: "We had trouble reading your PDF. Please try saving it as a plain PDF and uploading again. Or paste your resume text directly in the chat.",
       }]);
@@ -721,16 +729,15 @@ export default function Page() {
     setResumeExtraction(null);
     setActiveView("resume-builder");
 
-    // Clear messages — the welcome useEffect fires once `resumeExtraction` lands
+    // Append the upload chip to the SHARED thread so it appears whether the
+    // user is viewing chat or resume-builder. The welcome useEffect fires
+    // once `resumeExtraction` lands and pushes the welcome card after this.
     const uploadMsg: ChatMessage = { role: "user", content: `__FILE_UPLOAD__:${filename}`, timestamp: now() };
-    setResumeMessages([uploadMsg]);
+    setChatMessages((prev) => [...prev, uploadMsg]);
     setIntakeStep(0);
     setIntakeAnswers({});
     setIntakeData(null);
     setIsLoading(false);
-    // The welcome useEffect is now guarded on `resumeMessages.length === 0`,
-    // and we just cleared resumeMessages above — so it will re-fire naturally
-    // once the new extraction lands. No ref bookkeeping needed.
 
     // Run extraction in background — welcome auto-fires once it lands
     let extraction: ResumeExtraction | null = null;
@@ -766,7 +773,7 @@ export default function Page() {
       }
     } catch {
       setIsLoading(false);
-      setResumeMessages([{
+      setChatMessages((prev) => [...prev, {
         role: "assistant",
         content: "I couldn't read that file. Try uploading it again or paste your resume as text.",
       }]);
@@ -791,7 +798,7 @@ export default function Page() {
       if (analyzeRes.ok) {
         const analysis = await analyzeRes.json();
         setResumeAnalysis(analysis);
-        setResumeMessages((prev) => [
+        setChatMessages((prev) => [
           ...prev,
           { role: "assistant", content: "__RESUME_ANALYSIS__" },
           { role: "assistant", content: "__RESUME_PRIORITIES__" },
@@ -826,7 +833,7 @@ export default function Page() {
         setIntakeAnswers({});
         setIntakeData(null);
         setResumeAnalysis(null);
-        setResumeMessages((prev) => [
+        setChatMessages((prev) => [
           ...prev,
           { role: "user", content: trimmed },
           { role: "assistant", content: "Sure — let's redo the settings.\n\nWhat kind of report do you need?\n📋 Full Review\n⚡ Quick Scan" },
@@ -834,7 +841,7 @@ export default function Page() {
         return;
       }
       if (/^all done$/i.test(trimmed) && intakeStep === 5) {
-        setResumeMessages((prev) => [
+        setChatMessages((prev) => [
           ...prev,
           { role: "user", content: trimmed },
           { role: "assistant", content: "Great! Your report is ready in the panel on the right. Let me know if you have any questions about the results." },
@@ -854,7 +861,7 @@ export default function Page() {
           const answers = { ...intakeAnswers, reviewType: trimmed };
           setIntakeAnswers(answers);
           setIntakeStep(2);
-          setResumeMessages((prev) => [
+          setChatMessages((prev) => [
             ...prev,
             userMsg,
             { role: "assistant", content: `${ack}\n\nWhat level are they targeting?\n⭐ Senior\n⭐ Lead\n🧭 Manager\n💼 Director` },
@@ -865,7 +872,7 @@ export default function Page() {
           const answers = { ...intakeAnswers, seniority: trimmed };
           setIntakeAnswers(answers);
           setIntakeStep(3);
-          setResumeMessages((prev) => [
+          setChatMessages((prev) => [
             ...prev,
             userMsg,
             { role: "assistant", content: `${trimmed} — noted.\n\nWhat kind of company are they targeting?\n🌎 US General\n🏢 Big Tech\n🚀 Startup\n🏥 Healthcare\n💰 Finance` },
@@ -876,7 +883,7 @@ export default function Page() {
           const answers = { ...intakeAnswers, companyType: trimmed };
           setIntakeAnswers(answers);
           setIntakeStep(4);
-          setResumeMessages((prev) => [
+          setChatMessages((prev) => [
             ...prev,
             userMsg,
             { role: "assistant", content: `${trimmed} — great choice.\n\nDo you have a job description to benchmark against?\n✅ No JD\n📄 I have a JD` },
@@ -887,7 +894,7 @@ export default function Page() {
           // "I have a JD" → go to step 41 (waiting for paste)
           if (/i have|yes|paste|upload|have a jd/i.test(trimmed)) {
             setIntakeStep(41);
-            setResumeMessages((prev) => [
+            setChatMessages((prev) => [
               ...prev,
               userMsg,
               { role: "assistant", content: "Paste your job description below:" },
@@ -916,7 +923,7 @@ export default function Page() {
           const builtData: IntakeData = { reviewType, targetMarket, seniorityLevel, jobDescription: jd };
           setIntakeData(builtData);
 
-          setResumeMessages((prev) => [
+          setChatMessages((prev) => [
             ...prev,
             userMsg,
             { role: "assistant", content: `Got it — running a ${reviewType.toLowerCase()} for a ${seniorityLevel} profile. Give me a moment.` },
@@ -946,7 +953,7 @@ export default function Page() {
           marketRaw.includes("india") ? "India" : "US General";
         const builtData: IntakeData = { reviewType, targetMarket, seniorityLevel, jobDescription: jd };
         setIntakeData(builtData);
-        setResumeMessages((prev) => [
+        setChatMessages((prev) => [
           ...prev,
           userMsg,
           { role: "assistant", content: `Got it — running a ${reviewType.toLowerCase()} for a ${seniorityLevel} profile benchmarked against your JD. Give me a moment.` },
@@ -959,7 +966,7 @@ export default function Page() {
         setIntakeStep(5);
         const builtData: IntakeData = { reviewType: "Full Review", targetMarket: "US General", seniorityLevel: "Senior", jobDescription: "" };
         setIntakeData(builtData);
-        setResumeMessages((prev) => [
+        setChatMessages((prev) => [
           ...prev,
           { role: "user", content: trimmed },
           { role: "assistant", content: "Got it — running a full review. Give me a moment." },
@@ -1744,14 +1751,14 @@ export default function Page() {
               )}
             </div>
           </div>
-        ) : resumeText || resumeMessages.length > 0 ? (
+        ) : resumeText || chatMessages.length > 0 ? (
           /* Resume uploaded — show split view */
           <ResumeBuilder
             resumeText={resumeText}
             resumeFilename={resumeFilename}
             resumeExtraction={resumeExtraction}
             resumeAnalysis={resumeAnalysis}
-            messages={resumeMessages}
+            messages={chatMessages}
             isLoading={isLoading}
             isAnalyzingResume={isAnalyzingResume}
             input={resumeInput}
@@ -1768,7 +1775,7 @@ export default function Page() {
             onEditUserMessage={handleEditUserMessage}
             onPushAssistantMessage={(text) => {
               const ts = now();
-              setResumeMessages((prev) => {
+              setChatMessages((prev) => {
                 // De-dupe: if the exact same assistant message is already the
                 // last one (or anywhere in recent history), don't push again.
                 // Guards against effect re-fires that still sneak through.
@@ -1784,7 +1791,7 @@ export default function Page() {
               setResumeExtraction(updated);
               const id = activeChatId;
               if (id) {
-                persistChat(id, resumeMessages, "resume_builder", {
+                persistChat(id, chatMessages, "resume_builder", {
                   resumeText,
                   resumeFilename,
                   resumeExtraction: updated,
