@@ -395,17 +395,19 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         </div>
       )}
 
-      {/* Logo + wordmark */}
-      <div className="flex flex-col items-center mb-10 sm:mb-14 flex-shrink-0">
+      {/* Logo — pinned top-left corner. Wordmark next to the chip
+          instead of stacked underneath, since horizontal real estate
+          is cheap up there and we want vertical space back. */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex items-center gap-2">
         <div
-          className="w-11 h-11 rounded-2xl flex items-center justify-center text-black text-base font-bold shadow-md mb-3"
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-black text-sm font-bold shadow"
           style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
         >
           S
         </div>
-        <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-semibold">
+        <span className="text-[11px] uppercase tracking-[0.2em] text-gray-600 font-semibold">
           Stackle
-        </p>
+        </span>
       </div>
 
       {/* Discreet step accumulator pinned to the bottom of the viewport.
