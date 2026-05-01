@@ -433,9 +433,9 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
         {/* Step 1 — Profile photo */}
         <div className="animate-fadein flex flex-col items-center gap-4">
-          {/* Heading left-aligned to match every other step. Photo button
-              below stays visually centered via the parent's items-center. */}
-          <p className="text-lg font-semibold text-gray-900 self-start">
+          {/* Heading + photo both centered for step 1 — matches the
+              circular photo's visual weight. Other steps stay left-aligned. */}
+          <p className="text-lg font-semibold text-gray-900 text-center">
             {q1.displayed}
             <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q1.done ? "opacity-0" : "animate-pulse"}`} />
           </p>
