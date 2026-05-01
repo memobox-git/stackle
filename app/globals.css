@@ -180,3 +180,11 @@ nextjs-portal { display: none !important; }
   background: #f3f4f6 !important;
   color: #111 !important;
 }
+
+/* Shimmer for loading states (e.g. "Reading your resume…" button on
+   the onboarding screen). Slides a translucent stripe across the
+   button surface to communicate "something is happening". */
+@keyframes shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}

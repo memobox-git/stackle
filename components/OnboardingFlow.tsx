@@ -343,28 +343,97 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
     onComplete(profile);
   }
 
+  // Step indicator — labelled dots at the top show the user where they are
+  // in the 3-step onboarding so it doesn't feel infinite.
+  const STEP_LABELS = ["Photo", "Resume", "Confirm"] as const;
+
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center py-16 px-6 relative">
-      {/* "Already have an account? Sign in" — top-right corner so returning
-          users have a way out of this onboarding flow without redoing it. */}
+    <div className="min-h-screen flex flex-col items-center py-12 sm:py-16 px-6 relative overflow-hidden">
+      {/* Soft brand-tinted gradient background — replaces the bare white.
+          Two radial blobs in the brand yellow/pink, very low opacity. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background: `
+            radial-gradient(ellipse 80% 50% at 20% 0%,  rgba(255, 247, 173, 0.55), transparent 60%),
+            radial-gradient(ellipse 70% 50% at 80% 100%, rgba(255, 169, 249, 0.45), transparent 60%),
+            linear-gradient(180deg, #ffffff 0%, #fafaf9 100%)
+          `,
+        }}
+      />
+      {/* Subtle dot pattern overlay for texture */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07]"
+        style={{
+          backgroundImage: "radial-gradient(rgba(0,0,0,0.5) 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+
+      {/* "Already have an account? Sign in" — pill in top-right */}
       {onSignIn && (
-        <div className="absolute top-4 right-4 sm:top-6 sm:right-6 text-xs text-gray-500">
-          Already have an account?{" "}
+        <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
           <button
             onClick={onSignIn}
-            className="font-semibold text-gray-900 hover:text-black underline-offset-4 hover:underline"
+            className="text-xs px-3 py-1.5 rounded-full bg-white/70 backdrop-blur border border-gray-200 text-gray-600 hover:text-black hover:border-gray-300 hover:bg-white transition-all shadow-sm"
           >
-            Sign in
+            Already have an account?{" "}
+            <span className="font-semibold text-gray-900">Sign in →</span>
           </button>
         </div>
       )}
 
-      {/* Logo */}
-      <div
-        className="w-9 h-9 rounded-xl flex items-center justify-center text-black text-sm font-bold mb-14 flex-shrink-0"
-        style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
-      >
-        S
+      {/* Logo + wordmark */}
+      <div className="flex flex-col items-center mb-10 sm:mb-14 flex-shrink-0">
+        <div
+          className="w-11 h-11 rounded-2xl flex items-center justify-center text-black text-base font-bold shadow-md mb-3"
+          style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
+        >
+          S
+        </div>
+        <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-semibold">
+          Stackle
+        </p>
+      </div>
+
+      {/* Step indicator dots */}
+      <div className="flex items-center gap-2.5 mb-10 sm:mb-12">
+        {STEP_LABELS.map((label, i) => {
+          const stepNum = (i + 1) as 1 | 2 | 3;
+          const active = step === stepNum;
+          const completed = step > stepNum;
+          return (
+            <div key={label} className="flex items-center gap-1.5">
+              <span
+                className={`flex items-center justify-center text-[10px] font-bold w-5 h-5 rounded-full transition-all ${
+                  completed
+                    ? "bg-gray-900 text-white"
+                    : active
+                      ? "bg-white text-gray-900 ring-2 ring-gray-900"
+                      : "bg-white/60 text-gray-400 ring-1 ring-gray-200"
+                }`}
+              >
+                {completed ? "✓" : stepNum}
+              </span>
+              <span
+                className={`text-[11px] font-medium tracking-wide ${
+                  active ? "text-gray-900" : completed ? "text-gray-500" : "text-gray-400"
+                }`}
+              >
+                {label}
+              </span>
+              {i < STEP_LABELS.length - 1 && (
+                <span
+                  className={`w-6 h-px mx-1 transition-colors ${
+                    completed ? "bg-gray-900" : "bg-gray-300"
+                  }`}
+                />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-12">
@@ -380,9 +449,17 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
           {!rawAvatarUrl && !avatarUrl && (
             <button
               onClick={() => avatarInputRef.current?.click()}
-              className="w-24 h-24 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center hover:border-gray-400 transition-colors overflow-hidden bg-gray-50"
+              className="group w-28 h-28 rounded-full flex items-center justify-center transition-all overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_2px_#0f0f0f,0_12px_32px_-12px_rgba(0,0,0,0.25)] hover:-translate-y-0.5"
             >
-              <Camera className="w-6 h-6 text-gray-400" />
+              <div
+                className="w-full h-full rounded-full flex flex-col items-center justify-center gap-1"
+                style={{
+                  background: "radial-gradient(circle at 30% 30%, rgba(255, 247, 173, 0.6), rgba(255, 169, 249, 0.25) 65%, transparent 100%)",
+                }}
+              >
+                <Camera className="w-6 h-6 text-gray-700 group-hover:scale-110 transition-transform" strokeWidth={1.5} />
+                <span className="text-[10px] text-gray-500 font-medium tracking-wide">Click to add</span>
+              </div>
             </button>
           )}
 
@@ -497,22 +574,55 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
             {resumeFilename ? (
               <div className="flex flex-col gap-3">
-                <div className="px-4 py-3 rounded-xl border border-green-200 bg-green-50 text-sm text-green-700">
-                  {resumeFilename} — ready
+                <div className="px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm text-emerald-700 flex items-center gap-2.5 shadow-[0_2px_8px_-4px_rgba(16,185,129,0.25)]">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">✓</span>
+                  <span className="truncate"><strong className="font-semibold">{resumeFilename}</strong> — ready</span>
                 </div>
                 {step === 2 && (
                   <button onClick={handleResumeConfirm} disabled={uploading || extracting}
-                    className="w-full py-3 rounded-xl bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-50">
-                    {extracting ? "Reading your resume..." : "Continue"}
+                    className={`w-full py-3 rounded-xl text-white text-sm font-semibold transition-all disabled:cursor-not-allowed shadow-md hover:shadow-lg relative overflow-hidden ${
+                      extracting
+                        ? "bg-gray-900"
+                        : "bg-gray-900 hover:bg-black active:scale-[0.99]"
+                    }`}
+                  >
+                    {extracting && (
+                      <span
+                        aria-hidden
+                        className="absolute inset-0 -translate-x-full"
+                        style={{
+                          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
+                          animation: "shimmer 1.4s ease-in-out infinite",
+                        }}
+                      />
+                    )}
+                    <span className="relative">{extracting ? "Reading your resume…" : "Continue"}</span>
                   </button>
                 )}
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                <button onClick={() => resumeInputRef.current?.click()} disabled={uploading}
-                  className="w-full px-5 py-10 rounded-xl border-2 border-dashed border-gray-200 flex flex-col items-center gap-2 hover:border-gray-400 transition-colors">
-                  <Upload className="w-5 h-5 text-gray-400" />
-                  <span className="text-sm text-gray-400">{uploading ? "Uploading..." : "PDF or DOCX"}</span>
+                <button
+                  onClick={() => resumeInputRef.current?.click()}
+                  disabled={uploading}
+                  className="group w-full px-5 py-10 rounded-2xl bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.12)] hover:shadow-[0_0_0_2px_#0f0f0f,0_12px_32px_-12px_rgba(0,0,0,0.2)] hover:-translate-y-0.5 transition-all flex flex-col items-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform"
+                    style={{
+                      background: "linear-gradient(135deg, rgba(255, 247, 173, 0.6), rgba(255, 169, 249, 0.4))",
+                    }}
+                  >
+                    <Upload className="w-5 h-5 text-gray-800" strokeWidth={1.75} />
+                  </div>
+                  <div className="text-center">
+                    <span className="block text-sm font-semibold text-gray-900">
+                      {uploading ? "Uploading…" : "Click to upload"}
+                    </span>
+                    <span className="block text-[11px] text-gray-500 mt-0.5">
+                      PDF or DOCX · drag & drop coming soon
+                    </span>
+                  </div>
                 </button>
                 <input ref={resumeInputRef} type="file" accept=".pdf,.docx" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleResumeUpload(f); }} />
