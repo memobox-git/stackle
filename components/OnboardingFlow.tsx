@@ -433,7 +433,9 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
         {/* Step 1 — Profile photo */}
         <div className="animate-fadein flex flex-col items-center gap-4">
-          <p className="text-xl font-semibold text-gray-900 text-center">
+          {/* Heading left-aligned to match every other step. Photo button
+              below stays visually centered via the parent's items-center. */}
+          <p className="text-lg font-semibold text-gray-900 self-start">
             {q1.displayed}
             <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q1.done ? "opacity-0" : "animate-pulse"}`} />
           </p>
@@ -557,7 +559,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         {/* Step 2 — Resume upload */}
         {step >= 2 && (
           <div className="animate-fadein flex flex-col gap-4">
-            <p className="text-xl font-semibold text-gray-900">
+            <p className="text-lg font-semibold text-gray-900">
               {q2.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q2.done ? "opacity-0" : "animate-pulse"}`} />
             </p>
@@ -627,7 +629,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         {/* Step 3 — Career Goal */}
         {step === 3 && (
           <div className="animate-fadein flex flex-col gap-4">
-            <p className="text-xl font-semibold text-gray-900">
+            <p className="text-lg font-semibold text-gray-900">
               {q3.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q3.done ? "opacity-0" : "animate-pulse"}`} />
             </p>
@@ -684,7 +686,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         {/* Step 4 — Review extracted contact */}
         {step === 4 && (
           <div className="animate-fadein flex flex-col gap-5">
-            <p className="text-xl font-semibold text-gray-900">
+            <p className="text-lg font-semibold text-gray-900">
               {q4.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q4.done ? "opacity-0" : "animate-pulse"}`} />
             </p>
