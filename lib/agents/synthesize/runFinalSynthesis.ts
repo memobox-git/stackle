@@ -66,30 +66,63 @@ Summary: ${(ext.summary ?? "").slice(0, 400)}`);
   return parts.join("\n");
 }
 
+// Confirmed available on this account's API key (verified via /v1/models).
+// Opus 4.7 — sharpest, most coherent chat voice in the lineup.
+// Falls back to Sonnet 4.5 only if Anthropic returns an error.
+const CHAT_MODEL_PRIMARY = "claude-opus-4-7";
+const CHAT_MODEL_FALLBACK = "claude-sonnet-4-5";
+
 export async function runFinalSynthesis(workspace: WorkspaceViewModel): Promise<ReadableStream> {
   const systemPrompt = buildSynthesisSystemPrompt(workspace);
 
-  const stream = await client.messages.stream({
-    model: "claude-sonnet-4-5",
-    max_tokens: 16000,
-    system: systemPrompt,
-    messages: workspace.conversationHistory,
-  });
+  // Try primary, fall through to the fallback on init failure (e.g. model
+  // unavailable, rate limit on the premium tier). The fallback is the
+  // model we know works because it's also serving the resume edit pipeline.
+  let stream: Awaited<ReturnType<typeof client.messages.stream>>;
+  let usedModel = CHAT_MODEL_PRIMARY;
+  try {
+    stream = await client.messages.stream({
+      model: CHAT_MODEL_PRIMARY,
+      max_tokens: 16000,
+      system: systemPrompt,
+      messages: workspace.conversationHistory,
+    });
+  } catch (err) {
+    console.warn("[synthesis] primary model failed, falling back:", err instanceof Error ? err.message : err);
+    usedModel = CHAT_MODEL_FALLBACK;
+    stream = await client.messages.stream({
+      model: CHAT_MODEL_FALLBACK,
+      max_tokens: 16000,
+      system: systemPrompt,
+      messages: workspace.conversationHistory,
+    });
+  }
+  console.log(`[synthesis] using model=${usedModel}`);
 
   const encoder = new TextEncoder();
 
   return new ReadableStream({
     async start(controller) {
       try {
+        let chunkCount = 0;
         for await (const event of stream) {
           if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+            chunkCount++;
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ text: event.delta.text })}\n\n`)
             );
           }
         }
+        if (chunkCount === 0) {
+          // Empty stream — surface to the client so the UI doesn't hang silently.
+          console.error(`[synthesis] empty stream from ${usedModel}`);
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ text: "(no response — try again)" })}\n\n`)
+          );
+        }
         controller.enqueue(encoder.encode("data: [DONE]\n\n"));
       } catch (err) {
+        console.error(`[synthesis] stream error on ${usedModel}:`, err);
         controller.error(err);
       } finally {
         controller.close();
