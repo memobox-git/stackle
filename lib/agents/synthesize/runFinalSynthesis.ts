@@ -70,7 +70,11 @@ export async function runFinalSynthesis(workspace: WorkspaceViewModel): Promise<
   const systemPrompt = buildSynthesisSystemPrompt(workspace);
 
   const stream = await client.messages.stream({
-    model: "claude-sonnet-4-5",
+    // Opus 4.7 — user-requested upgrade for the main chat voice.
+    // Roughly 5x the cost of Sonnet 4.5 per token but produces the
+    // sharpest, most-coherent responses in the lineup. If a token shows
+    // "model not available" we'll need to fall back to Sonnet 4.5.
+    model: "claude-opus-4-7",
     max_tokens: 16000,
     system: systemPrompt,
     messages: workspace.conversationHistory,
