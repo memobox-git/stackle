@@ -431,14 +431,8 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
       <div className="w-full max-w-sm flex flex-col gap-12">
 
-        {/* Step 1 — Profile photo */}
+        {/* Step 1 — Profile photo. Image first, heading underneath. */}
         <div className="animate-fadein flex flex-col items-center gap-4">
-          {/* Heading + photo both centered for step 1 — matches the
-              circular photo's visual weight. Other steps stay left-aligned. */}
-          <p className="text-lg font-semibold text-gray-900 text-center">
-            {q1.displayed}
-            <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q1.done ? "opacity-0" : "animate-pulse"}`} />
-          </p>
 
           {/* Empty state — no photo chosen yet */}
           {!rawAvatarUrl && !avatarUrl && (
@@ -551,6 +545,14 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
               </button>
             </div>
           )}
+
+          {/* Heading lives BELOW the photo so the user's eye lands on the
+              image first, then reads the prompt. Centered to match the
+              circular control above. */}
+          <p className="text-lg font-semibold text-gray-900 text-center">
+            {q1.displayed}
+            <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q1.done ? "opacity-0" : "animate-pulse"}`} />
+          </p>
 
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarChange(f); }} />
