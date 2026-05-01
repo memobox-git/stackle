@@ -162,8 +162,11 @@ export async function saveOriginalResume({
   const displayName = baseName || `${name}_Original_${date}`;
 
   if (!user) {
-    // Local fallback — push directly to localStorage, no blob upload
+    // Local fallback — push directly to localStorage, no blob upload.
+    // Dedup: if an "original" already exists for this chat, reuse it.
     const files = readLocalDrive();
+    const existing = files.find((f) => f.chat_id === chatId && f.file_type === "original");
+    if (existing) return existing;
     const file = makeLocalFile({
       chat_id: chatId,
       display_name: displayName,
@@ -177,6 +180,21 @@ export async function saveOriginalResume({
     writeLocalDrive(files);
     return file;
   }
+
+  // Dedup: if this chat already has an "original" row, return it instead
+  // of inserting another. The previous behaviour inserted a new row every
+  // call, which is why uploading once produced 4+ duplicate Drive entries
+  // when multiple effects fired in parallel (auto-save effect + the
+  // explicit handleResumeUpload save path).
+  const { data: existing } = await supabase
+    .from("drive_files")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("chat_id", chatId)
+    .eq("file_type", "original")
+    .limit(1)
+    .maybeSingle();
+  if (existing) return existing as DriveFile;
 
   const storagePath = `${user.id}/${safeName(displayName)}.json`;
   await uploadJson("resumes", storagePath, { extraction, rawText, filename });
@@ -424,8 +442,24 @@ export async function saveReport({
   const displayName = `${candidateName}_Report_${date}`;
 
   if (!user) {
-    // Local fallback — full analysis inline, no blob
+    // Local fallback — full analysis inline, no blob.
+    // Dedup: one report per chat. Update in place when called again
+    // with fresh analysis (e.g. user accepted fixes that moved the score).
     const files = readLocalDrive();
+    const idx = files.findIndex((f) => f.chat_id === chatId && f.file_type === "report");
+    if (idx !== -1) {
+      const updated = {
+        ...files[idx],
+        display_name: displayName,
+        candidate_name: candidateName,
+        extraction_json: extraction,
+        analysis_json: analysis,
+        updated_at: nowISO(),
+      };
+      files[idx] = updated;
+      writeLocalDrive(files);
+      return updated;
+    }
     const file = makeLocalFile({
       chat_id: chatId,
       display_name: displayName,
@@ -442,8 +476,38 @@ export async function saveReport({
     return file;
   }
 
-  const storagePath = `${user.id}/${safeName(displayName)}.json`;
+  // Dedup: one report per chat. If a row already exists, update it in
+  // place — never insert a second. Prevents the runaway "6 reports for
+  // one upload" bug where every effect re-firing pushed a new row.
+  const { data: existing } = await supabase
+    .from("drive_files")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("chat_id", chatId)
+    .eq("file_type", "report")
+    .limit(1)
+    .maybeSingle();
+
+  const storagePath = existing?.storage_path
+    ?? `${user.id}/${safeName(displayName)}.json`;
   await uploadJson("reports", storagePath, { analysis, extraction });
+
+  if (existing) {
+    const { data, error } = await supabase
+      .from("drive_files")
+      .update({
+        display_name: displayName,
+        candidate_name: candidateName,
+        extraction_json: extraction,
+        analysis_json: analysis,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", existing.id)
+      .select()
+      .single();
+    if (error) { console.warn("Report update failed:", error.message); return null; }
+    return data as DriveFile;
+  }
 
   const { data, error } = await supabase
     .from("drive_files")
