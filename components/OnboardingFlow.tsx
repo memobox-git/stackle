@@ -408,42 +408,17 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         </p>
       </div>
 
-      {/* Step indicator dots */}
-      <div className="flex items-center gap-2.5 mb-10 sm:mb-12">
-        {STEP_LABELS.map((label, i) => {
-          const stepNum = (i + 1) as 1 | 2 | 3;
-          const active = step === stepNum;
-          const completed = step > stepNum;
-          return (
-            <div key={label} className="flex items-center gap-1.5">
-              <span
-                className={`flex items-center justify-center text-[10px] font-bold w-5 h-5 rounded-full transition-all ${
-                  completed
-                    ? "bg-gray-900 text-white"
-                    : active
-                      ? "bg-white text-gray-900 ring-2 ring-gray-900"
-                      : "bg-white/60 text-gray-400 ring-1 ring-gray-200"
-                }`}
-              >
-                {completed ? "✓" : stepNum}
-              </span>
-              <span
-                className={`text-[11px] font-medium tracking-wide ${
-                  active ? "text-gray-900" : completed ? "text-gray-500" : "text-gray-400"
-                }`}
-              >
-                {label}
-              </span>
-              {i < STEP_LABELS.length - 1 && (
-                <span
-                  className={`w-6 h-px mx-1 transition-colors ${
-                    completed ? "bg-gray-900" : "bg-gray-300"
-                  }`}
-                />
-              )}
-            </div>
-          );
-        })}
+      {/* Subtle progress bar — no labels, no numbered dots. The user
+          shouldn't be told "you have 4 steps to do"; they should feel
+          the flow. A 1px line at 25/50/75/100% communicates progress
+          without adding friction. */}
+      <div className="w-full max-w-sm mb-10 sm:mb-12">
+        <div className="h-px bg-gray-200 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gray-900 transition-all duration-500 ease-out"
+            style={{ width: `${(step / STEP_LABELS.length) * 100}%` }}
+          />
+        </div>
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-12">
