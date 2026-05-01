@@ -126,9 +126,10 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
     if (step === 4 && stTW.done) setFieldsReady(true);
   }, [step, stTW.done]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [step, fieldsReady]);
+  // Auto-scroll-to-bottom removed — now that only the current step renders
+  // (instead of stacking), there's nothing below to scroll to. Keeping the
+  // scroll caused the page to creep downward on every step change, pushing
+  // CTAs offscreen.
 
   function handleAvatarChange(file: File) {
     // New file picked — revoke the old raw URL if any, reset framing
@@ -358,7 +359,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   const STEP_LABELS = ["Photo", "Resume", "Goal", "Confirm"] as const;
 
   return (
-    <div className="min-h-screen flex flex-col items-center py-12 sm:py-16 px-6 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center py-6 px-4 relative overflow-hidden">
       {/* Soft brand-tinted gradient background — replaces the bare white.
           Two radial blobs in the brand yellow/pink, very low opacity. */}
       <div
@@ -395,17 +396,14 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         </div>
       )}
 
-      {/* Logo + wordmark */}
-      <div className="flex flex-col items-center mb-10 sm:mb-14 flex-shrink-0">
+      {/* Compact logo — wordmark dropped to save vertical space. */}
+      <div className="flex items-center justify-center mb-4 flex-shrink-0">
         <div
-          className="w-11 h-11 rounded-2xl flex items-center justify-center text-black text-base font-bold shadow-md mb-3"
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-black text-sm font-bold shadow"
           style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
         >
           S
         </div>
-        <p className="text-[10px] uppercase tracking-[0.25em] text-gray-500 font-semibold">
-          Stackle
-        </p>
       </div>
 
       {/* Discreet step accumulator pinned to the bottom of the viewport.
@@ -429,10 +427,12 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         })}
       </div>
 
-      <div className="w-full max-w-sm flex flex-col gap-12">
+      <div className="w-full max-w-sm flex flex-col gap-4">
 
-        {/* Step 1 — Profile photo */}
-        <div className="animate-fadein flex flex-col items-center gap-4">
+        {/* Step 1 — Profile photo. ONLY renders when on step 1 so we don't
+            keep stacking past steps and pushing later content offscreen. */}
+        {step === 1 && (
+        <div className="animate-fadein flex flex-col items-center gap-3">
           {/* Heading left-aligned to match every other step. Photo button
               below stays visually centered via the parent's items-center. */}
           <p className="text-lg font-semibold text-gray-900 self-start">
@@ -444,7 +444,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
           {!rawAvatarUrl && !avatarUrl && (
             <button
               onClick={() => avatarInputRef.current?.click()}
-              className="group w-28 h-28 rounded-full flex items-center justify-center transition-all overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_2px_#0f0f0f,0_12px_32px_-12px_rgba(0,0,0,0.25)] hover:-translate-y-0.5"
+              className="group w-20 h-20 rounded-full flex items-center justify-center transition-all overflow-hidden bg-white shadow-[0_0_0_1px_rgba(0,0,0,0.06),0_8px_24px_-12px_rgba(0,0,0,0.15)] hover:shadow-[0_0_0_2px_#0f0f0f,0_12px_32px_-12px_rgba(0,0,0,0.25)] hover:-translate-y-0.5"
             >
               <div
                 className="w-full h-full rounded-full flex flex-col items-center justify-center gap-1"
@@ -452,7 +452,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                   background: "radial-gradient(circle at 30% 30%, rgba(255, 247, 173, 0.6), rgba(255, 169, 249, 0.25) 65%, transparent 100%)",
                 }}
               >
-                <Camera className="w-6 h-6 text-gray-700 group-hover:scale-110 transition-transform" strokeWidth={1.5} />
+                <Camera className="w-5 h-5 text-gray-700 group-hover:scale-110 transition-transform" strokeWidth={1.5} />
                 <span className="text-[10px] text-gray-500 font-medium tracking-wide">Click to add</span>
               </div>
             </button>
@@ -533,7 +533,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                 type="button"
                 onClick={handleReEditAvatar}
                 aria-label="Adjust photo"
-                className="w-24 h-24 rounded-full overflow-hidden bg-gray-50 ring-0 hover:ring-2 hover:ring-gray-300 transition-all cursor-pointer relative"
+                className="w-20 h-20 rounded-full overflow-hidden bg-gray-50 ring-0 hover:ring-2 hover:ring-gray-300 transition-all cursor-pointer relative"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
@@ -555,10 +555,12 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarChange(f); }} />
         </div>
+        )}
 
-        {/* Step 2 — Resume upload */}
-        {step >= 2 && (
-          <div className="animate-fadein flex flex-col gap-4">
+        {/* Step 2 — Resume upload. Only when step === 2 so it doesn't
+            stack with step 3 / 4 below. */}
+        {step === 2 && (
+          <div className="animate-fadein flex flex-col gap-3">
             <p className="text-lg font-semibold text-gray-900">
               {q2.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q2.done ? "opacity-0" : "animate-pulse"}`} />
