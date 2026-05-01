@@ -557,6 +557,25 @@ export default function ResumeBuilder({
 
     const result = await callEditApi(instruction, workingExtraction, { lockedBullets, lockedSectionKey: opts?.lockedSectionKey });
 
+    // Writer marked this priority not applicable (structural action it
+    // can't perform — e.g. "remove References section", "convert table to
+    // bullets"). Auto-skip with a chat note so the user knows why this
+    // priority isn't being acted on, instead of letting the writer
+    // silently drift into rewriting the summary as a fallback.
+    if (result && result.sectionKey === "__not_applicable__") {
+      setFixFlow(null);
+      const reason = result.newContent?.trim() || "This action can't be performed by the writer.";
+      onPushAssistantMessage?.(`✗ Skipped: ${describeSection("__not_applicable__", workingExtraction) || "this priority"} — ${reason}`);
+      if (priorityIndex >= 0) {
+        setCompletedActions((prev) => {
+          const next = new Set([...prev, priorityIndex]);
+          advanceToNextFix(priorityIndex, next, workingExtraction);
+          return next;
+        });
+      }
+      return;
+    }
+
     // Defensive: the writer occasionally returns "experience.{i}" as a whole-entry
     // key but the UI only has bullet-level editables. Redirect to the first bullet
     // of that job so the fix is at least visible somewhere.
@@ -578,10 +597,22 @@ export default function ResumeBuilder({
       && result
       && (lockedBullets ?? []).includes(result.sectionKey);
 
-    if (!result || isProtected(result.sectionKey) || writerReturnedLockedBullet) {
+    // Drift check: if the writer chose a section the user has already
+    // accepted a fix on, this priority is a duplicate of earlier work —
+    // skip rather than rewriting an already-finalised section. Bypass
+    // the check when lockedSectionKey is set (user explicitly asked to
+    // re-edit that section via Rewrite or Sparkles).
+    const writerDriftedIntoAcceptedSection = result
+      && !opts?.lockedSectionKey
+      && acceptedSections.has(result.sectionKey);
+
+    if (!result || isProtected(result.sectionKey) || writerReturnedLockedBullet || writerDriftedIntoAcceptedSection) {
       // Skip silently and advance to the next non-protected priority so the
       // chain never stalls on a protected section.
       setFixFlow(null);
+      if (writerDriftedIntoAcceptedSection && result) {
+        onPushAssistantMessage?.(`✗ Skipped — this priority overlaps with a fix you already accepted on ${describeSection(result.sectionKey, workingExtraction)}.`);
+      }
       if (priorityIndex >= 0) {
         setCompletedActions((prev) => {
           const next = new Set([...prev, priorityIndex]);

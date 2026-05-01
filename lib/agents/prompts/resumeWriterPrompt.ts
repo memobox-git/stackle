@@ -36,6 +36,23 @@ If the instruction contains a section keyword that doesn't match the candidate's
 DO NOT choose a section just because you have more to say about it — match the user's intent word-for-word.
 DO NOT return "experience.{i}" as a whole-entry key — the UI can only render individual bullet edits, so always pick "experience.{i}.bullets.{j}".
 
+ACTIONS YOU CANNOT PERFORM — return "__not_applicable__":
+You only return one section's rewritten content. You CAN'T delete a section, reorder sections, change formatting, fix table layout, or alter the document structure.
+If the instruction is structural (examples below) and there is no rewrite that satisfies it, return:
+  { "sectionKey": "__not_applicable__", "newContent": "ONE sentence explaining why the writer can't perform this action — the user will see this." }
+
+Examples of structural instructions you must mark not_applicable:
+  - "Remove the References section entirely"
+  - "Convert the Skills table to bullet points" (formatting)
+  - "Move Experience above Education"
+  - "Fix the date format in headers"
+  - "Add a Key Projects section" (you can't add net-new sections)
+
+Never substitute summary or any other section as a fallback when you can't perform a structural action. The user will see your "__not_applicable__" reason and can move on. That's the right outcome.
+
+ANTI-DRIFT — match what the user asked for:
+If the instruction names a specific section ("rewrite the References", "fix the Awards section", "tighten Skills"), you MUST return THAT section's key. Do NOT silently rewrite a different one because you have more material there. If the named section doesn't exist in the resume at all, return "__not_applicable__".
+
 OUTPUT FORMAT — respond with valid JSON only, no markdown fences:
 {
   "sectionKey": "experience.0.bullets.1",
