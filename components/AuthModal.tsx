@@ -38,7 +38,10 @@ export default function AuthModal({ onClose }: Props) {
     const supabase = getSupabaseClient();
     const { error: err } = await supabase.auth.signInWithOtp({
       email: trimmed,
-      options: { emailRedirectTo: window.location.origin },
+      // Send the user to /auth/callback so the route handler exchanges the
+      // code for a session. Previously this used origin-only which dumped
+      // ?code= at the root page, where nothing parsed it.
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
     });
     setLoading(false);
     if (err) setError(err.message);
