@@ -408,17 +408,25 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         </p>
       </div>
 
-      {/* Subtle progress bar — no labels, no numbered dots. The user
-          shouldn't be told "you have 4 steps to do"; they should feel
-          the flow. A 1px line at 25/50/75/100% communicates progress
-          without adding friction. */}
-      <div className="w-full max-w-sm mb-10 sm:mb-12">
-        <div className="h-px bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gray-900 transition-all duration-500 ease-out"
-            style={{ width: `${(step / STEP_LABELS.length) * 100}%` }}
-          />
-        </div>
+      {/* Discreet step accumulator pinned to the bottom of the viewport.
+          One dot for the current step; an extra dot fades in for each
+          completed step. No labels, no numbers, no "you have 4 steps
+          to do" framing. The user feels forward motion without noticing
+          it as a progress indicator. */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 pointer-events-none">
+        {Array.from({ length: STEP_LABELS.length }).map((_, i) => {
+          const visible = i < step;
+          return (
+            <span
+              key={i}
+              className="w-1 h-1 rounded-full bg-gray-300 transition-all duration-500 ease-out"
+              style={{
+                opacity: visible ? 0.55 : 0,
+                transform: visible ? "scale(1)" : "scale(0.3)",
+              }}
+            />
+          );
+        })}
       </div>
 
       <div className="w-full max-w-sm flex flex-col gap-12">
