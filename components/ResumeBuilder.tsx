@@ -30,6 +30,14 @@ import {
 
 type PanelTab = "resume" | "report" | "edit";
 
+// Module-scope guard for the one-shot skills-gap fetch. Lives outside the
+// component so it survives unmount/remount cycles when the user navigates
+// between Chat / Resume Builder / Drive views. Without this, every remount
+// re-fired the fetch and re-pushed the "Strong AWS + Spark…" message into
+// the chat. Keyed by chatId so different chat sessions still each get one
+// skills-gap pass.
+const SKILLS_GAP_FIRED = new Set<string>();
+
 // Friendly label for a sectionKey — used in the chat log ("Rewrote your summary",
 // "bullet 2 at Acme Corp", etc.) so the user sees what changed without
 // decoding "experience.0.bullets.1".
@@ -374,9 +382,16 @@ export default function ResumeBuilder({
   const skillsGapInFlightRef = useRef(false);
   useEffect(() => {
     if (!resumeExtraction || !resumeAnalysis) return;
+    if (!chatId) return;
+    // Module-scope guard: only fire once per chatId across the entire
+    // session, even across remounts. The earlier in-component ref reset
+    // when ResumeBuilder unmounted on view switch, so the fetch fired
+    // again and pushed a duplicate "Strong AWS + Spark…" line.
+    if (SKILLS_GAP_FIRED.has(chatId)) return;
     if (skillsGap) return;                    // already have it
     if (skillsGapInFlightRef.current) return; // already fetching
     skillsGapInFlightRef.current = true;
+    SKILLS_GAP_FIRED.add(chatId);
 
     (async () => {
       try {

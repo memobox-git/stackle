@@ -365,14 +365,23 @@ export default function Page() {
   // ── Resume Builder welcome experience ────────────────────
   // When the user is in Resume Builder with a parsed resume and no chat
   // messages yet, push a personalised welcome + welcome-card sentinel.
-  // Writes to the unified `chatMessages` (single thread). The chat welcome
-  // effect below sits on the same bucket; whichever matches activeView
-  // first wins and the other no-ops because chatMessages.length > 0.
+  // Writes to the unified `chatMessages` (single thread).
+  //
+  // Critical guard: `welcomeFiredRef` is keyed by activeChatId. Once we've
+  // seeded a welcome for this chat, never re-seed for it — even if
+  // chatMessages.length flickers to 0 due to a transient state reset
+  // (token refresh, route change, etc.). This prevents the "main chat
+  // gets erased on view switch" symptom: the welcome can no longer
+  // overwrite a real conversation in client memory.
   const analysisKickoffRef = useRef<Set<string>>(new Set());
+  const welcomeFiredRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (activeView !== "resume-builder") return;
     if (!resumeExtraction) return;
+    if (!activeChatId) return;
+    if (welcomeFiredRef.current.has(activeChatId)) return;
     if (chatMessages.length > 0) return;
+    welcomeFiredRef.current.add(activeChatId);
 
     // Pull the most recent finalized version for this chat so the greeting
     // can say "your saved resume is X" on re-entry instead of the generic
@@ -445,7 +454,10 @@ export default function Page() {
   useEffect(() => {
     if (activeView !== "chat") return;
     if (!resumeExtraction) return;
+    if (!activeChatId) return;
+    if (welcomeFiredRef.current.has(activeChatId)) return;
     if (chatMessages.length > 0) return;
+    welcomeFiredRef.current.add(activeChatId);
 
     const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || "there";
     // Prefer a real employer — skip self-initiated / academic / project rows
@@ -493,6 +505,9 @@ export default function Page() {
     const msgs = chat.messages ?? [];
     setChatMessages(msgs);
     setActiveView(chat.mode === "resume_builder" ? "resume-builder" : "chat");
+    // If the restored chat already has messages, mark the welcome as fired
+    // so we don't seed a new welcome on top of the existing thread.
+    if (msgs.length > 0) welcomeFiredRef.current.add(chat.id);
 
     if (chat.mode === "resume_builder") {
       setResumeText(chat.resume_text ?? null);
@@ -550,6 +565,11 @@ export default function Page() {
   }
 
   function resetAllState() {
+    // TEMP diagnostic: surface every wipe so we can confirm view-switching
+    // is NOT calling this. Strip after we verify on prod.
+    console.log("[chat] resetAllState — chatMessages cleared", {
+      stack: new Error().stack?.split("\n").slice(2, 5).join(" | "),
+    });
     setChatMessages([]);
     setChatInput("");
     setResumeInput("");
@@ -585,6 +605,8 @@ export default function Page() {
       resumeAnalysis?: ResumeAnalysis | null;
     }
   ) {
+    // TEMP diagnostic: confirm every persistChat fires when expected.
+    console.log("[chat] persistChat", { id, mode, count: msgs.length });
     const title = deriveChatTitle(msgs);
     updateChat(id, {
       messages: msgs,
