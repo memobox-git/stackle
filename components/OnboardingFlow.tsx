@@ -562,12 +562,12 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
         {/* Step 2 — Resume upload */}
         {step >= 2 && (
-          <div className="animate-fadein flex flex-col gap-4">
-            <p className="text-lg font-semibold text-gray-900">
+          <div className="animate-fadein flex flex-col items-center gap-4">
+            <p className="text-lg font-semibold text-gray-900 text-center">
               {q2.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q2.done ? "opacity-0" : "animate-pulse"}`} />
             </p>
-            <p className="text-sm text-gray-400 -mt-2">
+            <p className="text-sm text-gray-400 -mt-2 text-center">
               I&apos;ll pull your details from it automatically.
             </p>
 
@@ -632,8 +632,8 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
         {/* Step 3 — Career Goal */}
         {step === 3 && (
-          <div className="animate-fadein flex flex-col gap-4">
-            <p className="text-lg font-semibold text-gray-900">
+          <div className="animate-fadein flex flex-col items-center gap-4">
+            <p className="text-lg font-semibold text-gray-900 text-center">
               {q3.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q3.done ? "opacity-0" : "animate-pulse"}`} />
             </p>
@@ -689,8 +689,8 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
         {/* Step 4 — Review extracted contact */}
         {step === 4 && (
-          <div className="animate-fadein flex flex-col gap-5">
-            <p className="text-lg font-semibold text-gray-900">
+          <div className="animate-fadein flex flex-col items-center gap-5">
+            <p className="text-lg font-semibold text-gray-900 text-center">
               {q4.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q4.done ? "opacity-0" : "animate-pulse"}`} />
             </p>

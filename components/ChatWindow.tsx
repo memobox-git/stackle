@@ -166,6 +166,12 @@ function StatusBanner({ icon, label, sub, color }: { icon: string; label: string
 
 const SENTINELS = ["__RESUME_PREVIEW__", "__RESUME_ANALYSIS__", "__RESUME_PRIORITIES__", "__MARKET_ANALYSIS__", "__RESUME_EXTRACTION__", "__INTERVIEW_PREP__", "__RESUME_WELCOME_CARD__", "__FIX_PROGRESS_CARD__"];
 
+// Inline chip sentinel. Format: "__INLINE_CHIPS__:Label one|Label two|Label three"
+// Renders as a row of clickable pills inside the chat (no avatar / bubble),
+// right after the previous assistant message. Click → fires onStarterPromptClick
+// with that label as the prompt.
+const INLINE_CHIPS_PREFIX = "__INLINE_CHIPS__:";
+
 // Pick an emoji for a chip based on keywords
 function chipEmoji(label: string): string {
   const l = label.toLowerCase();
@@ -662,6 +668,33 @@ export default function ChatWindow({
               currentIndex={currentFixIndex ?? null}
               onJumpTo={onFixItem}
             />
+          );
+        }
+
+        // Inline chips sentinel — rendered as a row of pill buttons right
+        // inside the chat thread (no avatar, no bubble). Lets the welcome
+        // present its CTAs as part of the conversation instead of a tray
+        // hovering above the input. Each chip's label is the prompt text.
+        if (msg.content.startsWith(INLINE_CHIPS_PREFIX)) {
+          const labels = msg.content.slice(INLINE_CHIPS_PREFIX.length).split("|").map((s) => s.trim()).filter(Boolean);
+          if (labels.length === 0) return null;
+          return (
+            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 mb-6">
+              <div className="ml-10 flex flex-wrap gap-2">
+                {labels.map((label, j) => (
+                  <button
+                    key={j}
+                    onClick={() => {
+                      if (onChatEditPrompt) onChatEditPrompt(label);
+                      else onStarterPromptClick?.(label);
+                    }}
+                    className="text-sm text-gray-200 bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] hover:border-[#3a3a3a] rounded-full px-4 py-1.5 transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
           );
         }
 

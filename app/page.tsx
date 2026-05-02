@@ -518,6 +518,10 @@ export default function Page() {
 
     const greetMsgs: ChatMessage[] = [
       { role: "assistant", content: `${header}${fullBody}`, timestamp: now() },
+      // Inline chip row — chips live IN the conversation thread so they
+      // feel like part of the assistant's first move, not a tray pinned
+      // above the input. Format consumed by ChatWindow's INLINE_CHIPS sentinel.
+      { role: "assistant", content: "__INLINE_CHIPS__:Fix my resume|What's going on?" },
     ];
     setChatMessages(greetMsgs);
 
@@ -1648,13 +1652,14 @@ export default function Page() {
                   setActiveView("resume-builder");
                 }}
                 onEditUserMessage={handleEditUserMessage}
-                starterPromptOverride={resumeExtraction ? ["Fix my resume", "What's going on?"] : undefined}
-                onStarterPromptClick={(prompt) => {
+                onChatEditPrompt={(prompt) => {
+                  // Inline chips clicked — route the special "Fix my resume"
+                  // pill to the resume builder view; everything else gets
+                  // sent through the chat as a normal user message.
                   if (prompt === "Fix my resume") {
                     setActiveView("resume-builder");
                     return;
                   }
-                  // Anything else — send as a normal chat message.
                   sendMessage(prompt);
                 }}
               />
