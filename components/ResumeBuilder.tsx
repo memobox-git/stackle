@@ -530,18 +530,17 @@ export default function ResumeBuilder({
     const workingExtraction = currentExtraction ?? editedExtraction;
     if (!workingExtraction) return;
 
-    // For direct per-section AI edits (Sparkles button — lockedSectionKey set),
-    // skip the chat-side "Generating…" spinner and just put a typing-pulse
-    // cursor on the locked section itself. Less screen-flash, faster perceived
-    // response — the user sees their section being worked on directly.
+    // For direct per-section AI edits (Sparkles button — lockedSectionKey
+    // set), skip the chat-side "Generating…" spinner. The section's
+    // existing content stays visible during the API call (don't replace
+    // it with an empty cursor — that's worse UX than just waiting).
+    // The AI button greys out via isRewriting so the user knows it's
+    // working; on response the diff box appears + typewriter fills.
     const isDirectSectionEdit = !!opts?.lockedSectionKey;
     if (!isDirectSectionEdit) {
       setFixFlow({ step: "loading", action: instruction, index: priorityIndex });
     } else {
-      // Show the section's pulsing-cursor placeholder while the writer call is
-      // in flight. Same UI state the typewriter uses, just with empty content.
-      setEditingSection(opts!.lockedSectionKey!);
-      setTypewriterContent("");
+      setIsRewriting(true);
     }
     setActiveTab("edit");
     setIsPanelOpen(true);
@@ -576,6 +575,7 @@ export default function ResumeBuilder({
     // silently drift into rewriting the summary as a fallback.
     if (result && result.sectionKey === "__not_applicable__") {
       setFixFlow(null);
+      if (opts?.lockedSectionKey) setIsRewriting(false);
       const reason = result.newContent?.trim() || "This action can't be performed by the writer.";
       onPushAssistantMessage?.(`✗ Skipped: ${describeSection("__not_applicable__", workingExtraction) || "this priority"} — ${reason}`);
       if (priorityIndex >= 0) {
@@ -622,6 +622,7 @@ export default function ResumeBuilder({
       // Skip silently and advance to the next non-protected priority so the
       // chain never stalls on a protected section.
       setFixFlow(null);
+      if (opts?.lockedSectionKey) setIsRewriting(false);
       if (writerDriftedIntoAcceptedSection && result) {
         onPushAssistantMessage?.(`✗ Skipped — this priority overlaps with a fix you already accepted on ${describeSection(result.sectionKey, workingExtraction)}.`);
       }
@@ -645,6 +646,9 @@ export default function ResumeBuilder({
     setInlineFix({ sectionKey: result.sectionKey, before, after: result.newContent, action: instruction, priorityIndex });
     setEditingSection(result.sectionKey);
     setTypewriterContent("");
+    // Direct section edit done — clear the AI-button busy state so the
+    // section's Sparkles control becomes clickable again next round.
+    if (opts?.lockedSectionKey) setIsRewriting(false);
 
     // Kick off the typewriter immediately. Scroll + flash run in parallel
     // — they no longer block the animation behind a 550ms timeout.
