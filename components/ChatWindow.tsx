@@ -164,7 +164,7 @@ function StatusBanner({ icon, label, sub, color }: { icon: string; label: string
   );
 }
 
-const SENTINELS = ["__RESUME_PREVIEW__", "__RESUME_ANALYSIS__", "__RESUME_PRIORITIES__", "__MARKET_ANALYSIS__", "__RESUME_EXTRACTION__", "__INTERVIEW_PREP__", "__RESUME_WELCOME_CARD__", "__FIX_PROGRESS_CARD__"];
+const SENTINELS = ["__RESUME_PREVIEW__", "__RESUME_ANALYSIS__", "__RESUME_PRIORITIES__", "__MARKET_ANALYSIS__", "__RESUME_EXTRACTION__", "__INTERVIEW_PREP__", "__RESUME_WELCOME_CARD__", "__FIX_PROGRESS_CARD__", "__EXTRACTING_RESUME__"];
 
 // Inline chip sentinel. Format: "__INLINE_CHIPS__:Label one|Label two|Label three"
 // Renders as a row of clickable pills inside the chat (no avatar / bubble),
@@ -559,6 +559,22 @@ export default function ChatWindow({
             ? <StatusBanner key={i} icon="📄" label={`${resumeExtraction.name} — Resume parsed`} sub="View in Resume tab →" color="#a99af9" />
             : null;
         if (msg.content === "__RESUME_PREVIEW__") return null;
+
+        // Extraction-in-progress card. Shown for the 10–20s gap between
+        // upload landing and the welcome firing, so the app doesn't look hung.
+        if (msg.content === "__EXTRACTING_RESUME__") {
+          return (
+            <div key={`extract-${i}`} className="w-full max-w-3xl mx-auto px-4 mb-6">
+              <div className="rounded-xl border border-[#2a2a2a] bg-[#111] px-5 py-4 flex items-center gap-3">
+                <span className="text-sm animate-spin" style={{ animationDuration: "2s" }}>⚙️</span>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">Reading your resume…</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Pulling out roles, dates, skills and projects. ~15s.</p>
+                </div>
+              </div>
+            </div>
+          );
+        }
 
         // Report artifact card
         if (msg.content === "__RESUME_ANALYSIS__") {
