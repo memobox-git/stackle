@@ -530,7 +530,19 @@ export default function ResumeBuilder({
     const workingExtraction = currentExtraction ?? editedExtraction;
     if (!workingExtraction) return;
 
-    setFixFlow({ step: "loading", action: instruction, index: priorityIndex });
+    // For direct per-section AI edits (Sparkles button — lockedSectionKey set),
+    // skip the chat-side "Generating…" spinner and just put a typing-pulse
+    // cursor on the locked section itself. Less screen-flash, faster perceived
+    // response — the user sees their section being worked on directly.
+    const isDirectSectionEdit = !!opts?.lockedSectionKey;
+    if (!isDirectSectionEdit) {
+      setFixFlow({ step: "loading", action: instruction, index: priorityIndex });
+    } else {
+      // Show the section's pulsing-cursor placeholder while the writer call is
+      // in flight. Same UI state the typewriter uses, just with empty content.
+      setEditingSection(opts!.lockedSectionKey!);
+      setTypewriterContent("");
+    }
     setActiveTab("edit");
     setIsPanelOpen(true);
     setRewriteAttempts([]); // fresh fix — clear any prior rewrite history
@@ -625,26 +637,26 @@ export default function ResumeBuilder({
 
     const before = resolveSectionContent(workingExtraction, result.sectionKey);
     setFixFlow(null);
+    // Set editingSection + clear typewriterContent IN THE SAME RENDER as
+    // setInlineFix so the green box never flashes the full text before the
+    // typewriter starts. EditableSection's `isEditing` check now flips to
+    // true immediately, displayAfter = typewriterContent = "" (empty), and
+    // the typewriter fills it character-by-character from there.
     setInlineFix({ sectionKey: result.sectionKey, before, after: result.newContent, action: instruction, priorityIndex });
+    setEditingSection(result.sectionKey);
+    setTypewriterContent("");
 
-    // Scroll the section into view, THEN kick off the typewriter so the
-    // user doesn't miss the animation if the section was offscreen.
-    // `scrollIntoView` has no promise; we estimate ~600ms for smooth scroll.
-    // Then flash the section with a purple ring so the user can't miss WHERE
-    // the fix is being applied — no more "why didn't anything happen?" moments.
+    // Kick off the typewriter immediately. Scroll + flash run in parallel
+    // — they no longer block the animation behind a 550ms timeout.
+    runTypewriter(result.newContent, result.sectionKey);
     requestAnimationFrame(() => {
       const el = document.querySelector(`[data-section-key^="${CSS.escape(result.sectionKey)}"]`) as HTMLElement | null;
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
-        // Re-trigger the animation by toggling the class off then on
         el.classList.remove("stackle-fix-flash");
-        // Force reflow so the animation restarts cleanly
-        void el.offsetHeight;
+        void el.offsetHeight; // force reflow so the keyframe restarts cleanly
         el.classList.add("stackle-fix-flash");
         setTimeout(() => el.classList.remove("stackle-fix-flash"), 1200);
-        setTimeout(() => runTypewriter(result.newContent, result.sectionKey), 550);
-      } else {
-        runTypewriter(result.newContent, result.sectionKey);
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
