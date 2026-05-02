@@ -792,11 +792,8 @@ export default function ChatWindow({
       )}
     </div>
     {showStarterPills && (onChatEditPrompt || onStarterPromptClick) && (
-      <div className="flex-shrink-0 border-t border-[#1f1f1f] bg-[#0a0a0a] px-4 py-3">
-        <p className="text-[10px] font-medium tracking-[0.1em] uppercase text-gray-600 mb-2">
-          Try one of these
-        </p>
-        <div className="flex flex-wrap gap-2">
+      <div className="flex-shrink-0 px-4 pb-2">
+        <div className="flex flex-wrap gap-2 max-w-3xl mx-auto">
           {starterPrompts.map((prompt, idx) => (
             <button
               key={idx}
