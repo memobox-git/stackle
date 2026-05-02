@@ -436,6 +436,15 @@ export default function Page() {
         .then((a: ResumeAnalysis | null) => {
           if (a) {
             setResumeAnalysis(a);
+            // The report is the wow moment. Auto-pop the Report tab and
+            // narrate it in chat so the user knows where to look.
+            setActiveView("resume-builder");
+            setOpenReportSignal((n) => n + 1);
+            setChatMessages((prev) => {
+              const note = "Your report is ready — opening it on the right →";
+              if (prev.some((m) => m.content === note)) return prev;
+              return [...prev, { role: "assistant", content: note, timestamp: now() }];
+            });
             if (activeChatId) {
               persistChat(activeChatId, welcomeMsgs, "resume_builder", {
                 resumeText,

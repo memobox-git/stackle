@@ -169,16 +169,28 @@ nextjs-portal { display: none !important; }
   border-radius: 6px;
 }
 
-/* Manual-edit pencil — fades in when the user hovers a section that supports
-   plain-text editing (summary, bullets, etc.). Stays visible when the pencil
-   itself is focused so keyboard users can tab into it. */
+/* Manual-edit pencil + AI buttons — ALWAYS visible (was hover-only and
+   users couldn't find them). Slightly translucent at rest, full on hover. */
+.lre-manual-btn {
+  opacity: 0.65 !important;
+}
 .lre-manual-host:hover .lre-manual-btn,
-.lre-manual-btn:focus {
+.lre-manual-btn:focus,
+.lre-manual-btn:hover {
   opacity: 1 !important;
 }
 .lre-manual-btn:hover {
   background: #f3f4f6 !important;
   color: #111 !important;
+}
+
+/* Section-edit button row (Pencil + AI Sparkles + Accept/Reject when active).
+   Was opacity:0 baseline so users hovered blindly. Show at 0.7, full on hover. */
+.lre-section-buttons {
+  opacity: 0.75 !important;
+}
+.lre-section-host:hover .lre-section-buttons {
+  opacity: 1 !important;
 }
 
 /* Shimmer for loading states (e.g. "Reading your resume…" button on

@@ -313,10 +313,20 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         city,
         state,
       });
-      setStep(3);
+      // Skip the Career Goal + Contact review steps — drop straight into
+      // the app so the user sees their report being prepared. Profile is
+      // persisted with whatever extraction landed.
+      setExtracting(false);
+      const profile = persistProfile();
+      onComplete(profile);
+      return;
     } catch {
-      // Extraction failed — still advance so the user can hand-enter details.
-      setStep(3);
+      // Extraction failed — still drop into the app; the user can re-upload
+      // or paste text in chat.
+      setExtracting(false);
+      const profile = persistProfile();
+      onComplete(profile);
+      return;
     } finally {
       setExtracting(false);
     }
