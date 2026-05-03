@@ -84,7 +84,9 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   const [avatarDragging, setAvatarDragging] = useState(false);
   const avatarDragStartRef = useRef({ x: 0, y: 0, startX: 0, startY: 0 });
   const rawImgRef = useRef<HTMLImageElement>(null);
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  // Photo step retired — start at upload. Avatar code is left in place
+  // (unused) in case we re-introduce it as an optional post-upload nudge.
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(2);
   const [uploading, setUploading] = useState(false);
   const [resumeFilename, setResumeFilename] = useState("");
   const [resumeText, setResumeText] = useState("");
