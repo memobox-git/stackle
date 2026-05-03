@@ -449,7 +449,7 @@ export default function Page() {
         .catch(() => { /* non-fatal — card stays in skeleton */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeView, resumeExtraction, chatMessages.length]);
+  }, [activeView, resumeExtraction, chatMessages.length, activeChatId]);
 
   // ── Main chat welcome greeting ────────────────────────────
   // When the user lands in the main chat view (not Resume Builder) with a
@@ -535,7 +535,7 @@ export default function Page() {
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeView, resumeExtraction, resumeAnalysis, isAnalyzingResume, chatMessages.length]);
+  }, [activeView, resumeExtraction, resumeAnalysis, isAnalyzingResume, chatMessages.length, activeChatId]);
 
   // ── Timestamp helper ──────────────────────────────────
   function now() {
