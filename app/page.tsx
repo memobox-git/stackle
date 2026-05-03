@@ -518,6 +518,10 @@ export default function Page() {
 
     const greetMsgs: ChatMessage[] = [
       { role: "assistant", content: `${header}${fullBody}`, timestamp: now() },
+      // Inline chip row — chips live IN the conversation thread so they
+      // feel like part of the assistant's first move, not a tray pinned
+      // above the input. Format consumed by ChatWindow's INLINE_CHIPS sentinel.
+      { role: "assistant", content: "__INLINE_CHIPS__:Fix my resume|What's going on?" },
     ];
     setChatMessages(greetMsgs);
 
@@ -546,10 +550,26 @@ export default function Page() {
   // we'd use for any other chat.
   function restoreChatState(chat: SupabaseChat) {
     const raw = chat.messages ?? [];
-    // Strip any legacy inline-chip sentinels — chips were retired.
-    const msgs = raw.filter(
-      (m) => !(typeof m.content === "string" && m.content.startsWith("__INLINE_CHIPS__:"))
-    );
+    // Backfill: older chats were saved before inline chips existed. If this
+    // is a chat-mode thread that never got chips, inject them right after
+    // the first assistant message so re-entering an old chat looks like
+    // a new one. Cheap, idempotent, no DB write.
+    let msgs = raw;
+    if (chat.mode !== "resume_builder" && raw.length > 0) {
+      const hasChips = raw.some((m) => typeof m.content === "string" && m.content.startsWith("__INLINE_CHIPS__:"));
+      if (!hasChips) {
+        const firstAssistantIdx = raw.findIndex((m) => m.role === "assistant");
+        if (firstAssistantIdx >= 0) {
+          const before = raw.slice(0, firstAssistantIdx + 1);
+          const after = raw.slice(firstAssistantIdx + 1);
+          msgs = [
+            ...before,
+            { role: "assistant", content: "__INLINE_CHIPS__:Fix my resume|What's going on?" },
+            ...after,
+          ];
+        }
+      }
+    }
     setChatMessages(msgs);
     setActiveView(chat.mode === "resume_builder" ? "resume-builder" : "chat");
     setCareerGoal(chat.career_goal ?? null);
