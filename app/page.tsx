@@ -827,11 +827,7 @@ export default function Page() {
     // user is viewing chat or resume-builder. The welcome useEffect fires
     // once `resumeExtraction` lands and pushes the welcome card after this.
     const uploadMsg: ChatMessage = { role: "user", content: `__FILE_UPLOAD__:${filename}`, timestamp: now() };
-    // Push an extracting-progress card so the 10–20s of silence while Opus
-    // parses the resume reads as activity, not a hung app. The card is
-    // spliced out when extraction lands.
-    const extractingMsg: ChatMessage = { role: "assistant", content: "__EXTRACTING_RESUME__" };
-    setChatMessages((prev) => [...prev, uploadMsg, extractingMsg]);
+    setChatMessages((prev) => [...prev, uploadMsg]);
     setIntakeStep(0);
     setIntakeAnswers({});
     setIntakeData(null);
@@ -848,8 +844,6 @@ export default function Page() {
       if (extractRes.ok) {
         extraction = await extractRes.json();
         setResumeExtraction(extraction);
-        // Remove the extracting-progress card; welcome takes over.
-        setChatMessages((prev) => prev.filter((m) => m.content !== "__EXTRACTING_RESUME__"));
 
         const id = activeChatIdRef.current;
         if (id) {
@@ -873,13 +867,10 @@ export default function Page() {
       }
     } catch {
       setIsLoading(false);
-      setChatMessages((prev) => [
-        ...prev.filter((m) => m.content !== "__EXTRACTING_RESUME__"),
-        {
-          role: "assistant",
-          content: "I couldn't read that file. Try uploading it again or paste your resume as text.",
-        },
-      ]);
+      setChatMessages((prev) => [...prev, {
+        role: "assistant",
+        content: "I couldn't read that file. Try uploading it again or paste your resume as text.",
+      }]);
     }
   };
 
