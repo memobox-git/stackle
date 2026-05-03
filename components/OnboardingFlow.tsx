@@ -435,7 +435,8 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
       <div className="w-full max-w-sm flex flex-col gap-12">
 
-        {/* Step 1 — Profile photo. Image first, heading underneath. */}
+        {/* Step 1 — Profile photo. Retired — gated so it never renders. */}
+        {false && (
         <div className="animate-fadein flex flex-col items-center gap-4">
 
           {/* Empty state — no photo chosen yet */}
@@ -561,6 +562,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarChange(f); }} />
         </div>
+        )}
 
         {/* Step 2 — Resume upload */}
         {step >= 2 && (
