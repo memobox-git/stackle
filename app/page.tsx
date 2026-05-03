@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
-import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, ChevronDown } from "lucide-react";
+import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
@@ -549,27 +549,7 @@ export default function Page() {
   // resume-builder panel and load their thread into the same shared array
   // we'd use for any other chat.
   function restoreChatState(chat: SupabaseChat) {
-    const raw = chat.messages ?? [];
-    // Backfill: older chats were saved before inline chips existed. If this
-    // is a chat-mode thread that never got chips, inject them right after
-    // the first assistant message so re-entering an old chat looks like
-    // a new one. Cheap, idempotent, no DB write.
-    let msgs = raw;
-    if (chat.mode !== "resume_builder" && raw.length > 0) {
-      const hasChips = raw.some((m) => typeof m.content === "string" && m.content.startsWith("__INLINE_CHIPS__:"));
-      if (!hasChips) {
-        const firstAssistantIdx = raw.findIndex((m) => m.role === "assistant");
-        if (firstAssistantIdx >= 0) {
-          const before = raw.slice(0, firstAssistantIdx + 1);
-          const after = raw.slice(firstAssistantIdx + 1);
-          msgs = [
-            ...before,
-            { role: "assistant", content: "__INLINE_CHIPS__:Fix my resume|What's going on?" },
-            ...after,
-          ];
-        }
-      }
-    }
+    const msgs = chat.messages ?? [];
     setChatMessages(msgs);
     setActiveView(chat.mode === "resume_builder" ? "resume-builder" : "chat");
     setCareerGoal(chat.career_goal ?? null);
@@ -1582,17 +1562,8 @@ export default function Page() {
             </button>
           </div>
 
-          <div className="text-sm font-medium text-gray-300 truncate max-w-[50%] text-center">
-            {(() => {
-              if (!isSignedUp) return "";
-              if (activeView === "drive") return "Drive";
-              const candidateName = (resumeExtraction?.name ?? "").trim();
-              if (activeView === "resume-builder") {
-                return candidateName ? `${candidateName}'s Resume` : "Resume Builder";
-              }
-              // chat
-              return candidateName ? `Chat — ${candidateName}` : "Career Chat";
-            })()}
+          <div className="text-sm font-medium text-gray-400">
+            {isSignedUp && activeView === "resume-builder" ? "Resume Builder" : ""}
           </div>
 
           <div className="flex items-center gap-2">
@@ -1614,7 +1585,6 @@ export default function Page() {
                     {(user?.email ?? "?").slice(0, 1).toUpperCase()}
                   </span>
                   <span className="truncate">{user?.email ?? "Account"}</span>
-                  <ChevronDown className={`w-3 h-3 opacity-60 flex-shrink-0 transition-transform ${userMenuOpen ? "rotate-180" : ""}`} strokeWidth={2} />
                 </button>
                 {userMenuOpen && (
                   <>
