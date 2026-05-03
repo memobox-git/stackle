@@ -506,7 +506,7 @@ export default function ResumeReportCard({
           <Divider />
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
             <SectionLabel>Prioritized Action Plan</SectionLabel>
-            {onFixAll && (() => {
+            {onFixAll && !isFinalized && (() => {
               const remaining = analysis.rewritePriorities.filter((_, i) => !(completedActions?.has(i) ?? false)).length;
               if (remaining === 0) return null; // all handled — hide the button
               return (
@@ -517,7 +517,7 @@ export default function ResumeReportCard({
             })()}
             {isFinalized && (
               <span style={{ fontFamily: "system-ui, sans-serif", fontSize: "10px", fontWeight: "600", color: "#16a34a", padding: "4px 10px", border: "1px solid #bbf7d0", borderRadius: "4px", background: "#f0fdf4", letterSpacing: "0.03em", marginBottom: "10px" }}>
-                ✓ Saved — keep editing to make a new version
+                ✓ Cycle saved — start a new cycle to revise again
               </span>
             )}
           </div>
@@ -579,7 +579,7 @@ export default function ResumeReportCard({
                     </td>
                     <td style={{ padding: "8px 8px", color: "#374151", lineHeight: "1.5", ...strikeStyle }}>
                       {fixText || displayAction}
-                      {onFixItem && !isDone && (
+                      {onFixItem && !isDone && !isFinalized && (
                         <button onClick={() => onFixItem(action, i)} style={{ fontFamily: "system-ui, sans-serif", marginLeft: "10px", fontSize: "9px", fontWeight: "600", padding: "2px 8px", border: "1px solid #d1d5db", borderRadius: "3px", background: "#fff", color: "#374151", cursor: "pointer" }}>
                           Fix this
                         </button>
