@@ -414,7 +414,7 @@ function EditableSection({
                   gap: "3px",
                   marginLeft: "6px",
                   verticalAlign: "middle",
-                  opacity: 0.7,
+                  opacity: 0,
                   transition: "opacity 140ms ease",
                   whiteSpace: "nowrap",
                 }
@@ -427,7 +427,7 @@ function EditableSection({
                   flexDirection: "column",
                   alignItems: "center",
                   gap: "3px",
-                  opacity: 0.7,
+                  opacity: 0,
                   transition: "opacity 140ms ease",
                 }
           }

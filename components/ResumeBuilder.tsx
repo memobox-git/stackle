@@ -192,9 +192,6 @@ export default function ResumeBuilder({
   // Tracks AI versions the user rejected via Rewrite for the current fix, so
   // the next call can ask Sonnet for something substantively different.
   const [rewriteAttempts, setRewriteAttempts] = useState<string[]>([]);
-  // Per-priority attempt history. Keyed by rewritePriority index so re-fixing
-  // the same priority forces variation against everything we've shown before.
-  const priorityAttemptHistoryRef = useRef<Map<number, string[]>>(new Map());
   // True while a Rewrite call is in flight — used to disable the buttons and
   // show a "Rewriting…" state without unmounting the current proposal.
   const [isRewriting, setIsRewriting] = useState(false);
@@ -548,11 +545,6 @@ export default function ResumeBuilder({
     setActiveTab("edit");
     setIsPanelOpen(true);
     setRewriteAttempts([]); // fresh fix — clear any prior rewrite history
-    // Pull prior attempts for this priority so the writer is told what NOT
-    // to repeat. Stops the loop where Fix → same wording reappears.
-    const priorHistory = priorityIndex >= 0
-      ? (priorityAttemptHistoryRef.current.get(priorityIndex) ?? [])
-      : [];
 
     // Ensure a working copy exists in Drive (first-fix path)
     if (chatId && originalDriveFileId && !workingCopyId) {
@@ -574,14 +566,7 @@ export default function ResumeBuilder({
       ? strongBulletKeys(workingExtraction.experience)
       : undefined;
 
-    const result = await callEditApi(instruction, workingExtraction, { lockedBullets, lockedSectionKey: opts?.lockedSectionKey, previousAttempts: priorHistory.length > 0 ? priorHistory : undefined });
-
-    // Stash this attempt so a subsequent Fix on the same priority sees it
-    // as a "rejected" version and produces something genuinely different.
-    if (result && result.newContent && priorityIndex >= 0) {
-      const next = [...priorHistory, result.newContent].slice(-3); // keep last 3
-      priorityAttemptHistoryRef.current.set(priorityIndex, next);
-    }
+    const result = await callEditApi(instruction, workingExtraction, { lockedBullets, lockedSectionKey: opts?.lockedSectionKey });
 
     // Writer marked this priority not applicable (structural action it
     // can't perform — e.g. "remove References section", "convert table to
