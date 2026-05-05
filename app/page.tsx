@@ -285,6 +285,11 @@ export default function Page() {
     if (authLoading) return;
     loadChats()
       .then(async (chats) => {
+        console.log("[loadChats]", {
+          count: chats.length,
+          firstChatMessages: chats[0]?.messages?.length ?? 0,
+          firstChatMode: chats[0]?.mode,
+        });
         if (chats.length === 0) {
           // No existing chat (auth'd: empty Supabase, unauth: no localStorage).
           // Seed one with the profile resume so welcome + future messages
@@ -402,8 +407,21 @@ export default function Page() {
     // doesn't sit silently while activeChatId is still null. Same pattern
     // as the auto-save-original effect uses.
     const effectiveChatId = activeChatId ?? "local-chat";
-    if (welcomeFiredRef.current.has(effectiveChatId)) return;
-    if (chatMessages.length > 0) return;
+    const decision = {
+      activeChatId,
+      effectiveChatId,
+      existingMessages: chatMessages.length,
+      alreadyFired: welcomeFiredRef.current.has(effectiveChatId),
+    };
+    if (welcomeFiredRef.current.has(effectiveChatId)) {
+      console.log("[welcome:rb] skip — already fired", decision);
+      return;
+    }
+    if (chatMessages.length > 0) {
+      console.log("[welcome:rb] skip — messages present", decision);
+      return;
+    }
+    console.log("[welcome:rb] FIRING", decision);
     welcomeFiredRef.current.add(effectiveChatId);
 
     // Pull the most recent finalized version for this chat so the greeting
@@ -480,12 +498,29 @@ export default function Page() {
     if (activeView !== "chat") return;
     if (!resumeExtraction) return;
     if (!activeChatId) return;
-    if (welcomeFiredRef.current.has(activeChatId)) return;
-    if (chatMessages.length > 0) return;
+    const decision = {
+      activeChatId,
+      existingMessages: chatMessages.length,
+      alreadyFired: welcomeFiredRef.current.has(activeChatId),
+      isAnalyzingResume,
+      hasAnalysis: !!resumeAnalysis,
+    };
+    if (welcomeFiredRef.current.has(activeChatId)) {
+      console.log("[welcome:chat] skip — already fired", decision);
+      return;
+    }
+    if (chatMessages.length > 0) {
+      console.log("[welcome:chat] skip — messages present", decision);
+      return;
+    }
     // Wait for analysis if it's actively loading — the rich welcome
     // depends on bestFitRoles / strengths / weaknesses. If analysis isn't
     // running anymore (failed or never started), proceed with header-only.
-    if (isAnalyzingResume && !resumeAnalysis) return;
+    if (isAnalyzingResume && !resumeAnalysis) {
+      console.log("[welcome:chat] skip — analysis still loading", decision);
+      return;
+    }
+    console.log("[welcome:chat] FIRING", decision);
     welcomeFiredRef.current.add(activeChatId);
 
     const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || "there";
@@ -570,12 +605,28 @@ export default function Page() {
   // we'd use for any other chat.
   function restoreChatState(chat: SupabaseChat) {
     const msgs = chat.messages ?? [];
+    console.log("[restore]", {
+      chatId: chat.id,
+      messageCount: msgs.length,
+      mode: chat.mode,
+      hasResumeExtraction: !!chat.resume_extraction,
+      hasResumeAnalysis: !!chat.resume_analysis,
+    });
     setChatMessages(msgs);
     setActiveView(chat.mode === "resume_builder" ? "resume-builder" : "chat");
     setCareerGoal(chat.career_goal ?? null);
-    // If the restored chat already has messages, mark the welcome as fired
-    // so we don't seed a new welcome on top of the existing thread.
-    if (msgs.length > 0) welcomeFiredRef.current.add(chat.id);
+    // CRITICAL: mark welcome as fired for this chat ALWAYS once we restore.
+    // If the chat row exists, this is an existing conversation — even if
+    // its messages array is currently empty, we should NOT push a fresh
+    // welcome on top because the user might be mid-flight (an in-flight
+    // persist could still be writing the first message). Marking the chat
+    // 'fired' here prevents the welcome useEffect from racing in and
+    // wiping any messages that arrive after restore.
+    welcomeFiredRef.current.add(chat.id);
+    // Also block the unauth fallback id so a transient activeChatId=null
+    // window doesn't cause the resume-builder welcome useEffect to push
+    // a welcome under "local-chat" before the real id propagates.
+    welcomeFiredRef.current.add("local-chat");
 
     if (chat.mode === "resume_builder") {
       setResumeText(chat.resume_text ?? null);
@@ -1274,8 +1325,13 @@ export default function Page() {
           { role: "assistant", content: assistantText },
         ];
 
-        // Persist to Supabase
+        // Persist to Supabase / localStorage
         const id = activeChatIdRef.current;
+        console.log("[send:after-stream]", {
+          activeChatId: id,
+          streamedMessageCount: streamedMessages.length,
+          willPersist: !!id,
+        });
         if (id) {
           persistChat(id, streamedMessages, isResumeMode ? "resume_builder" : "chat", {
             resumeText,
