@@ -791,29 +791,9 @@ export default function ChatWindow({
         </button>
       )}
     </div>
-    {showStarterPills && (onChatEditPrompt || onStarterPromptClick) && (
-      <div className="flex-shrink-0 border-t border-[#1f1f1f] bg-[#0a0a0a] px-4 py-3">
-        <p className="text-[10px] font-medium tracking-[0.1em] uppercase text-gray-600 mb-2">
-          Try one of these
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {starterPrompts.map((prompt, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                // Prefer the document-edit flow when available so pills trigger
-                // the typewriter + ✓/✗ on the resume instead of filling the chat input.
-                if (onChatEditPrompt) onChatEditPrompt(prompt);
-                else onStarterPromptClick?.(prompt);
-              }}
-              className="text-[12px] text-gray-300 bg-[#141414] hover:bg-[#1a1a1a] border border-[#1f1f1f] hover:border-[#2a2a2a] rounded-full px-3 py-1.5 transition-colors"
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
-      </div>
-    )}
+    {/* Starter-pill tray removed — felt like rigid clutter above the input.
+        The chat input placeholder + the AI Coach card on the Report tab
+        already point users to the right next move. */}
     </div>
   );
 }
