@@ -143,12 +143,29 @@ function renderContent(content: string) {
       continue;
     }
 
-    // Bullet list
-    if (line.match(/^[-*•]\s/)) {
+    // Bullet list — collect contiguous bullet items, allowing blank lines
+    // between them. Strips a SINGLE leading "-", "*", or "•" plus any extra
+    // bullet glyphs the model accidentally produced (e.g. "* • Item" or
+    // "• * Item"), so the rendered "•" is the only bullet visible.
+    const bulletRe = /^\s*[-*•]\s+/;
+    if (bulletRe.test(line)) {
       const items: string[] = [];
-      while (i < lines.length && lines[i].match(/^[-*•]\s/)) {
-        items.push(lines[i].replace(/^[-*•]\s/, ""));
-        i++;
+      while (i < lines.length) {
+        if (bulletRe.test(lines[i])) {
+          // Strip leading bullet, then strip any further leading bullet/asterisk
+          // glyphs the model may have stacked (defensive against "- * Item").
+          const cleaned = lines[i]
+            .replace(bulletRe, "")
+            .replace(/^[-*•]\s+/, "")
+            .trim();
+          items.push(cleaned);
+          i++;
+        } else if (lines[i].trim() === "" && i + 1 < lines.length && bulletRe.test(lines[i + 1])) {
+          // Blank line between bullet items — stay in the list.
+          i++;
+        } else {
+          break;
+        }
       }
       elements.push(
         <ul key={`ul-${i}`} className="space-y-2 my-3">
@@ -163,19 +180,31 @@ function renderContent(content: string) {
       continue;
     }
 
-    // Numbered list
-    if (line.match(/^\d+\.\s/)) {
-      const items: string[] = [];
-      while (i < lines.length && lines[i].match(/^\d+\.\s/)) {
-        items.push(lines[i].replace(/^\d+\.\s/, ""));
-        i++;
+    // Numbered list — same blank-line-tolerant collection as bullets. Uses
+    // the ACTUAL number captured from the source (1., 2., 3.) instead of an
+    // index, so a list split by blank lines still renders 1, 2, 3 — not
+    // 1, 1, 1 (the previous bug).
+    const orderedRe = /^\s*(\d+)\.\s+(.*)$/;
+    const orderedMatch = line.match(orderedRe);
+    if (orderedMatch) {
+      const items: { num: string; content: string }[] = [];
+      while (i < lines.length) {
+        const m = lines[i].match(orderedRe);
+        if (m) {
+          items.push({ num: m[1], content: m[2] });
+          i++;
+        } else if (lines[i].trim() === "" && i + 1 < lines.length && orderedRe.test(lines[i + 1])) {
+          i++;
+        } else {
+          break;
+        }
       }
       elements.push(
         <ol key={`ol-${i}`} className="space-y-2 my-3">
           {items.map((item, idx) => (
             <li key={idx} className="flex gap-3 text-[15px] leading-6 text-gray-700">
-              <span className="text-gray-600 flex-shrink-0 font-medium tabular-nums">{idx + 1}.</span>
-              <span>{inlineFormat(item)}</span>
+              <span className="text-gray-600 flex-shrink-0 font-medium tabular-nums">{item.num}.</span>
+              <span>{inlineFormat(item.content)}</span>
             </li>
           ))}
         </ol>
