@@ -37,6 +37,10 @@ type PanelTab = "resume" | "report" | "edit";
 // the chat. Keyed by chatId so different chat sessions still each get one
 // skills-gap pass.
 const SKILLS_GAP_FIRED = new Set<string>();
+// Per-chatId dismiss state for the slim AI Coach card on the Report tab.
+// Module scope (not React state) so a remount during view switches doesn't
+// clear it — once the user clicks ×, it stays gone for that chat session.
+const AI_COACH_DISMISSED = new Set<string>();
 
 // Friendly label for a sectionKey — used in the chat log ("Rewrote your summary",
 // "bullet 2 at Acme Corp", etc.) so the user sees what changed without
@@ -222,6 +226,9 @@ export default function ResumeBuilder({
   // `chatLine` → surfaced as an assistant message so the user hears it
   type SkillGapMissing = { skill: string; category: string; reason: string; priority: "high" | "medium" };
   const [skillsGap, setSkillsGap] = useState<{ missing: SkillGapMissing[]; chatLine: string } | null>(null);
+  // Tick state used solely to re-render after toggling AI_COACH_DISMISSED so
+  // the slim coach card on the Report tab disappears immediately on click.
+  const [, setCoachDismissTick] = useState(0);
   // Skills the user has dismissed from the suggested row in this session
   const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<string>>(new Set());
   // 1-deep snapshot of skillGroups before the auto-regroup so the user can Undo.
@@ -2014,15 +2021,16 @@ export default function ResumeBuilder({
 
             {activeTab === "report" && effectiveAnalysis && (
               <div className="p-4" style={{ animation: "fadeIn 200ms ease" }} ref={reportRef}>
-                {/* AI Coach — the "fastest win" callout. Distills the report
-                    into one sentence + one CTA so the user doesn't have to
-                    read the whole thing to know what to do first. */}
+                {/* Slim AI Coach — context-aware. The user is ALREADY on the
+                    Report tab so the full "View full report" CTA is gone.
+                    One line, one Fix CTA, an × to dismiss for this session.
+                    Dismiss state is module-scoped per chatId so it survives
+                    panel/tab switches and remounts. */}
                 {(() => {
-                  const issueCount = (effectiveAnalysis.weaknesses?.length ?? 0)
-                    + Math.min((effectiveAnalysis.weakBullets?.length ?? 0), 3);
                   const topPriority = effectiveAnalysis.rewritePriorities?.[0];
                   if (!topPriority) return null;
-                  // Best-effort label of what section the top fix targets.
+                  const dismissKey = chatId ?? "local-chat";
+                  if (AI_COACH_DISMISSED.has(dismissKey)) return null;
                   const sectionLabel = /summary/i.test(topPriority)
                     ? "Summary"
                     : /skills?/i.test(topPriority)
@@ -2031,34 +2039,31 @@ export default function ResumeBuilder({
                         ? "Experience bullets"
                         : "Top priority";
                   return (
-                    <div className="mb-6 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white px-6 py-5 shadow-sm">
-                      <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-violet-100 border border-violet-200 flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-5 h-5 text-violet-600" strokeWidth={2} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-semibold tracking-widest uppercase text-violet-700 mb-1.5">AI Coach</p>
-                          <p className="text-base text-gray-900 leading-snug">
-                            I found <span className="font-semibold">{issueCount} issue{issueCount === 1 ? "" : "s"}</span>. The fastest win is fixing your <span className="font-semibold">{sectionLabel.toLowerCase()}</span>.
-                          </p>
-                          <p className="text-sm text-gray-600 mt-2 leading-relaxed">{topPriority}</p>
-                          <div className="flex items-center gap-2 mt-4">
-                            <button
-                              onClick={() => handleFixItem(topPriority, 0)}
-                              disabled={isEditStreaming}
-                              className="text-sm font-semibold px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
-                            >
-                              Fix {sectionLabel}
-                            </button>
-                            <button
-                              onClick={() => reportRef.current?.scrollTo({ top: 9999, behavior: "smooth" })}
-                              className="text-sm font-medium px-4 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors border border-gray-300"
-                            >
-                              View full report
-                            </button>
-                          </div>
-                        </div>
+                    <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3 flex items-center gap-3">
+                      <div className="w-7 h-7 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="w-3.5 h-3.5 text-violet-600" strokeWidth={2} />
                       </div>
+                      <p className="text-sm text-gray-900 flex-1 min-w-0 leading-snug">
+                        Top priority: <span className="font-semibold">fix your {sectionLabel.toLowerCase()}</span>.
+                      </p>
+                      <button
+                        onClick={() => handleFixItem(topPriority, 0)}
+                        disabled={isEditStreaming}
+                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                      >
+                        Fix {sectionLabel}
+                      </button>
+                      <button
+                        onClick={() => {
+                          AI_COACH_DISMISSED.add(dismissKey);
+                          setCoachDismissTick((n) => n + 1);
+                        }}
+                        aria-label="Dismiss AI Coach"
+                        title="Dismiss"
+                        className="w-7 h-7 rounded-md text-gray-500 hover:text-gray-900 hover:bg-violet-100 flex items-center justify-center flex-shrink-0 transition-colors"
+                      >
+                        <X className="w-4 h-4" strokeWidth={2} />
+                      </button>
                     </div>
                   );
                 })()}
