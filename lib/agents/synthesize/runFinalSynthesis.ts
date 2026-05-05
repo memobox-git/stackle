@@ -74,11 +74,13 @@ Summary: ${(ext.summary ?? "").slice(0, 400)}`);
   return parts.join("\n");
 }
 
-// Confirmed available on this account's API key (verified via /v1/models).
-// Opus 4.7 — sharpest, most coherent chat voice in the lineup.
-// Falls back to Sonnet 4.5 only if Anthropic returns an error.
-const CHAT_MODEL_PRIMARY = "claude-opus-4-7";
-const CHAT_MODEL_FALLBACK = "claude-sonnet-4-5";
+// Sonnet 4.5 for chat. Opus 4.7 was sharper but its time-to-first-token
+// for short conversational replies (e.g. "hi") was 20-60s — felt broken.
+// Sonnet streams the first token in 1-3s and finishes 4-line replies in
+// under 10s, which is what live chat actually needs. Opus 4.7 only kicks
+// in if Sonnet errors (rate limit / outage).
+const CHAT_MODEL_PRIMARY = "claude-sonnet-4-5";
+const CHAT_MODEL_FALLBACK = "claude-opus-4-7";
 
 export async function runFinalSynthesis(workspace: WorkspaceViewModel): Promise<ReadableStream> {
   const systemPrompt = buildSynthesisSystemPrompt(workspace);
@@ -91,7 +93,7 @@ export async function runFinalSynthesis(workspace: WorkspaceViewModel): Promise<
   try {
     stream = await client.messages.stream({
       model: CHAT_MODEL_PRIMARY,
-      max_tokens: 16000,
+      max_tokens: 4000,
       system: systemPrompt,
       messages: workspace.conversationHistory,
     });
@@ -100,7 +102,7 @@ export async function runFinalSynthesis(workspace: WorkspaceViewModel): Promise<
     usedModel = CHAT_MODEL_FALLBACK;
     stream = await client.messages.stream({
       model: CHAT_MODEL_FALLBACK,
-      max_tokens: 16000,
+      max_tokens: 4000,
       system: systemPrompt,
       messages: workspace.conversationHistory,
     });
