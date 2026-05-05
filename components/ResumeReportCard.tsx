@@ -572,13 +572,37 @@ export default function ResumeReportCard({
       {/* ── 6. PRIORITIZED ACTION PLAN ── */}
       {allPriorities.length > 0 && (
         <Card style={{ padding: "24px 24px 12px" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "16px", flexWrap: "wrap" }}>
             <div>
               <SectionLabel>Prioritized Action Plan</SectionLabel>
               <div style={{ fontSize: "13px", color: "#71717a", marginTop: "-4px" }}>
                 {allPriorities.length} fix{allPriorities.length !== 1 ? "es" : ""} the writer can ship for you
               </div>
             </div>
+            {onFixAll && !isFinalized && allPriorities.length > 1 && (
+              <button
+                onClick={onFixAll}
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  background: "#18181b",
+                  color: "#ffffff",
+                  border: "none",
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                ✨ Optimize all
+                <span style={{ fontSize: "11px", color: "#a1a1aa", fontWeight: 400 }}>
+                  +{totalImpact} pts
+                </span>
+              </button>
+            )}
           </div>
 
           <div>

@@ -12,6 +12,7 @@ import LiveEditableResume from "@/components/LiveEditableResume";
 import ResumeCompletionModal from "@/components/ResumeCompletionModal";
 import CoverLetterModal from "@/components/CoverLetterModal";
 import JDMatchModal from "@/components/JDMatchModal";
+import SideBySideCompareModal from "@/components/SideBySideCompareModal";
 import ToastStack, { useToasts } from "@/components/ToastStack";
 import ResumeReportCard from "@/components/ResumeReportCard";
 import { ChatMessage } from "@/components/Message";
@@ -248,6 +249,7 @@ export default function ResumeBuilder({
   // Completion modal trigger state
   const [rejectedCount, setRejectedCount] = useState(0);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showCompareModal, setShowCompareModal] = useState(false);
   // Most-recently finalized version's display name — drives the Edit tab label,
   // the PDF filename, and the "you finalized X last time" greeting on re-entry.
   const [lastFinalizedName, setLastFinalizedName] = useState<string | null>(null);
@@ -1757,9 +1759,20 @@ export default function ResumeBuilder({
             setShowCompletionModal(false);
             setCoverLetterOpen(true);
           }}
+          onCompareWithOriginal={resumeExtraction && editedExtraction ? () => {
+            setShowCompareModal(true);
+          } : undefined}
           onKeepEditing={() => {
             setShowCompletionModal(false);
           }}
+        />
+      )}
+
+      {showCompareModal && resumeExtraction && editedExtraction && (
+        <SideBySideCompareModal
+          original={resumeExtraction}
+          working={editedExtraction}
+          onClose={() => setShowCompareModal(false)}
         />
       )}
     </div>

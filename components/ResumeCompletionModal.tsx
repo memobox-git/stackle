@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Link2, Mail, CheckCircle2, X } from "lucide-react";
+import { Download, Link2, Mail, CheckCircle2, X, Columns2 } from "lucide-react";
 
 interface ResumeCompletionModalProps {
   baseScore: number;
@@ -26,6 +26,9 @@ interface ResumeCompletionModalProps {
   // Optional: opens the cover letter modal pre-filled with the finalized
   // resume. Third secondary CTA; hidden if not provided.
   onWriteCoverLetter?: () => void;
+  // Optional: opens the side-by-side compare modal with the original
+  // resume vs the current working version. Hidden if not provided.
+  onCompareWithOriginal?: () => void;
   onKeepEditing: () => void;
   isSaving?: boolean;
 }
@@ -51,6 +54,7 @@ export default function ResumeCompletionModal({
   onDownloadPdf,
   onCopyShareLink,
   onWriteCoverLetter,
+  onCompareWithOriginal,
   onKeepEditing,
   isSaving,
 }: ResumeCompletionModalProps) {
@@ -175,6 +179,14 @@ export default function ResumeCompletionModal({
           >
             {isSaving ? "Saving…" : `Save as "${(name.trim() || suggestedName).slice(0, 34)}"`}
           </button>
+          {onCompareWithOriginal && (
+            <button
+              onClick={onCompareWithOriginal}
+              className="w-full py-2 rounded-lg bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 hover:text-gray-900 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+            >
+              <Columns2 className="w-3 h-3" strokeWidth={1.75} /> Compare with original
+            </button>
+          )}
           <div className={`grid ${onWriteCoverLetter ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
             <button
               onClick={onDownloadPdf}
