@@ -98,7 +98,7 @@ export default function HomeInput({ value, onChange, onSend, onFileUpload, disab
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:text-gray-300 hover:bg-gray-100 disabled:opacity-40 transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-40 transition-all"
               title="Attach file — resume, JD, PDF, DOCX, JSON, CSV, TXT..."
             >
               {uploading ? (

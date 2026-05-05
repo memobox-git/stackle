@@ -287,7 +287,7 @@ function CtaCard({
       <div className="flex items-center gap-3 mb-2">
         <div
           className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            primary ? "bg-black text-white" : "bg-gray-100 text-gray-300"
+            primary ? "bg-black text-white" : "bg-gray-100 text-gray-600"
           }`}
         >
           {icon}

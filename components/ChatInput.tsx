@@ -60,7 +60,7 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:text-gray-300 hover:bg-gray-100 disabled:opacity-40 transition-all flex-shrink-0 mb-0.5"
+            className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-100 disabled:opacity-40 transition-all flex-shrink-0 mb-0.5"
             title="Attach resume, JD, PDF, DOCX..."
           >
             <Paperclip className="w-4 h-4" strokeWidth={2} />

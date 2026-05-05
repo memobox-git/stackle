@@ -199,7 +199,7 @@ export default function ResumeCompletionModal({
           </div>
           <button
             onClick={onKeepEditing}
-            className="w-full py-2 text-xs text-gray-500 hover:text-gray-300 transition-colors"
+            className="w-full py-2 text-xs text-gray-500 hover:text-gray-900 transition-colors"
           >
             Keep editing
           </button>

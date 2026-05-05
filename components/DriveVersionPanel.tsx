@@ -171,7 +171,7 @@ export default function DriveVersionPanel({
                         {fileIcon(child.file_type)}
                         <span
                           className={`text-[11px] truncate flex-1 ${
-                            isCurrent ? "text-gray-900" : "text-gray-500 group-hover:text-gray-300"
+                            isCurrent ? "text-gray-900" : "text-gray-500 group-hover:text-gray-900"
                           }`}
                         >
                           {shortName(child.display_name)}
@@ -216,7 +216,7 @@ export default function DriveVersionPanel({
                   className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left hover:bg-gray-100 border border-transparent transition-colors group"
                 >
                   {fileIcon(f.file_type)}
-                  <span className="text-[11px] text-gray-500 truncate flex-1 group-hover:text-gray-300">
+                  <span className="text-[11px] text-gray-500 truncate flex-1 group-hover:text-gray-900">
                     {fileLabel(f)}
                   </span>
                 </button>

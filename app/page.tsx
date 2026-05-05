@@ -48,7 +48,7 @@ type ActiveView = "chat" | "resume-builder" | "drive";
 function SidebarTooltip({ label }: { label: string }) {
   return (
     <span
-      className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded-md bg-gray-100 border border-gray-200 text-xs font-medium text-gray-200 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-lg z-50"
+      className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded-md bg-gray-900 text-xs font-medium text-white whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-lg z-50"
       role="tooltip"
     >
       {label}
@@ -1384,7 +1384,7 @@ export default function Page() {
                 className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg font-medium transition-all ${
                   isActive
                     ? "text-gray-900 bg-white border border-gray-200"
-                    : "text-gray-500 hover:text-gray-300 hover:bg-gray-100 border border-transparent"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100 border border-transparent"
                 }`}
               >
                 <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-gray-900" : "text-gray-600"}`} strokeWidth={1.75} />
@@ -1403,7 +1403,7 @@ export default function Page() {
                 setOpenReportSignal((n) => n + 1);
                 setIsSidebarOpen(false);
               }}
-              className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg font-medium transition-all text-gray-500 hover:text-gray-300 hover:bg-gray-100 border border-transparent`}
+              className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg font-medium transition-all text-gray-500 hover:text-gray-900 hover:bg-gray-100 border border-transparent`}
             >
               <ClipboardList className="w-4 h-4 flex-shrink-0 text-gray-600" strokeWidth={1.75} />
               {expanded && <span className="text-sm truncate">Report</span>}
@@ -1430,7 +1430,7 @@ export default function Page() {
                   className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors pr-8 truncate ${
                     activeChatId === chat.id
                       ? "bg-white text-gray-900 border border-gray-200"
-                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-300 border border-transparent"
+                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-900 border border-transparent"
                   }`}
                 >
                   {chat.title}

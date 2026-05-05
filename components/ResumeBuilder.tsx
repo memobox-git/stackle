@@ -1796,7 +1796,7 @@ export default function ResumeBuilder({
                     className={`group relative flex items-center gap-1.5 pl-4 pr-2 py-2.5 text-sm font-medium transition-colors whitespace-nowrap rounded-t-lg flex-shrink-0 cursor-pointer ${
                       isActive
                         ? "text-gray-900 bg-gray-100 border border-gray-200 border-b-[#1a1a1a]"
-                        : "text-gray-500 hover:text-gray-300"
+                        : "text-gray-500 hover:text-gray-900"
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5" strokeWidth={1.75} />
@@ -1810,7 +1810,7 @@ export default function ResumeBuilder({
                       title={`Close ${tab.label}`}
                       aria-label={`Close ${tab.label} tab`}
                       className={`ml-1 w-4 h-4 flex items-center justify-center rounded-sm transition-opacity hover:bg-gray-200 ${
-                        isActive ? "text-gray-400 hover:text-gray-900 opacity-70 hover:opacity-100" : "text-gray-600 hover:text-gray-300 opacity-0 group-hover:opacity-100"
+                        isActive ? "text-gray-400 hover:text-gray-900 opacity-70 hover:opacity-100" : "text-gray-600 hover:text-gray-900 opacity-0 group-hover:opacity-100"
                       }`}
                     >
                       <X className="w-3 h-3" strokeWidth={2.25} />
@@ -1822,7 +1822,7 @@ export default function ResumeBuilder({
                 <button
                   type="button"
                   onClick={handleRestoreTabs}
-                  className="ml-2 text-[10px] font-semibold text-gray-600 hover:text-gray-300 border border-dashed border-gray-200 hover:border-gray-300 rounded px-2 py-1 transition-colors flex-shrink-0"
+                  className="ml-2 text-[10px] font-semibold text-gray-600 hover:text-gray-900 border border-dashed border-gray-200 hover:border-gray-300 rounded px-2 py-1 transition-colors flex-shrink-0"
                   title="Show tabs you've closed"
                 >
                   + Restore tabs
@@ -2041,7 +2041,7 @@ export default function ResumeBuilder({
                             <button
                               onClick={() => handleFixItem(topPriority, 0)}
                               disabled={isEditStreaming}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                               Fix {sectionLabel}
                             </button>

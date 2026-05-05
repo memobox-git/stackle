@@ -150,7 +150,7 @@ export default function FeedbackButton() {
                         className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-colors border ${
                           active
                             ? "bg-gray-100 border-gray-300 text-gray-900"
-                            : "border-transparent text-gray-500 hover:text-gray-300"
+                            : "border-transparent text-gray-500 hover:text-gray-900"
                         }`}
                       >
                         <Icon className="w-3 h-3" strokeWidth={1.75} style={{ color: active ? color : undefined }} />
@@ -201,7 +201,7 @@ export default function FeedbackButton() {
                   <p className="text-[10px] text-gray-600 mr-auto">⌘↩ to send</p>
                   <button
                     onClick={() => { setOpen(false); reset(); }}
-                    className="text-xs text-gray-500 hover:text-gray-300 px-3 py-1.5"
+                    className="text-xs text-gray-500 hover:text-gray-900 px-3 py-1.5"
                     disabled={submitting}
                   >
                     Cancel

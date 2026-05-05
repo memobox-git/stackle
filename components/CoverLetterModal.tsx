@@ -214,7 +214,7 @@ export default function CoverLetterModal({
               {!inputsExpanded && (
                 <button
                   onClick={() => setInputsExpanded(true)}
-                  className="text-[11px] text-gray-500 hover:text-gray-300 mb-3 inline-flex items-center gap-1"
+                  className="text-[11px] text-gray-500 hover:text-gray-900 mb-3 inline-flex items-center gap-1"
                 >
                   ← Edit inputs
                 </button>
@@ -300,7 +300,7 @@ export default function CoverLetterModal({
               <div className="flex-1" />
               <button
                 onClick={onClose}
-                className="text-xs text-gray-500 hover:text-gray-300 px-3 py-2"
+                className="text-xs text-gray-500 hover:text-gray-900 px-3 py-2"
               >
                 Done
               </button>
