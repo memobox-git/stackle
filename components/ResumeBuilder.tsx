@@ -2021,69 +2021,10 @@ export default function ResumeBuilder({
 
             {activeTab === "report" && effectiveAnalysis && (
               <div className="p-4" style={{ animation: "fadeIn 200ms ease" }} ref={reportRef}>
-                {/* AI Coach — single CTA, square brand icon, close button,
-                    score-impact subtitle. Dismiss state per chatId (module
-                    scope) so it stays gone across panel/tab switches. */}
-                {(() => {
-                  const topPriority = effectiveAnalysis.rewritePriorities?.[0];
-                  if (!topPriority) return null;
-                  const dismissKey = chatId ?? "local-chat";
-                  if (AI_COACH_DISMISSED.has(dismissKey)) return null;
-                  const sectionLabel = /summary/i.test(topPriority)
-                    ? "Summary"
-                    : /skills?/i.test(topPriority)
-                      ? "Skills"
-                      : /bullet|impact|metric|quantif/i.test(topPriority)
-                        ? "Experience bullets"
-                        : "Top priority";
-                  // Estimate score impact from priority tier embedded in the
-                  // string ("HIGH —" → +8, "MEDIUM —" → +4, default +6).
-                  const upper = topPriority.toUpperCase();
-                  const impactPts = upper.startsWith("HIGH") ? 8
-                    : upper.startsWith("MEDIUM") ? 4
-                    : 2;
-                  return (
-                    <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50/60 p-5 relative">
-                      <button
-                        onClick={() => {
-                          AI_COACH_DISMISSED.add(dismissKey);
-                          setCoachDismissTick((n) => n + 1);
-                        }}
-                        aria-label="Dismiss"
-                        title="Dismiss"
-                        className="absolute top-3 right-3 w-7 h-7 rounded-md text-gray-500 hover:text-gray-900 hover:bg-violet-100 flex items-center justify-center transition-colors"
-                      >
-                        <X className="w-4 h-4" strokeWidth={2} />
-                      </button>
-                      <div className="flex items-start gap-3 pr-8">
-                        <div className="w-8 h-8 rounded-md bg-violet-600 flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-4 h-4 text-white" strokeWidth={2.25} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-medium tracking-[0.05em] uppercase text-violet-700 mb-1">AI Coach</p>
-                          <p className="text-base text-gray-900 leading-snug">
-                            Fastest win: <span className="font-medium">fix your {sectionLabel.toLowerCase()}</span>.
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
-                            Estimated score boost: <span className="text-emerald-700 font-medium">+{impactPts} points</span>
-                          </p>
-                          <button
-                            onClick={() => handleFixItem(topPriority, 0)}
-                            disabled={isEditStreaming}
-                            className="mt-4 text-sm font-medium px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          >
-                            Fix {sectionLabel}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {/* JD-match strip retired from the report top. To return as
-                    a dedicated tab where the user pastes a JD into the chat
-                    and Match-a-JD becomes part of that flow. */}
-
+                {/* AI Coach moved INTO ResumeReportCard as the first card.
+                    Single source for that callout, lives next to the data
+                    it summarises. JD-match strip retired here too — will
+                    return as a dedicated tab. */}
                 <ResumeReportCard
                   analysis={effectiveAnalysis}
                   candidateName={resumeExtraction?.name}

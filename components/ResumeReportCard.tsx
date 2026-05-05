@@ -18,6 +18,7 @@
  */
 
 import { useState } from "react";
+import { Sparkles, X, ArrowRight } from "lucide-react";
 import { ResumeAnalysis, ScoreCategory } from "@/lib/agents/schemas/resumeIntelligence";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -117,15 +118,51 @@ function cleanAction(action: string): string {
   return action.replace(/^(HIGH|MEDIUM|LOW)\s*[—–-]\s*/i, "");
 }
 
-// Extract a "+8 pts" style score impact if the model embedded one in the
-// priority text, otherwise estimate from priority tier.
-function scoreImpact(action: string): string {
-  const m = action.match(/\+(\d+)\s*pts?/i);
-  if (m) return `+${m[1]} pts`;
-  const p = extractPriority(action);
-  if (p === "HIGH") return "+8 pts";
-  if (p === "MEDIUM") return "+4 pts";
-  return "+2 pts";
+// Substitute "the candidate" / "candidate" with the user's first name so
+// the report reads as if it's about them, not a clinical case study.
+function humanise(text: string, firstName: string | undefined): string {
+  if (!text) return text;
+  const name = (firstName ?? "").trim();
+  if (!name) return text;
+  return text
+    .replace(/\bthe candidate\b/gi, name)
+    .replace(/\bcandidates?\b/gi, name);
+}
+
+// Extract first name from a full name string (handles single-word and
+// multi-word names; falls back to the whole string).
+function firstNameOf(full: string | undefined): string | undefined {
+  if (!full) return undefined;
+  const t = full.trim();
+  if (!t) return undefined;
+  return t.split(/\s+/)[0];
+}
+
+// Build a per-priority score impact array. Distribute the projected score
+// lift across all priorities, weighted by tier (HIGH > MEDIUM > LOW), and
+// clamp each value to its tier range so the math sums realistically:
+//   HIGH  → 6-12 pts  · MEDIUM → 3-5 pts · LOW → 1-2 pts
+function buildImpacts(priorities: string[], current: number, projected?: string): number[] {
+  // Parse projected score: "75-82" → 82, "82" → 82, "" → current+20 fallback.
+  const m = (projected ?? "").match(/(\d+)(?:\s*[-–]\s*(\d+))?/);
+  const projHigh = m ? parseInt(m[2] ?? m[1], 10) : Math.min(100, current + 20);
+  const lift = Math.max(8, projHigh - current);
+
+  const tiers = priorities.map((a) => extractPriority(a));
+  const weight = (t: string) => (t === "HIGH" ? 4 : t === "MEDIUM" ? 2 : 1);
+  const totalWeight = tiers.reduce((s, t) => s + weight(t), 0) || 1;
+
+  // Each fix's raw share + index-based variance so two HIGH items don't
+  // both round to the same number.
+  return priorities.map((_, i) => {
+    const t = tiers[i];
+    const raw = (weight(t) / totalWeight) * lift;
+    const variance = (i % 3) - 1; // -1, 0, +1
+    const candidate = Math.round(raw) + variance;
+    if (t === "HIGH")   return Math.max(6, Math.min(12, candidate));
+    if (t === "MEDIUM") return Math.max(3, Math.min(5, candidate));
+    return Math.max(1, Math.min(2, candidate));
+  });
 }
 
 // ── Main component ────────────────────────────────────────────────────────────
@@ -134,6 +171,7 @@ export default function ResumeReportCard({
   analysis,
   candidateName,
   onFixItem,
+  onFixAll,
   completedActions,
   acceptedActions,
   isFinalized,
@@ -150,6 +188,10 @@ export default function ResumeReportCard({
   const total = scores.total;
   const tier = tierBadge(total);
 
+  // First name — used to humanise every "the candidate" / "candidate"
+  // mention coming from the analysis prompt's third-person voice.
+  const firstName = firstNameOf(candidateName);
+
   // Sub-scores under the hero. 5 columns, vertical dividers between.
   const subs = [
     { key: "ats",      label: "ATS",        score: scores.atsCompatibility.score,    max: scores.atsCompatibility.max },
@@ -158,11 +200,6 @@ export default function ResumeReportCard({
     { key: "keyword",  label: "Keywords",   score: scores.keywordCoverage.score,      max: scores.keywordCoverage.max },
     { key: "senior",   label: "Seniority",  score: scores.senioritySignal.score,      max: scores.senioritySignal.max },
   ];
-
-  // Hero summary — 1 line, derived from positioning or assessment.
-  const summarySource = (analysis.currentPositioning ?? analysis.overallAssessment ?? "").trim();
-  const firstSentence = summarySource.match(/^[^.!?]+[.!?]/)?.[0] ?? summarySource;
-  const heroSummary = firstSentence.length > 180 ? firstSentence.slice(0, 177) + "…" : firstSentence;
 
   // Score circle geometry
   const r = 48;
@@ -176,10 +213,40 @@ export default function ResumeReportCard({
     : { label: "Gap detected", color: "#b91c1c" };
 
   const [showAllPriorities, setShowAllPriorities] = useState(false);
+  const [coachDismissed, setCoachDismissed] = useState(false);
   const VISIBLE_PRIORITIES = 4;
   const allPriorities = analysis.rewritePriorities ?? [];
   const visiblePriorities = showAllPriorities ? allPriorities : allPriorities.slice(0, VISIBLE_PRIORITIES);
   const hiddenCount = Math.max(0, allPriorities.length - VISIBLE_PRIORITIES);
+
+  // Per-priority score impact — distributes the projected lift across
+  // priorities, weighted by tier, clamped to realistic ranges.
+  const impacts = buildImpacts(allPriorities, total, scores.projectedPostFix);
+  const totalImpact = impacts.reduce((s, n) => s + n, 0);
+  const projHighMatch = (scores.projectedPostFix ?? "").match(/(\d+)(?:\s*[-–]\s*(\d+))?/);
+  const projectedHigh = projHighMatch ? parseInt(projHighMatch[2] ?? projHighMatch[1], 10) : Math.min(100, total + totalImpact);
+
+  // Top-priority-section label for the AI Coach card (Skills / Summary /
+  // Experience bullets / Top priority).
+  const topPriority = allPriorities[0];
+  const topSectionLabel = topPriority
+    ? /summary/i.test(topPriority) ? "Summary"
+    : /skills?/i.test(topPriority) ? "Skills"
+    : /bullet|impact|metric|quantif/i.test(topPriority) ? "Experience bullets"
+    : "Top priority"
+    : null;
+  const top3 = allPriorities.slice(0, 3);
+  const top3ImpactSum = impacts.slice(0, 3).reduce((s, n) => s + n, 0);
+  const biggestImpactIdx = impacts.length > 0 ? impacts.reduce((maxI, v, i, arr) => v > arr[maxI] ? i : maxI, 0) : -1;
+  const biggestImpactSection = biggestImpactIdx >= 0
+    ? (() => {
+        const a = allPriorities[biggestImpactIdx];
+        return /summary/i.test(a) ? "summary"
+          : /skills?/i.test(a) ? "skills"
+          : /bullet|impact|metric|quantif/i.test(a) ? "experience bullets"
+          : "this priority";
+      })()
+    : "";
 
   return (
     <div style={{
@@ -194,6 +261,115 @@ export default function ResumeReportCard({
       flexDirection: "column",
       gap: "16px",
     }}>
+
+      {/* ── 0. AI COACH (top of report) ── */}
+      {topPriority && topSectionLabel && !coachDismissed && !isFinalized && (
+        <Card tone="violet" style={{ position: "relative", padding: "24px" }}>
+          <button
+            onClick={() => setCoachDismissed(true)}
+            aria-label="Dismiss"
+            title="Dismiss"
+            style={{
+              position: "absolute", top: "14px", right: "14px",
+              width: "28px", height: "28px",
+              borderRadius: "6px",
+              background: "transparent", border: "none",
+              color: "#71717a", cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}
+          >
+            <X size={16} strokeWidth={2} />
+          </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
+            <div style={{
+              width: "32px", height: "32px",
+              borderRadius: "8px",
+              background: "#7c3aed",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}>
+              <Sparkles size={16} strokeWidth={2.25} color="#fff" />
+            </div>
+            <span style={{
+              fontSize: "11px", fontWeight: 500,
+              letterSpacing: "0.05em", textTransform: "uppercase",
+              color: "#6d28d9",
+            }}>AI Coach</span>
+          </div>
+
+          <p style={{ fontSize: "16px", color: "#18181b", margin: 0, lineHeight: 1.5, fontWeight: 500 }}>
+            Quick read: <span style={{ fontWeight: 400 }}>your fastest win is the </span>
+            <span style={{ fontWeight: 500 }}>{topSectionLabel.toLowerCase()}</span>
+            <span style={{ fontWeight: 400 }}>{firstName ? `, ${firstName}` : ""}.</span>
+          </p>
+          <p style={{ fontSize: "14px", color: "#52525b", margin: "8px 0 0", lineHeight: 1.55 }}>
+            {humanise(topPriority, firstName).replace(/^(HIGH|MEDIUM|LOW)\s*[—–-]\s*/i, "")}
+          </p>
+
+          {/* Three info boxes — Fastest Win / Biggest Impact / Projected */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: "10px",
+            marginTop: "20px",
+          }}>
+            <div style={{ background: "#fff", border: "1px solid #ede9fe", borderRadius: "10px", padding: "12px 14px" }}>
+              <div style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: "4px" }}>Fastest Win</div>
+              <div style={{ fontSize: "14px", fontWeight: 500, color: "#18181b" }}>{topSectionLabel}</div>
+              <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>+{impacts[0] ?? 0} pts</div>
+            </div>
+            <div style={{ background: "#fff", border: "1px solid #ede9fe", borderRadius: "10px", padding: "12px 14px" }}>
+              <div style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: "4px" }}>Biggest Impact</div>
+              <div style={{ fontSize: "14px", fontWeight: 500, color: "#18181b", textTransform: "capitalize" }}>{biggestImpactSection || "—"}</div>
+              <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>+{impacts[biggestImpactIdx] ?? 0} pts</div>
+            </div>
+            <div style={{ background: "#fff", border: "1px solid #ede9fe", borderRadius: "10px", padding: "12px 14px" }}>
+              <div style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: "4px" }}>Projected</div>
+              <div style={{ fontSize: "14px", fontWeight: 500, color: "#18181b" }}>{projectedHigh}/100</div>
+              <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>+{projectedHigh - total} pts total</div>
+            </div>
+          </div>
+
+          {/* Two buttons */}
+          <div style={{ display: "flex", gap: "8px", marginTop: "16px" }}>
+            <button
+              onClick={() => {
+                if (top3.length === 0) return;
+                onFixItem?.(top3[0], 0);
+              }}
+              disabled={top3.length === 0}
+              style={{
+                fontSize: "14px", fontWeight: 500,
+                padding: "9px 16px",
+                borderRadius: "8px",
+                background: "#7c3aed",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: "6px",
+              }}
+            >
+              Fix top 3 <span style={{ color: "#ddd6fe", fontSize: "12px" }}>(+{top3ImpactSum} pts)</span>
+            </button>
+            <button
+              onClick={() => onFixAll?.()}
+              style={{
+                fontSize: "14px", fontWeight: 500,
+                padding: "9px 16px",
+                borderRadius: "8px",
+                background: "#fff",
+                color: "#52525b",
+                border: "1px solid #e4e4e7",
+                cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: "6px",
+              }}
+            >
+              Walk me through it <ArrowRight size={14} strokeWidth={2} />
+            </button>
+          </div>
+        </Card>
+      )}
 
       {/* ── 1. HERO ── */}
       <Card>
@@ -241,16 +417,13 @@ export default function ResumeReportCard({
               {candidateName || analysis.likelyTargetRole || "Resume Review"}
             </div>
             {analysis.likelyTargetRole && candidateName && (
-              <div style={{ fontSize: "13px", color: "#52525b", marginBottom: "8px" }}>
+              <div style={{ fontSize: "13px", color: "#52525b", margin: 0 }}>
                 Targeting <span style={{ color: "#18181b", fontWeight: 500 }}>{analysis.likelyTargetRole}</span>
                 {analysis.seniorityEstimate && <> · {analysis.seniorityEstimate}</>}
               </div>
             )}
-            {heroSummary && (
-              <p style={{ fontSize: "14px", color: "#52525b", margin: 0, lineHeight: 1.55 }}>
-                {heroSummary}
-              </p>
-            )}
+            {/* Hero summary removed — full version lives in The Bottom Line
+                card below; one-line duplicate up here was redundant. */}
           </div>
         </div>
 
@@ -290,7 +463,7 @@ export default function ResumeReportCard({
         <Card>
           <SectionLabel>The Bottom Line</SectionLabel>
           <p style={{ fontSize: "16px", color: "#18181b", margin: 0, lineHeight: 1.55, fontWeight: 400 }}>
-            {(analysis.currentPositioning ?? analysis.overallAssessment ?? "").trim()}
+            {humanise((analysis.currentPositioning ?? analysis.overallAssessment ?? "").trim(), firstName)}
           </p>
         </Card>
       )}
@@ -353,7 +526,7 @@ export default function ResumeReportCard({
             {analysis.strengths.slice(0, 4).map((s, i) => (
               <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
                 <span style={{ color: "#16a34a", flexShrink: 0, marginTop: "1px", fontSize: "14px" }}>✓</span>
-                <span style={{ fontSize: "14px", color: "#18181b", lineHeight: 1.55 }}>{s}</span>
+                <span style={{ fontSize: "14px", color: "#18181b", lineHeight: 1.55 }}>{humanise(s, firstName)}</span>
               </li>
             ))}
           </ul>
@@ -366,7 +539,7 @@ export default function ResumeReportCard({
             {analysis.weaknesses.slice(0, 4).map((w, i) => (
               <li key={i} style={{ display: "flex", gap: "10px", alignItems: "flex-start" }}>
                 <span style={{ color: "#d97706", flexShrink: 0, marginTop: "1px", fontSize: "14px" }}>!</span>
-                <span style={{ fontSize: "14px", color: "#18181b", lineHeight: 1.55 }}>{w}</span>
+                <span style={{ fontSize: "14px", color: "#18181b", lineHeight: 1.55 }}>{humanise(w, firstName)}</span>
               </li>
             ))}
           </ul>
@@ -412,8 +585,8 @@ export default function ResumeReportCard({
             {visiblePriorities.map((action, i) => {
               const pLabel = extractPriority(action);
               const p = priorityColor(pLabel);
-              const fixText = cleanAction(action).replace(/\s*\+\d+\s*pts?\s*\w*/i, "").trim();
-              const impact = scoreImpact(action);
+              const fixText = humanise(cleanAction(action).replace(/\s*\+\d+\s*pts?\s*\w*/i, "").trim(), firstName);
+              const impact = `+${impacts[i] ?? 0} pts`;
 
               const isDone = completedActions?.has(i) ?? false;
               const wasAccepted = acceptedActions?.has(i) ?? false;
