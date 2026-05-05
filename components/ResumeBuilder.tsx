@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { X, ChevronLeft, ChevronDown, FileText, ClipboardList, Pencil, Download, Link2, Share2, Check, Mail, Target } from "lucide-react";
+import { X, ChevronLeft, ChevronDown, FileText, ClipboardList, Pencil, Download, Link2, Share2, Check, Mail, Target, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
@@ -2000,6 +2000,55 @@ export default function ResumeBuilder({
 
             {activeTab === "report" && effectiveAnalysis && (
               <div className="p-4" style={{ animation: "fadeIn 200ms ease" }} ref={reportRef}>
+                {/* AI Coach — the "fastest win" callout. Distills the report
+                    into one sentence + one CTA so the user doesn't have to
+                    read the whole thing to know what to do first. */}
+                {(() => {
+                  const issueCount = (effectiveAnalysis.weaknesses?.length ?? 0)
+                    + Math.min((effectiveAnalysis.weakBullets?.length ?? 0), 3);
+                  const topPriority = effectiveAnalysis.rewritePriorities?.[0];
+                  if (!topPriority) return null;
+                  // Best-effort label of what section the top fix targets.
+                  const sectionLabel = /summary/i.test(topPriority)
+                    ? "Summary"
+                    : /skills?/i.test(topPriority)
+                      ? "Skills"
+                      : /bullet|impact|metric|quantif/i.test(topPriority)
+                        ? "Experience bullets"
+                        : "Top priority";
+                  return (
+                    <div className="mb-4 rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-950/30 via-[#0d0d0d] to-[#0d0d0d] px-4 py-4">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="w-4 h-4 text-violet-300" strokeWidth={2} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-semibold tracking-widest uppercase text-violet-400 mb-1">AI Coach</p>
+                          <p className="text-sm text-gray-200 leading-snug">
+                            I found <span className="font-semibold text-white">{issueCount} issue{issueCount === 1 ? "" : "s"}</span>. The fastest win is fixing your <span className="font-semibold text-white">{sectionLabel.toLowerCase()}</span>.
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{topPriority}</p>
+                          <div className="flex items-center gap-2 mt-3">
+                            <button
+                              onClick={() => handleFixItem(topPriority, 0)}
+                              disabled={isEditStreaming}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            >
+                              Fix {sectionLabel}
+                            </button>
+                            <button
+                              onClick={() => reportRef.current?.scrollTo({ top: 9999, behavior: "smooth" })}
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] text-gray-300 hover:text-white transition-colors border border-[#2a2a2a]"
+                            >
+                              View full report
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* JD match CTA — sits above the general report. The general
                     report is role-agnostic; this is the JD-specific one. */}
                 <div className="mb-4 rounded-xl border border-[#2a2a2a] bg-[#0d0d0d] px-4 py-3 flex items-center gap-3">

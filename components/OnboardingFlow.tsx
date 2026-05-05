@@ -98,6 +98,24 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   // Mirror analysis as state so the score-reveal screen re-renders the moment
   // the background analysis lands. Ref alone won't trigger re-render.
   const [resumeAnalysisState, setResumeAnalysisState] = useState<ResumeAnalysis | null>(null);
+  // Target role + optional JD captured BEFORE the analysis kicks off so the
+  // analyze call is already focused on what the user is targeting.
+  const ROLE_OPTIONS = [
+    "Data Engineer",
+    "Senior Data Engineer",
+    "Lead / Staff Data Engineer",
+    "Analytics Engineer",
+    "Data Analyst",
+    "BI Developer",
+    "Data Scientist",
+    "ML Engineer",
+    "Software Engineer",
+    "Other",
+  ] as const;
+  const [targetRole, setTargetRole] = useState<string>("Data Engineer");
+  const [targetRoleCustom, setTargetRoleCustom] = useState<string>("");
+  const [jobDescription, setJobDescription] = useState<string>("");
+  const [showJdField, setShowJdField] = useState<boolean>(false);
 
   // Step 3 — Career Goal
   const [careerGoal, setCareerGoal] = useState<string | null>(null);
@@ -275,11 +293,31 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
       const ext: ResumeExtraction = await res.json();
       setResumeExtraction(ext);
 
+      // Resolve target role: dropdown selection, or custom typed value when
+      // "Other" was chosen. Falls back to dropdown label.
+      const resolvedRole = targetRole === "Other" && targetRoleCustom.trim()
+        ? targetRoleCustom.trim()
+        : targetRole;
+      // Heuristic seniority pulled from the role label so the analysis prompt
+      // can lean Senior/Lead/Staff appropriately.
+      const seniorityLevel = /staff|principal/i.test(resolvedRole)
+        ? "Staff"
+        : /lead/i.test(resolvedRole)
+          ? "Lead"
+          : /senior|sr\b/i.test(resolvedRole)
+            ? "Senior"
+            : "Mid";
       // Kick off full analysis in the background — don't block the user.
       analysisInFlightRef.current = fetch("/api/agents/resume/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ resumeText }),
+        body: JSON.stringify({
+          resumeText,
+          targetRole: resolvedRole,
+          seniorityLevel,
+          jobDescription: jobDescription.trim() || undefined,
+          reviewType: "Full Review",
+        }),
       })
         .then((r) => (r.ok ? r.json() : null))
         .then((a: ResumeAnalysis | null) => {
@@ -598,13 +636,62 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
             </p>
 
             {resumeFilename ? (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 w-full">
                 <div className="px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm text-emerald-700 flex items-center gap-2.5 shadow-[0_2px_8px_-4px_rgba(16,185,129,0.25)]">
                   <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">✓</span>
                   <span className="truncate"><strong className="font-semibold">{resumeFilename}</strong> — ready</span>
                 </div>
+
+                {/* Target role */}
+                <div className="flex flex-col gap-1.5 mt-2">
+                  <label className="text-xs font-medium text-gray-600">Target role</label>
+                  <select
+                    value={targetRole}
+                    onChange={(e) => setTargetRole(e.target.value)}
+                    disabled={extracting}
+                    className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors"
+                  >
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                  {targetRole === "Other" && (
+                    <input
+                      type="text"
+                      placeholder="Type your target role"
+                      value={targetRoleCustom}
+                      onChange={(e) => setTargetRoleCustom(e.target.value)}
+                      disabled={extracting}
+                      className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors mt-1"
+                    />
+                  )}
+                </div>
+
+                {/* Optional JD */}
+                {!showJdField ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowJdField(true)}
+                    className="text-xs text-gray-500 hover:text-gray-800 transition-colors text-left mt-1"
+                  >
+                    + Paste a job description (optional)
+                  </button>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-gray-600">Job description (optional)</label>
+                    <textarea
+                      value={jobDescription}
+                      onChange={(e) => setJobDescription(e.target.value)}
+                      disabled={extracting}
+                      placeholder="Paste the JD here so I score against it"
+                      rows={4}
+                      className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors resize-none"
+                    />
+                  </div>
+                )}
+
                 {step === 2 && (
-                  <button onClick={handleResumeConfirm} disabled={uploading || extracting}
+                  <button onClick={handleResumeConfirm} disabled={uploading || extracting || (targetRole === "Other" && !targetRoleCustom.trim())}
                     className={`w-full py-3 rounded-xl text-white text-sm font-semibold transition-all disabled:cursor-not-allowed shadow-md hover:shadow-lg relative overflow-hidden ${
                       extracting
                         ? "bg-gray-900"
@@ -621,7 +708,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                         }}
                       />
                     )}
-                    <span className="relative">{extracting ? "Reading your resume…" : "Continue"}</span>
+                    <span className="relative">{extracting ? "Analyzing your resume…" : "Analyze My Resume"}</span>
                   </button>
                 )}
               </div>
