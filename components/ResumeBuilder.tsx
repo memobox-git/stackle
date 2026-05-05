@@ -2021,11 +2021,9 @@ export default function ResumeBuilder({
 
             {activeTab === "report" && effectiveAnalysis && (
               <div className="p-4" style={{ animation: "fadeIn 200ms ease" }} ref={reportRef}>
-                {/* Slim AI Coach — context-aware. The user is ALREADY on the
-                    Report tab so the full "View full report" CTA is gone.
-                    One line, one Fix CTA, an × to dismiss for this session.
-                    Dismiss state is module-scoped per chatId so it survives
-                    panel/tab switches and remounts. */}
+                {/* AI Coach — single CTA, square brand icon, close button,
+                    score-impact subtitle. Dismiss state per chatId (module
+                    scope) so it stays gone across panel/tab switches. */}
                 {(() => {
                   const topPriority = effectiveAnalysis.rewritePriorities?.[0];
                   if (!topPriority) return null;
@@ -2038,32 +2036,46 @@ export default function ResumeBuilder({
                       : /bullet|impact|metric|quantif/i.test(topPriority)
                         ? "Experience bullets"
                         : "Top priority";
+                  // Estimate score impact from priority tier embedded in the
+                  // string ("HIGH —" → +8, "MEDIUM —" → +4, default +6).
+                  const upper = topPriority.toUpperCase();
+                  const impactPts = upper.startsWith("HIGH") ? 8
+                    : upper.startsWith("MEDIUM") ? 4
+                    : 2;
                   return (
-                    <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3 flex items-center gap-3">
-                      <div className="w-7 h-7 rounded-lg bg-violet-100 border border-violet-200 flex items-center justify-center flex-shrink-0">
-                        <Sparkles className="w-3.5 h-3.5 text-violet-600" strokeWidth={2} />
-                      </div>
-                      <p className="text-sm text-gray-900 flex-1 min-w-0 leading-snug">
-                        Top priority: <span className="font-semibold">fix your {sectionLabel.toLowerCase()}</span>.
-                      </p>
-                      <button
-                        onClick={() => handleFixItem(topPriority, 0)}
-                        disabled={isEditStreaming}
-                        className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
-                      >
-                        Fix {sectionLabel}
-                      </button>
+                    <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50/60 p-5 relative">
                       <button
                         onClick={() => {
                           AI_COACH_DISMISSED.add(dismissKey);
                           setCoachDismissTick((n) => n + 1);
                         }}
-                        aria-label="Dismiss AI Coach"
+                        aria-label="Dismiss"
                         title="Dismiss"
-                        className="w-7 h-7 rounded-md text-gray-500 hover:text-gray-900 hover:bg-violet-100 flex items-center justify-center flex-shrink-0 transition-colors"
+                        className="absolute top-3 right-3 w-7 h-7 rounded-md text-gray-500 hover:text-gray-900 hover:bg-violet-100 flex items-center justify-center transition-colors"
                       >
                         <X className="w-4 h-4" strokeWidth={2} />
                       </button>
+                      <div className="flex items-start gap-3 pr-8">
+                        <div className="w-8 h-8 rounded-md bg-violet-600 flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="w-4 h-4 text-white" strokeWidth={2.25} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-medium tracking-[0.05em] uppercase text-violet-700 mb-1">AI Coach</p>
+                          <p className="text-base text-gray-900 leading-snug">
+                            Fastest win: <span className="font-medium">fix your {sectionLabel.toLowerCase()}</span>.
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">
+                            Estimated score boost: <span className="text-emerald-700 font-medium">+{impactPts} points</span>
+                          </p>
+                          <button
+                            onClick={() => handleFixItem(topPriority, 0)}
+                            disabled={isEditStreaming}
+                            className="mt-4 text-sm font-medium px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            Fix {sectionLabel}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   );
                 })()}
