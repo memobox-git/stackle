@@ -1675,7 +1675,14 @@ export default function ResumeBuilder({
       {showCompletionModal && resumeAnalysis && (
         <ResumeCompletionModal
           baseScore={completionBaseScore || deriveScore(resumeAnalysis)}
-          finalScore={deriveScore(effectiveAnalysis)}
+          // finalScore must reflect what the user is seeing in the Edit tab
+          // banner. Two paths can move the score: (1) accepted PRIORITIES
+          // (tracked in acceptedIndices) bump the analysis directly via
+          // analysisWithAccepted, (2) any edit (priority or direct AI rewrite)
+          // adds editHistory entries and earns up to +15 from currentEditScore.
+          // Take whichever is higher so the modal never under-reports vs. the
+          // banner the user just looked at.
+          finalScore={Math.max(deriveScore(effectiveAnalysis), currentEditScore)}
           accepted={acceptedPoints > 0 ? completedActions.size - rejectedCount : 0}
           rejected={rejectedCount}
           signalsHit={{
