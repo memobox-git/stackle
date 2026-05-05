@@ -407,10 +407,24 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   // into Resume Builder Report tab. This is the wow moment.
   if (step === 3) {
     const firstName = (resumeExtraction?.name ?? "").trim().split(/\s+/)[0] || null;
+    // Most-recent real-employer role label, used to personalise the loading
+    // sequence ("You're a Senior Data Engineer with 8 years…"). Falls back
+    // to the very first experience entry if no real-employer detection
+    // applies (skip-list elsewhere is in resumeBuilderWelcome.ts; we use
+    // the simpler experience[0] here since we just want SOMETHING).
+    const extractedRole = (resumeExtraction?.experience?.[0]?.title ?? "").trim() || null;
+    const years = resumeExtraction?.totalYearsExperience ?? null;
+    // The user's chosen target from the upload step (resolves "Other" too).
+    const resolvedTargetRole = targetRole === "Other" && targetRoleCustom.trim()
+      ? targetRoleCustom.trim()
+      : targetRole;
     return (
       <ScoreReveal
         analysis={resumeAnalysisState ?? resumeAnalysisRef.current}
         candidateFirstName={firstName}
+        extractedRole={extractedRole}
+        years={years}
+        targetRole={resolvedTargetRole}
         onContinue={() => {
           const profile = persistProfile();
           onComplete(profile);
