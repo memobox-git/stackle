@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
-import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check } from "lucide-react";
+import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, Mic, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
@@ -99,6 +99,15 @@ export default function Page() {
   const [activeView, setActiveView] = useState<ActiveView>("resume-builder");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  // Toast surfaced when the user clicks a locked nav item (Cover Letter,
+  // Profile, Settings, etc). Auto-dismisses after 1.6s.
+  const [navToast, setNavToast] = useState<string | null>(null);
+  const navToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function showNavToast(label: string) {
+    if (navToastTimerRef.current) clearTimeout(navToastTimerRef.current);
+    setNavToast(`${label} is coming soon.`);
+    navToastTimerRef.current = setTimeout(() => setNavToast(null), 1600);
+  }
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isAnalyzingResume, setIsAnalyzingResume] = useState(false);
@@ -1421,9 +1430,44 @@ export default function Page() {
       ? orchestratorDecision?.primaryNeed
       : null;
 
-  const NAV_ITEMS = [
-    { key: "resume-builder" as ActiveView, label: "Resume Builder", icon: FileText },
-    { key: "drive" as ActiveView, label: "Drive", icon: FolderOpen },
+  // Hierarchical nav: parent groups (not clickable) with child items
+  // (clickable). Locked children show "Soon" pill and a toast on click.
+  // When we ship Cover Letter / Interview Prep / Job Match / Published /
+  // Versions / Profile / Settings, flip locked:false and set view to a
+  // real ActiveView. The data shape stays the same.
+  type NavChild = {
+    key: string;
+    label: string;
+    icon: typeof FileText;
+    view: ActiveView | null;
+    locked: boolean;
+  };
+  type NavGroup = { label: string; items: NavChild[] };
+  const NAV_GROUPS: NavGroup[] = [
+    {
+      label: "Workspace",
+      items: [
+        { key: "resume-builder", label: "Resume Builder", icon: FileText,      view: "resume-builder", locked: false },
+        { key: "cover-letter",   label: "Cover Letter",   icon: Mail,          view: null,             locked: true },
+        { key: "interview-prep", label: "Interview Prep", icon: Mic,           view: null,             locked: true },
+        { key: "job-match",      label: "Job Match",      icon: Target,        view: null,             locked: true },
+      ],
+    },
+    {
+      label: "Library",
+      items: [
+        { key: "drive",     label: "Drive",     icon: FolderOpen, view: "drive", locked: false },
+        { key: "published", label: "Published", icon: Globe,      view: null,    locked: true },
+        { key: "versions",  label: "Versions",  icon: GitBranch,  view: null,    locked: true },
+      ],
+    },
+    {
+      label: "You",
+      items: [
+        { key: "profile",  label: "Profile",  icon: UserIcon,     view: null, locked: true },
+        { key: "settings", label: "Settings", icon: SettingsIcon, view: null, locked: true },
+      ],
+    },
   ];
 
   // ── Sidebar JSX ───────────────────────────────────────
@@ -1456,46 +1500,92 @@ export default function Page() {
         </div>
       </div>
 
-      {/* Nav icons */}
-      <div className={`space-y-0.5 ${expanded ? "px-2" : "px-1.5"} mb-3`}>
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeView === item.key;
-          return (
-            <div key={item.key} className="relative group">
-              <button
-                onClick={() => { setActiveView(item.key); setIsSidebarOpen(false); }}
-                className={`flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors ${
-                  isActive
-                    ? "text-gray-900"
-                    : "text-gray-500 hover:text-gray-900"
-                }`}
-              >
-                <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={1.75} />
-                {expanded && <span className="text-sm truncate">{item.label}</span>}
-              </button>
-              {!expanded && <SidebarTooltip label={item.label} />}
+      {/* Nav — grouped (Workspace / Library / You). Expanded shows group
+          labels + indented children. Collapsed shows icons stacked with
+          a small gap between groups, no labels. */}
+      <div className={`${expanded ? "px-2" : "px-1.5"} mb-3`}>
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.label} className={gi > 0 ? "mt-4" : ""}>
+            {expanded && (
+              <p className="text-[10px] font-medium tracking-[0.05em] uppercase text-gray-400 px-2 mb-1">
+                {group.label}
+              </p>
+            )}
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = !item.locked && item.view !== null && activeView === item.view;
+                const baseClasses = `flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors`;
+                const stateClasses = item.locked
+                  ? "text-gray-400 cursor-default opacity-60"
+                  : isActive
+                    ? "text-gray-900 bg-gray-100"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50";
+                const handleClick = () => {
+                  if (item.locked) {
+                    showNavToast(item.label);
+                    return;
+                  }
+                  if (item.view) {
+                    setActiveView(item.view);
+                    setIsSidebarOpen(false);
+                  }
+                };
+                return (
+                  <div key={item.key} className="relative group">
+                    <button
+                      onClick={handleClick}
+                      className={`${baseClasses} ${stateClasses}`}
+                    >
+                      <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={1.75} />
+                      {expanded && (
+                        <>
+                          <span className="text-sm truncate flex-1 text-left">{item.label}</span>
+                          {item.locked && (
+                            <span className="text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded border border-gray-200 text-gray-400">
+                              Soon
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </button>
+                    {!expanded && (
+                      <SidebarTooltip label={item.locked ? `${item.label} — coming soon` : item.label} />
+                    )}
+                  </div>
+                );
+              })}
+              {/* Conditional Report row — sits inside Workspace, only when
+                  analysis is loaded. Same active style as the others. */}
+              {group.label === "Workspace" && resumeAnalysis && (
+                <div className="relative group">
+                  <button
+                    onClick={() => {
+                      setActiveView("resume-builder");
+                      setOpenReportSignal((n) => n + 1);
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors text-gray-500 hover:text-gray-900 hover:bg-gray-50`}
+                  >
+                    <ClipboardList className="w-5 h-5 flex-shrink-0" strokeWidth={1.75} />
+                    {expanded && <span className="text-sm truncate">Report</span>}
+                  </button>
+                  {!expanded && <SidebarTooltip label="Report" />}
+                </div>
+              )}
             </div>
-          );
-        })}
-        {/* Dynamic Report item — appears only when a report exists */}
-        {resumeAnalysis && (
-          <div className="relative group">
-            <button
-              onClick={() => {
-                setActiveView("resume-builder");
-                setOpenReportSignal((n) => n + 1);
-                setIsSidebarOpen(false);
-              }}
-              className={`flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors text-gray-500 hover:text-gray-900`}
-            >
-              <ClipboardList className="w-5 h-5 flex-shrink-0" strokeWidth={1.75} />
-              {expanded && <span className="text-sm truncate">Report</span>}
-            </button>
-            {!expanded && <SidebarTooltip label="Report" />}
           </div>
-        )}
+        ))}
       </div>
+
+      {/* Locked-item toast — only renders while there's a message. Pinned
+          to bottom-right of the viewport so it's visible even when the
+          sidebar is collapsed. Auto-dismisses via showNavToast timer. */}
+      {navToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-gray-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg animate-fade-in">
+          {navToast}
+        </div>
+      )}
 
       {/* Chat history — only when expanded */}
       {expanded && chatList.length > 0 && (
