@@ -12,6 +12,7 @@ import LiveEditableResume from "@/components/LiveEditableResume";
 import ResumeCompletionModal from "@/components/ResumeCompletionModal";
 import CoverLetterModal from "@/components/CoverLetterModal";
 import JDMatchModal from "@/components/JDMatchModal";
+import ToastStack, { useToasts } from "@/components/ToastStack";
 import ResumeReportCard from "@/components/ResumeReportCard";
 import { ChatMessage } from "@/components/Message";
 import { ResumeExtraction, SkillGroup } from "@/lib/agents/schemas/resumeExtraction";
@@ -132,6 +133,9 @@ export default function ResumeBuilder({
   resumeDocHtml,
   openReportSignal,
 }: ResumeBuilderProps) {
+  // Transient status updates (rewrite confirmations, skip notices, score
+  // changes) flow through this stack instead of the chat thread.
+  const toasts = useToasts();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   // Initial tab: if the analysis is already present at mount time (user just
   // finished onboarding and lands here), open the Report tab. The useEffect
@@ -590,7 +594,7 @@ export default function ResumeBuilder({
       setFixFlow(null);
       if (opts?.lockedSectionKey) setIsRewriting(false);
       const reason = result.newContent?.trim() || "This action can't be performed by the writer.";
-      onPushAssistantMessage?.(`✗ Skipped: ${describeSection("__not_applicable__", workingExtraction) || "this priority"} — ${reason}`);
+      toasts.push({ kind: "warn", text: `Skipped: ${reason}`, durationMs: 4000 });
       if (priorityIndex >= 0) {
         setCompletedActions((prev) => {
           const next = new Set([...prev, priorityIndex]);
@@ -637,7 +641,7 @@ export default function ResumeBuilder({
       setFixFlow(null);
       if (opts?.lockedSectionKey) setIsRewriting(false);
       if (writerDriftedIntoAcceptedSection && result) {
-        onPushAssistantMessage?.(`✗ Skipped — this priority overlaps with a fix you already accepted on ${describeSection(result.sectionKey, workingExtraction)}.`);
+        toasts.push({ kind: "warn", text: `Skipped — overlaps with an accepted fix on ${describeSection(result.sectionKey, workingExtraction)}.`, durationMs: 4000 });
       }
       if (priorityIndex >= 0) {
         setCompletedActions((prev) => {
@@ -797,13 +801,10 @@ export default function ResumeBuilder({
       setConfettiBurst({ id: Date.now() });
       setTimeout(() => setConfettiBurst(null), 1200);
     }
-    // Log an entry in the chat so the user sees a running record of what
-    // they accepted — "✓ Rewrote summary (+3 pts)" etc.
+    // Surface the accept as a toast (slides in bottom-right, 3s, no chat
+    // clutter). Score animation is handled separately by the +pts pulse.
     const logLabel = describeSection(sectionKey, editedExtraction);
-    const progressCardActive = messages.some((m) => m.content === "__FIX_PROGRESS_CARD__");
-    if (onPushAssistantMessage && !progressCardActive) {
-      onPushAssistantMessage(`✓ Rewrote ${logLabel} (+${pts} pts)`);
-    }
+    toasts.push({ kind: "score", badge: `+${pts} pts`, text: `Rewrote ${logLabel}` });
     setInlineFix(null);
     setRewriteAttempts([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -821,12 +822,9 @@ export default function ResumeBuilder({
     setInlineFix(null);
     setRewriteAttempts([]);
 
-    // Log the rejection so the chat shows the user they consciously skipped it
+    // Reject as a toast. Quick, non-celebratory.
     const logLabel = describeSection(sectionKey, editedExtraction);
-    const progressCardActive = messages.some((m) => m.content === "__FIX_PROGRESS_CARD__");
-    if (onPushAssistantMessage && !progressCardActive) {
-      onPushAssistantMessage(`✗ Skipped the ${logLabel} rewrite — kept your original.`);
-    }
+    toasts.push({ kind: "info", text: `Kept your original ${logLabel}.` });
 
     if (priorityIndex >= 0) {
       setRejectedCount((r) => r + 1);
@@ -1146,7 +1144,7 @@ export default function ResumeBuilder({
           const restored: ResumeExtraction = { ...editedExtraction, skillGroups: skillsRegroupSnapshot };
           setSkillsRegroupSnapshot(null);
           persistWorkingCopy(restored);
-          onPushAssistantMessage?.("Restored your original skill groups.");
+          toasts.push({ kind: "info", text: "Restored your original skill groups." });
           return;
         }
         if (activeTab === "edit" && editHistory.length > 0 && !inlineFix) {
@@ -2052,24 +2050,31 @@ export default function ResumeBuilder({
                   flexShrink: 0,
                   position: "relative",
                 }}>
-                  <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase", color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "4px", padding: "1px 6px", marginRight: "4px" }}>Working Copy</span>
-                  <span style={{ color: "#555" }}>Score</span>
+                  <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase", color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "4px", padding: "1px 6px", marginRight: "8px" }}>Working Copy</span>
+                  <span style={{ color: "#52525b" }}>Original score:</span>
                   <span
                     key={`base-${baseScore}`}
-                    style={{ fontFamily: "monospace", color: "#e8e8ec", transition: "color 300ms" }}
+                    style={{ fontFamily: "monospace", fontWeight: 500, color: "#71717a", transition: "color 300ms" }}
                   >
                     {baseScore}
                   </span>
+                  <span style={{ color: "#a1a1aa", margin: "0 4px" }}>→</span>
+                  <span style={{ color: "#52525b" }}>Working version:</span>
+                  <span
+                    key={`edit-${currentEditScore}`}
+                    style={{
+                      fontFamily: "monospace",
+                      fontWeight: 600,
+                      color: editHistory.length > 0 ? "#15803d" : "#71717a",
+                      transition: "color 300ms",
+                    }}
+                  >
+                    {currentEditScore}
+                  </span>
                   {editHistory.length > 0 && (
-                    <>
-                      <span style={{ color: "#333" }}>→</span>
-                      <span
-                        key={`edit-${currentEditScore}`}
-                        style={{ fontFamily: "monospace", color: "#4fc9a4", transition: "color 300ms" }}
-                      >
-                        {currentEditScore}
-                      </span>
-                    </>
+                    <span style={{ fontSize: "11px", color: "#15803d", fontWeight: 500, marginLeft: "4px" }}>
+                      +{currentEditScore - baseScore} pts
+                    </span>
                   )}
                   {editHistory.length > 0 && (
                     <button
@@ -2194,6 +2199,7 @@ export default function ResumeBuilder({
 
   return (
     <>
+      <ToastStack toasts={toasts.toasts} onDismiss={toasts.dismiss} />
       <style>{`
         @keyframes fadeIn {
           from { opacity: 0; }

@@ -144,33 +144,51 @@ function EditableSection({
   if (hasInlineFix) {
     const isTyping = isEditing && typewriterContent.length < (inlineFix?.after.length ?? 0);
     const displayAfter = isEditing ? typewriterContent : (inlineFix?.after ?? "");
+    // "Why" explanation comes from the priority text the user is acting on
+    // (analysis.rewritePriorities[priorityIndex]). We strip the
+    // 'HIGH — '/'MEDIUM — '/'LOW — ' prefix for cleaner reading.
+    const whyText = (inlineFix?.action ?? "").replace(/^(HIGH|MEDIUM|LOW)\s*[—–-]\s*/i, "").trim();
+
+    const sectionLabelStyle: React.CSSProperties = {
+      fontSize: "10px",
+      fontWeight: 500,
+      letterSpacing: "0.05em",
+      textTransform: "uppercase",
+      color: "#9ca3af",
+      marginBottom: "6px",
+      marginTop: "4px",
+    };
+
     return (
-      <div data-section-key={sectionKey} style={{ margin: "2px 0", scrollMarginTop: "80px" }}>
-        {/* Original — struck out red */}
+      <div data-section-key={sectionKey} style={{ margin: "8px 0 12px", scrollMarginTop: "80px" }}>
+        {/* CURRENT VERSION */}
+        <div style={sectionLabelStyle}>Current version</div>
         <div style={{
           background: "#fff5f5",
           border: "1px solid #fca5a5",
-          borderRadius: "4px",
-          padding: "6px 10px",
-          marginBottom: "4px",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          marginBottom: "12px",
           fontSize: "inherit",
           lineHeight: "inherit",
           color: "#b91c1c",
           textDecoration: "line-through",
-          opacity: 0.75,
+          opacity: 0.85,
         }}>
           {children}
         </div>
-        {/* New — green, typewriting */}
+
+        {/* PROPOSED VERSION */}
+        <div style={sectionLabelStyle}>Proposed version</div>
         <div style={{
           background: "#f0fdf4",
           border: "1px solid #86efac",
-          borderRadius: "4px",
-          padding: "6px 10px",
-          marginBottom: "6px",
+          borderRadius: "8px",
+          padding: "10px 14px",
+          marginBottom: "12px",
           fontSize: "inherit",
           lineHeight: "inherit",
-          color: "#15803d",
+          color: "#14532d",
         }}>
           {displayAfter}
           {isTyping && (
@@ -185,37 +203,58 @@ function EditableSection({
             }} />
           )}
         </div>
-        {/* Accept / Rewrite / Custom / Reject — icon-only with tooltips, shown after typing */}
+
+        {/* WHY THIS IS BETTER (only when typing's done so the explanation
+            doesn't compete with the streaming text) */}
+        {!isTyping && whyText && (
+          <>
+            <div style={sectionLabelStyle}>Why this is better</div>
+            <div style={{
+              background: "#fafafa",
+              border: "1px solid #e5e7eb",
+              borderRadius: "8px",
+              padding: "10px 14px",
+              marginBottom: "12px",
+              fontSize: "13px",
+              lineHeight: 1.55,
+              color: "#52525b",
+            }}>
+              {whyText}
+            </div>
+          </>
+        )}
+
+        {/* ACCEPT / REWRITE / REJECT — visible labels, not icon-only */}
         {!isTyping && (
           <>
-            <div style={{ display: "flex", gap: "6px", marginBottom: "4px" }}>
+            <div style={{ display: "flex", gap: "8px", marginBottom: "4px", flexWrap: "wrap", alignItems: "center" }}>
               <button
                 title="Accept (Enter)"
-                aria-label="Accept"
                 onClick={(e) => { e.stopPropagation(); onAcceptFix?.(); }}
                 disabled={isRewriting}
                 style={{
-                  width: "28px", height: "26px", borderRadius: "6px",
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  fontSize: "13px", fontWeight: 500,
+                  padding: "7px 14px", borderRadius: "8px",
                   background: isRewriting ? "#9ca3af" : "#16a34a",
-                  color: "#111827", border: "none",
+                  color: "#fff", border: "none",
                   cursor: isRewriting ? "not-allowed" : "pointer",
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
                   opacity: isRewriting ? 0.6 : 1,
                 }}
               >
-                <Check size={14} strokeWidth={2.75} />
+                <Check size={14} strokeWidth={2.75} /> Accept
               </button>
               {onRewriteFix && (
                 <button
-                  title={isRewriting ? "Generating a new version…" : "Rewrite — get a different version"}
-                  aria-label="Rewrite"
+                  title={isRewriting ? "Generating a new version…" : "Rewrite differently"}
                   onClick={(e) => { e.stopPropagation(); onRewriteFix(); }}
                   disabled={isRewriting}
                   style={{
-                    width: "28px", height: "26px", borderRadius: "6px",
-                    background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe",
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    fontSize: "13px", fontWeight: 500,
+                    padding: "7px 14px", borderRadius: "8px",
+                    background: "#fff", color: "#52525b", border: "1px solid #d4d4d8",
                     cursor: isRewriting ? "wait" : "pointer",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
                   }}
                 >
                   <span style={{
@@ -224,43 +263,44 @@ function EditableSection({
                   }}>
                     <RotateCcw size={14} strokeWidth={2.25} />
                   </span>
+                  {isRewriting ? "Rewriting…" : "Rewrite differently"}
                 </button>
               )}
               {onCustomFix && (
                 <button
                   title="Tell it what you want"
-                  aria-label="Tell it what you want"
                   onClick={(e) => {
                     e.stopPropagation();
                     setCustomInstruction((v) => (v === null ? "" : null));
                   }}
                   disabled={isRewriting}
                   style={{
-                    width: "28px", height: "26px", borderRadius: "6px",
-                    background: customInstruction !== null ? "#e2e8f0" : "#f1f5f9",
-                    color: "#475569", border: "1px solid #e2e8f0",
+                    display: "inline-flex", alignItems: "center", gap: "6px",
+                    fontSize: "13px", fontWeight: 500,
+                    padding: "7px 14px", borderRadius: "8px",
+                    background: customInstruction !== null ? "#e9d5ff" : "#faf5ff",
+                    color: "#7c3aed", border: "1px solid #ddd6fe",
                     cursor: isRewriting ? "not-allowed" : "pointer",
-                    display: "inline-flex", alignItems: "center", justifyContent: "center",
                     opacity: isRewriting ? 0.6 : 1,
                   }}
                 >
-                  <Sparkles size={14} strokeWidth={2.25} />
+                  <Sparkles size={14} strokeWidth={2.25} /> Tell it what you want
                 </button>
               )}
               <button
                 title="Reject (Esc)"
-                aria-label="Reject"
                 onClick={(e) => { e.stopPropagation(); onSkipFix?.(); }}
                 disabled={isRewriting}
                 style={{
-                  width: "28px", height: "26px", borderRadius: "6px",
-                  background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca",
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                  fontSize: "13px", fontWeight: 500,
+                  padding: "7px 14px", borderRadius: "8px",
+                  background: "#fff", color: "#b91c1c", border: "1px solid #fecaca",
                   cursor: isRewriting ? "not-allowed" : "pointer",
-                  display: "inline-flex", alignItems: "center", justifyContent: "center",
                   opacity: isRewriting ? 0.6 : 1,
                 }}
               >
-                <X size={14} strokeWidth={2.75} />
+                <X size={14} strokeWidth={2.5} /> Reject
               </button>
             </div>
             {customInstruction !== null && (

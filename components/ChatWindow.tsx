@@ -453,6 +453,24 @@ export default function ChatWindow({
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  // Claude-style scroll anchoring: when a new user message is sent, we
+  // scroll IT to the top of the viewport so the user immediately sees
+  // their question + the assistant response forming underneath. Replaces
+  // the prior 'always scroll to bottom' behaviour which buried new
+  // exchanges below the fold.
+  const lastUserMsgAnchorRef = useRef<HTMLDivElement>(null);
+  const lastUserMessageIndex = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user" && !messages[i].content.startsWith("__FILE_UPLOAD__:")) return i;
+    }
+    return -1;
+  })();
+  // Track the count of user messages — incrementing means the user just
+  // sent a new one. Anchor only on that transition, not on every render.
+  const userMsgCountRef = useRef<number>(0);
+  const userMsgCount = messages.filter((m) => m.role === "user" && !m.content.startsWith("__FILE_UPLOAD__:")).length;
+  const userJustSent = userMsgCount > userMsgCountRef.current;
+  userMsgCountRef.current = userMsgCount;
   // Report highlight — pulse border for 2s when report first arrives
   const [reportHighlight, setReportHighlight] = useState(false);
   const prevAnalysisRef = useRef<typeof resumeAnalysis>(null);
@@ -475,14 +493,23 @@ export default function ChatWindow({
   }, []);
 
   useEffect(() => {
-    const lastMsg = messages[messages.length - 1];
-    const userJustSent = lastMsg?.role === "user";
-    // Always scroll when user sends, or when near bottom and new content arrives
-    if (userJustSent || isNearBottom) {
-      bottomRef.current?.scrollIntoView({ behavior: userJustSent ? "instant" : "smooth" });
-      if (userJustSent) setIsNearBottom(true);
+    // Claude-style anchoring: if the user just sent a new message, scroll
+    // THAT message to the top of the chat viewport so the user sees their
+    // question + the assistant response forming below it. After that we
+    // stop auto-scrolling — the assistant text fills downward naturally
+    // and the user reads top-to-bottom (or scrolls manually).
+    if (userJustSent && lastUserMsgAnchorRef.current) {
+      lastUserMsgAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
     }
-  }, [messages, isLoading, isNearBottom]);
+    // For non-user-send updates (e.g. streaming chunk arriving), only
+    // auto-scroll if the user is already near the bottom — never yank
+    // them down if they've scrolled up to read history.
+    if (isNearBottom && !userJustSent) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, userJustSent, isLoading]);
 
   function scrollToBottom() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -722,7 +749,11 @@ export default function ChatWindow({
               : msg;
 
         return (
-          <div key={i}>
+          <div
+            key={i}
+            ref={i === lastUserMessageIndex ? lastUserMsgAnchorRef : undefined}
+            style={{ scrollMarginTop: "16px" }}
+          >
             <Message
               message={displayMsg}
               onEdit={
