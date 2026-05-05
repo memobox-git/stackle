@@ -299,17 +299,22 @@ export default function Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  // Load all drive files when user opens Drive tab (reads from Supabase if
-  // authed, from localStorage otherwise)
+  // Load drive files for the CURRENT chat only when the Drive tab is
+  // opened. Previously this used loadAllDriveFiles() which returned every
+  // file across every chat the user ever had — so a user who had four
+  // chat sessions saw four 'Original' resumes even if they only uploaded
+  // once. One chat = one Original + one Working Copy + N versions +
+  // reports. If they want the full archive across chats we'll add a
+  // second view later.
   useEffect(() => {
-    if (activeView === "drive") {
-      setDriveLoading(true);
-      loadAllDriveFiles()
-        .then(setDriveFiles)
-        .catch(() => {})
-        .finally(() => setDriveLoading(false));
-    }
-  }, [activeView, user]);
+    if (activeView !== "drive") return;
+    const id = activeChatId ?? "local-chat";
+    setDriveLoading(true);
+    loadDriveFiles(id)
+      .then(setDriveFiles)
+      .catch(() => {})
+      .finally(() => setDriveLoading(false));
+  }, [activeView, activeChatId, user]);
 
   // Cross-tab sync — if another tab edits stackle_drive or stackle_chats,
   // reload our local view so stale data doesn't linger.
@@ -317,7 +322,8 @@ export default function Page() {
     if (typeof window === "undefined") return;
     function onStorage(e: StorageEvent) {
       if (e.key === "stackle_drive" && activeView === "drive") {
-        loadAllDriveFiles().then(setDriveFiles).catch(() => {});
+        const id = activeChatId ?? "local-chat";
+        loadDriveFiles(id).then(setDriveFiles).catch(() => {});
       }
       if (e.key === "stackle_chats") {
         loadChats().then(setChatList).catch(() => {});
