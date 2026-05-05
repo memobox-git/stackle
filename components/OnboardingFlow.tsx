@@ -718,7 +718,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
                 {step === 2 && (
                   <button onClick={handleResumeConfirm} disabled={uploading || extracting || (targetRole === "Other" && !targetRoleCustom.trim())}
-                    className={`w-full py-3 rounded-xl text-gray-900 text-sm font-semibold transition-all disabled:cursor-not-allowed shadow-md hover:shadow-lg relative overflow-hidden ${
+                    className={`w-full py-3 rounded-xl text-white text-sm font-semibold transition-all disabled:cursor-not-allowed shadow-md hover:shadow-lg relative overflow-hidden ${
                       extracting
                         ? "bg-gray-900"
                         : "bg-gray-900 hover:bg-black active:scale-[0.99]"
