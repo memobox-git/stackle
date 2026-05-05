@@ -274,12 +274,21 @@ export default function Page() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Load chats when signed in ─────────────────────────
+  // ── Load chats (works for authed AND unauth users) ──────
+  // Authed: pulls rows from Supabase. Unauth: pulls from localStorage via
+  // the same loadChats() helper. Either way we ensure activeChatId is
+  // pinned to a real chat so persistChat downstream actually has somewhere
+  // to write — without this, unauth users had zero persistence and any
+  // refresh wiped the whole conversation.
+  // We wait until authLoading is false so we know whether we're auth'd.
   useEffect(() => {
-    if (!user) return;
+    if (authLoading) return;
     loadChats()
       .then(async (chats) => {
         if (chats.length === 0) {
+          // No existing chat (auth'd: empty Supabase, unauth: no localStorage).
+          // Seed one with the profile resume so welcome + future messages
+          // have a chat to attach to.
           const prof = getProfileResume();
           const newChat = await createChat("chat", {
             resumeText: prof.resumeText,
@@ -297,7 +306,7 @@ export default function Page() {
       })
       .catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, authLoading]);
 
   // Load drive files for the CURRENT chat only when the Drive tab is
   // opened. Previously this used loadAllDriveFiles() which returned every
