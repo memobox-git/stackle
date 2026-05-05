@@ -1507,9 +1507,11 @@ export default function Page() {
             }
             if (ra) setResumeAnalysis(ra);
             if (goal) setCareerGoal(goal);
-            // Drop straight into chat. The welcome message + rich profile
-            // typewrites in there as the opener — no separate page.
-            setActiveView("chat");
+            // After the score-reveal CTA fires, land the user on the Resume
+            // Builder with the Report tab open. The score they just saw is
+            // the report's TL;DR — they expect the full breakdown next.
+            setActiveView("resume-builder");
+            setOpenReportSignal((n) => n + 1);
             setOnboardingCompleted(true);
           }}
           onSignIn={() => setShowAuthModal(true)}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, Upload, X } from "lucide-react";
 import { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
 import { ResumeAnalysis } from "@/lib/agents/schemas/resumeIntelligence";
+import ScoreReveal from "./ScoreReveal";
 
 function useTypewriter(text: string, speed = 28) {
   const [displayed, setDisplayed] = useState("");
@@ -94,6 +95,9 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   const [resumeExtraction, setResumeExtraction] = useState<ResumeExtraction | null>(null);
   const resumeAnalysisRef = useRef<ResumeAnalysis | null>(null);
   const analysisInFlightRef = useRef<Promise<ResumeAnalysis | null> | null>(null);
+  // Mirror analysis as state so the score-reveal screen re-renders the moment
+  // the background analysis lands. Ref alone won't trigger re-render.
+  const [resumeAnalysisState, setResumeAnalysisState] = useState<ResumeAnalysis | null>(null);
 
   // Step 3 — Career Goal
   const [careerGoal, setCareerGoal] = useState<string | null>(null);
@@ -280,6 +284,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         .then((r) => (r.ok ? r.json() : null))
         .then((a: ResumeAnalysis | null) => {
           resumeAnalysisRef.current = a;
+          if (a) setResumeAnalysisState(a);
           // If onboarding is already complete, update localStorage so the
           // main page can pick it up on next mount.
           try {
@@ -358,6 +363,23 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
   // Step indicator — labelled dots at the top.
   const STEP_LABELS = ["Photo", "Resume", "Goal", "Confirm"] as const;
+
+  // Score reveal — full-screen takeover the moment extraction is done.
+  // Skips Career Goal + Contact review entirely; CTA drops user straight
+  // into Resume Builder Report tab. This is the wow moment.
+  if (step === 3) {
+    const firstName = (resumeExtraction?.name ?? "").trim().split(/\s+/)[0] || null;
+    return (
+      <ScoreReveal
+        analysis={resumeAnalysisState ?? resumeAnalysisRef.current}
+        candidateFirstName={firstName}
+        onContinue={() => {
+          const profile = persistProfile();
+          onComplete(profile);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center py-12 sm:py-16 px-6 relative overflow-hidden">
@@ -472,7 +494,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     ref={rawImgRef}
-                    src={rawAvatarUrl}
+                    src={rawAvatarUrl ?? undefined}
                     alt="avatar preview"
                     draggable={false}
                     className="absolute inset-0 w-full h-full pointer-events-none"
@@ -535,7 +557,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                 className="w-24 h-24 rounded-full overflow-hidden bg-gray-50 ring-0 hover:ring-2 hover:ring-gray-300 transition-all cursor-pointer relative"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
+                <img src={avatarUrl ?? undefined} alt="avatar" className="w-full h-full object-cover" />
                 <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-medium">
                   Adjust
                 </span>
@@ -634,8 +656,8 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
           </div>
         )}
 
-        {/* Step 3 — Career Goal */}
-        {step === 3 && (
+        {/* Step 3 — Career Goal (retired; ScoreReveal handles step 3 now via early return) */}
+        {false && (
           <div className="animate-fadein flex flex-col items-center gap-4">
             <p className="text-lg font-semibold text-gray-900 text-center">
               {q3.displayed}
