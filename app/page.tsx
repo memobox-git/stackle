@@ -398,7 +398,7 @@ export default function Page() {
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     )[0];
     const lastFinalized = latestFinal ? { displayName: latestFinal.display_name } : null;
-    const welcomeText = buildResumeBuilderWelcome(resumeExtraction, lastFinalized);
+    const welcomeText = buildResumeBuilderWelcome(resumeExtraction, lastFinalized, resumeAnalysis);
     const welcomeMsgs: ChatMessage[] = [
       { role: "assistant", content: welcomeText, timestamp: now() },
       { role: "assistant", content: "__RESUME_WELCOME_CARD__" },

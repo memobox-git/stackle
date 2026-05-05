@@ -411,9 +411,11 @@ export default function ResumeBuilder({
         const data = await res.json();
         if (!data?.chatLine) return;
         setSkillsGap({ missing: data.missing ?? [], chatLine: data.chatLine });
-        // Push the gap line as an assistant message — but only if one isn't
-        // already there. Defensive: the effect may have raced with a prior run.
-        onPushAssistantMessage?.(data.chatLine);
+        // SILENT — skills-gap data flows into the Skills section UI inline.
+        // We do NOT push it into chat. The fetch resolves 20-40s after the
+        // user lands in Resume Builder and a delayed message felt like the
+        // app was "possessed" — the welcome already covers what the user
+        // needs to know up front.
 
         // Apply the full re-categorised sweep if it's materially richer than
         // what's currently in skillGroups. Replace in place + persist + toast.
@@ -428,9 +430,8 @@ export default function ResumeBuilder({
           setSkillsRegroupSnapshot(resumeExtraction.skillGroups ?? []);
           const next: ResumeExtraction = { ...resumeExtraction, skillGroups: recategorized };
           persistWorkingCopy(next);
-          onPushAssistantMessage?.(
-            `Pulled ${newSkillCount} technical skills from across your resume and regrouped them. ⌘Z to undo.`
-          );
+          // SILENT — the regroup is visible directly in the Skills section UI.
+          // No chat toast (used to fire 30-60s after mount and read as noise).
         }
       } catch (err) {
         console.warn("[skills-gap] failed:", err);
