@@ -129,7 +129,12 @@ export default function ResumeBuilder({
   openReportSignal,
 }: ResumeBuilderProps) {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<PanelTab>("resume");
+  // Initial tab: if the analysis is already present at mount time (user just
+  // finished onboarding and lands here), open the Report tab. The useEffect
+  // below stays as a safety net in case analysis arrives after first render.
+  const [activeTab, setActiveTab] = useState<PanelTab>(() =>
+    resumeAnalysis ? "report" : "resume"
+  );
   // Tabs the user has dismissed via the × button. Filter out of the strip.
   // Re-opening the panel or hitting the "Restore" chip brings them back.
   const [closedTabs, setClosedTabs] = useState<Set<PanelTab>>(new Set());
