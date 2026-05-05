@@ -308,6 +308,10 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
             ? "Senior"
             : "Mid";
       // Kick off full analysis in the background — don't block the user.
+      // Hard 200s timeout: Sonnet 4.5 typically lands in 30-60s; anything
+      // over 200s is a stuck function and the user shouldn't wait forever.
+      const analysisAbort = new AbortController();
+      const analysisTimeout = setTimeout(() => analysisAbort.abort(), 200_000);
       analysisInFlightRef.current = fetch("/api/agents/resume/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -318,8 +322,12 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
           jobDescription: jobDescription.trim() || undefined,
           reviewType: "Full Review",
         }),
+        signal: analysisAbort.signal,
       })
-        .then((r) => (r.ok ? r.json() : null))
+        .then((r) => {
+          clearTimeout(analysisTimeout);
+          return r.ok ? r.json() : null;
+        })
         .then((a: ResumeAnalysis | null) => {
           resumeAnalysisRef.current = a;
           if (a) setResumeAnalysisState(a);
@@ -339,7 +347,11 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
           } catch { /* ignore */ }
           return a;
         })
-        .catch(() => null);
+        .catch((err) => {
+          clearTimeout(analysisTimeout);
+          console.warn("[analyze] failed or timed out:", err);
+          return null;
+        });
 
       const fullName: string = ext.name ?? "";
       const parts = fullName.trim().split(/\s+/);
