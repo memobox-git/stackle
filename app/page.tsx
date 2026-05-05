@@ -294,6 +294,7 @@ export default function Page() {
           // No existing chat (auth'd: empty Supabase, unauth: no localStorage).
           // Seed one with the profile resume so welcome + future messages
           // have a chat to attach to.
+          console.log("[createChat] from loadChats — no existing chats");
           const prof = getProfileResume();
           const newChat = await createChat("chat", {
             resumeText: prof.resumeText,
@@ -793,6 +794,7 @@ export default function Page() {
 
   // ── Chat session actions ───────────────────────────────
   async function handleNewConversation() {
+    console.log("[createChat] from handleNewConversation — user clicked + New conversation");
     const prof = getProfileResume();
     try {
       const newChat = await createChat("chat", {
@@ -832,6 +834,7 @@ export default function Page() {
         setActiveChatId(remaining[0].id);
         restoreChatState(remaining[0]);
       } else {
+        console.log("[createChat] from handleDeleteChat — last chat deleted, seeding empty");
         const prof = getProfileResume();
         const newChat = await createChat("chat", {
           resumeText: prof.resumeText,
@@ -971,6 +974,16 @@ export default function Page() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
+      // Diagnostic: confirm we're appending to the existing chat, not
+      // spawning a new one. There is no createChat() anywhere in this
+      // function — the message goes through persistChat → updateChat,
+      // which targets activeChatIdRef.current via setMessage flow below.
+      console.log("[send]", {
+        activeChatId,
+        activeChatIdRef: activeChatIdRef.current,
+        existingMessages: chatMessages.length,
+        action: activeChatIdRef.current ? "appending to existing chat" : "no chat id — creating local-chat fallback",
+      });
 
       // ── Post-analysis actions ─────────────────────────
       if (/^change settings$/i.test(trimmed) && intakeStep === 5) {
