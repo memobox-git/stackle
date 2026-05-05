@@ -13,6 +13,7 @@ import ResumeCompletionModal from "@/components/ResumeCompletionModal";
 import CoverLetterModal from "@/components/CoverLetterModal";
 import JDMatchModal from "@/components/JDMatchModal";
 import SideBySideCompareModal from "@/components/SideBySideCompareModal";
+import RewriteTab from "@/components/RewriteTab";
 import ToastStack, { useToasts } from "@/components/ToastStack";
 import ResumeReportCard from "@/components/ResumeReportCard";
 import { ChatMessage } from "@/components/Message";
@@ -30,7 +31,7 @@ import {
   loadDriveFiles,
 } from "@/lib/supabase/drive";
 
-type PanelTab = "resume" | "report" | "edit";
+type PanelTab = "resume" | "report" | "edit" | "rewrite";
 
 // Module-scope guard for the one-shot skills-gap fetch. Lives outside the
 // component so it survives unmount/remount cycles when the user navigates
@@ -1433,6 +1434,7 @@ export default function ResumeBuilder({
     ...(resumeExtraction ? [{ key: "resume" as PanelTab, label: "Resume", icon: FileText }] : []),
     ...(resumeAnalysis ? [{ key: "report" as PanelTab, label: "Report", icon: ClipboardList }] : []),
     ...(resumeAnalysis ? [{ key: "edit" as PanelTab, label: editTabLabel, icon: Pencil }] : []),
+    ...(resumeAnalysis ? [{ key: "rewrite" as PanelTab, label: "Rewrite", icon: Sparkles }] : []),
   ];
   const availableTabs = allTabs.filter((t) => !closedTabs.has(t.key));
   const hasHiddenTabs = allTabs.length > availableTabs.length;
@@ -2192,6 +2194,32 @@ export default function ResumeBuilder({
                   />
                 )}
               </div>
+            )}
+
+            {activeTab === "rewrite" && resumeAnalysis && resumeExtraction && (
+              <RewriteTab
+                extraction={editedExtraction ?? resumeExtraction}
+                analysis={resumeAnalysis}
+                targetRole={resumeAnalysis.likelyTargetRole ?? "your target role"}
+                jobDescription={null}
+                onAcceptAll={(rewritten) => {
+                  // Replace the working extraction with the AI rewrite,
+                  // bump editHistory so the score banner reflects the
+                  // change, persist via the standard onUpdateExtraction
+                  // hook so Drive picks up the working copy.
+                  setEditedExtraction(rewritten);
+                  setEditHistory((prev) => [...prev, rewritten]);
+                  onUpdateExtraction(rewritten);
+                  toasts.push({ kind: "score", badge: "AI Rewrite", text: "Optimised resume applied. Save as a version when you're ready." });
+                  setActiveTab("resume");
+                }}
+                onTweakInEdit={(rewritten) => {
+                  setEditedExtraction(rewritten);
+                  setEditHistory((prev) => [...prev, rewritten]);
+                  onUpdateExtraction(rewritten);
+                  setActiveTab("edit");
+                }}
+              />
             )}
           </div>
         </>
