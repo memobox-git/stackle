@@ -31,12 +31,12 @@ export default function ResumeUpload({ hasResume, onUpload, onRemove, filename }
 
   if (hasResume) {
     return (
-      <div className="flex items-center gap-2 text-xs text-[#e0e0e0] bg-[#1e1e1e] border border-[#2a2a2a] rounded-lg px-3 py-1.5">
+      <div className="flex items-center gap-2 text-xs text-gray-800 bg-white border border-gray-200 rounded-lg px-3 py-1.5">
         <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" strokeWidth={2} />
-        <span className="truncate max-w-[130px] text-[#e0e0e0]">{filename}</span>
+        <span className="truncate max-w-[130px] text-gray-800">{filename}</span>
         <button
           onClick={onRemove}
-          className="ml-1 text-[#888888] hover:text-white transition-colors"
+          className="ml-1 text-gray-500 hover:text-gray-900 transition-colors"
           aria-label="Remove file"
         >
           <X className="w-3 h-3" />
@@ -50,7 +50,7 @@ export default function ResumeUpload({ hasResume, onUpload, onRemove, filename }
       <button
         onClick={() => inputRef.current?.click()}
         disabled={loading}
-        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-200 transition-colors disabled:opacity-50 border border-[#2a2a2a] rounded-lg px-3 py-1.5 hover:border-[#3a3a3a]"
+        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-200 transition-colors disabled:opacity-50 border border-gray-200 rounded-lg px-3 py-1.5 hover:border-gray-300"
       >
         <Upload className="w-3.5 h-3.5" strokeWidth={2} />
         {loading ? "Reading file..." : "Upload file"}

@@ -91,7 +91,7 @@ export default function FeedbackButton() {
         onClick={() => setOpen(true)}
         title="Send feedback"
         aria-label="Send feedback"
-        className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] text-gray-300 hover:bg-[#252525] hover:text-white shadow-lg transition-all"
+        className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-gray-100 border border-gray-200 text-gray-300 hover:bg-gray-200 hover:text-gray-900 shadow-lg transition-all"
         style={{ backdropFilter: "blur(8px)" }}
       >
         <MessageSquareWarning className="w-3.5 h-3.5" strokeWidth={1.75} />
@@ -105,24 +105,24 @@ export default function FeedbackButton() {
           onClick={() => { setOpen(false); reset(); }}
         >
           <div
-            className="w-full max-w-md bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl"
+            className="w-full max-w-md bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden shadow-2xl"
             onClick={(e) => e.stopPropagation()}
             style={{ animation: "fadeIn 220ms ease" }}
           >
             {/* Header */}
-            <div className="px-5 pt-4 pb-3 border-b border-[#1f1f1f] flex items-center gap-3">
-              <div className="w-7 h-7 rounded-md bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">
+            <div className="px-5 pt-4 pb-3 border-b border-gray-200 flex items-center gap-3">
+              <div className="w-7 h-7 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center">
                 <MessageSquareWarning className="w-3.5 h-3.5 text-gray-300" strokeWidth={1.75} />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-sm font-semibold text-white">Send feedback</h2>
+                <h2 className="text-sm font-semibold text-gray-900">Send feedback</h2>
                 <p className="text-[10px] text-gray-500 mt-0.5">
                   Found a bug or have an idea? We read every one.
                 </p>
               </div>
               <button
                 onClick={() => { setOpen(false); reset(); }}
-                className="text-gray-500 hover:text-white w-6 h-6 rounded-md flex items-center justify-center hover:bg-[#1a1a1a]"
+                className="text-gray-500 hover:text-gray-900 w-6 h-6 rounded-md flex items-center justify-center hover:bg-gray-100"
                 aria-label="Close"
               >
                 <X className="w-4 h-4" strokeWidth={1.75} />
@@ -134,7 +134,7 @@ export default function FeedbackButton() {
                 <div className="w-10 h-10 rounded-full bg-emerald-950/40 border border-emerald-900/50 flex items-center justify-center">
                   <Check className="w-4 h-4 text-emerald-400" strokeWidth={2.5} />
                 </div>
-                <p className="text-sm font-medium text-white">Thanks — we got it.</p>
+                <p className="text-sm font-medium text-gray-900">Thanks — we got it.</p>
                 <p className="text-[11px] text-gray-500">Your note is in our queue.</p>
               </div>
             ) : (
@@ -149,7 +149,7 @@ export default function FeedbackButton() {
                         onClick={() => setSeverity(value)}
                         className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md text-xs transition-colors border ${
                           active
-                            ? "bg-[#1a1a1a] border-[#3a3a3a] text-white"
+                            ? "bg-gray-100 border-gray-300 text-gray-900"
                             : "border-transparent text-gray-500 hover:text-gray-300"
                         }`}
                       >
@@ -179,7 +179,7 @@ export default function FeedbackButton() {
                   rows={5}
                   disabled={submitting}
                   autoFocus
-                  className="w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#555] outline-none transition-colors resize-y leading-6"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-[#555] outline-none transition-colors resize-y leading-6"
                 />
 
                 <input
@@ -188,7 +188,7 @@ export default function FeedbackButton() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email (optional — only if you want a reply)"
                   disabled={submitting}
-                  className="w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-3 py-1.5 text-xs text-white placeholder-[#555] outline-none transition-colors"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-gray-300 rounded-lg px-3 py-1.5 text-xs text-gray-900 placeholder-[#555] outline-none transition-colors"
                 />
 
                 {error && (

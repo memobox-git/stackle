@@ -28,9 +28,9 @@ export default function FixProgressCard({
 
   return (
     <div data-fix-progress-card className="w-full max-w-3xl mx-auto px-4 mb-4" style={{ animation: "fadeIn 240ms ease" }}>
-      <div className="rounded-2xl border border-[#2a2a2a] bg-[#0d0d0d] overflow-hidden">
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
         {/* Header */}
-        <div className="px-5 py-3 border-b border-[#1f1f1f] flex items-center gap-3">
+        <div className="px-5 py-3 border-b border-gray-200 flex items-center gap-3">
           <span className="text-[10px] font-semibold tracking-[0.1em] uppercase text-gray-500">
             {allDone ? "All fixes handled" : "Fixes to do"}
           </span>
@@ -42,7 +42,7 @@ export default function FixProgressCard({
         </div>
 
         {/* Progress bar */}
-        <div className="h-1 bg-[#1a1a1a] relative overflow-hidden">
+        <div className="h-1 bg-gray-100 relative overflow-hidden">
           <div
             className="h-full bg-emerald-500 transition-all duration-500"
             style={{ width: total > 0 ? `${(acceptedCount / total) * 100}%` : "0%" }}
@@ -74,7 +74,7 @@ export default function FixProgressCard({
               <li
                 key={i}
                 className={`flex items-start gap-3 px-5 py-2.5 transition-colors ${
-                  isCurrent ? "bg-[#1a1735]" : isDone ? "opacity-55" : "hover:bg-[#141414]"
+                  isCurrent ? "bg-[#1a1735]" : isDone ? "opacity-55" : "hover:bg-gray-50"
                 }`}
               >
                 {/* Status icon */}
@@ -103,7 +103,7 @@ export default function FixProgressCard({
                     )}
                     <span
                       className={`text-[12px] leading-5 ${
-                        isDone ? "line-through text-gray-500" : isCurrent ? "text-white font-medium" : "text-gray-300"
+                        isDone ? "line-through text-gray-500" : isCurrent ? "text-gray-900 font-medium" : "text-gray-300"
                       }`}
                     >
                       {display}
@@ -122,7 +122,7 @@ export default function FixProgressCard({
                   ) : onJumpTo ? (
                     <button
                       onClick={() => onJumpTo(raw, i)}
-                      className="text-[10px] font-semibold text-gray-500 hover:text-white transition-colors border border-[#2a2a2a] hover:border-[#3a3a3a] rounded px-2 py-0.5"
+                      className="text-[10px] font-semibold text-gray-500 hover:text-gray-900 transition-colors border border-gray-200 hover:border-gray-300 rounded px-2 py-0.5"
                     >
                       Fix
                     </button>
@@ -135,7 +135,7 @@ export default function FixProgressCard({
 
         {/* Footer */}
         {allDone && (
-          <div className="px-5 py-3 border-t border-[#1f1f1f] text-[11px] text-emerald-400 font-medium">
+          <div className="px-5 py-3 border-t border-gray-200 text-[11px] text-emerald-400 font-medium">
             All done. Resume is ready to save as a new version.
           </div>
         )}

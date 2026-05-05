@@ -26,14 +26,14 @@ function inlineFormat(text: string): React.ReactNode {
   return parts.map((part, i) => {
     if (part.startsWith("***") && part.endsWith("***")) {
       return (
-        <strong key={i} className="font-semibold italic text-white">
+        <strong key={i} className="font-semibold italic text-gray-900">
           {part.slice(3, -3)}
         </strong>
       );
     }
     if (part.startsWith("**") && part.endsWith("**")) {
       return (
-        <strong key={i} className="font-semibold text-white">
+        <strong key={i} className="font-semibold text-gray-900">
           {part.slice(2, -2)}
         </strong>
       );
@@ -49,7 +49,7 @@ function inlineFormat(text: string): React.ReactNode {
       return (
         <code
           key={i}
-          className="bg-[#161b22] border border-[#30363d] rounded px-1.5 py-0.5 text-sm font-mono text-[#79c0ff]"
+          className="bg-gray-50 border border-gray-300 rounded px-1.5 py-0.5 text-sm font-mono text-[#79c0ff]"
         >
           {part.slice(1, -1)}
         </code>
@@ -77,9 +77,9 @@ function renderContent(content: string) {
         i++;
       }
       elements.push(
-        <div key={`code-${i}`} className="my-3 rounded-xl overflow-hidden border border-[#30363d]">
+        <div key={`code-${i}`} className="my-3 rounded-xl overflow-hidden border border-gray-300">
           {lang && (
-            <div className="bg-[#161b22] border-b border-[#30363d] px-4 py-1.5 text-xs text-gray-500 font-mono">
+            <div className="bg-gray-50 border-b border-gray-300 px-4 py-1.5 text-xs text-gray-500 font-mono">
               {lang}
             </div>
           )}
@@ -95,7 +95,7 @@ function renderContent(content: string) {
     // H1
     if (line.startsWith("# ")) {
       elements.push(
-        <h1 key={`h1-${i}`} className="text-xl font-bold text-white mt-4 mb-2 leading-snug">
+        <h1 key={`h1-${i}`} className="text-xl font-bold text-gray-900 mt-4 mb-2 leading-snug">
           {inlineFormat(line.slice(2))}
         </h1>
       );
@@ -106,7 +106,7 @@ function renderContent(content: string) {
     // H2
     if (line.startsWith("## ")) {
       elements.push(
-        <h2 key={`h2-${i}`} className="text-lg font-semibold text-white mt-4 mb-1.5 leading-snug">
+        <h2 key={`h2-${i}`} className="text-lg font-semibold text-gray-900 mt-4 mb-1.5 leading-snug">
           {inlineFormat(line.slice(3))}
         </h2>
       );
@@ -117,7 +117,7 @@ function renderContent(content: string) {
     // H3
     if (line.startsWith("### ")) {
       elements.push(
-        <h3 key={`h3-${i}`} className="text-base font-semibold text-white mt-3 mb-1 leading-snug">
+        <h3 key={`h3-${i}`} className="text-base font-semibold text-gray-900 mt-3 mb-1 leading-snug">
           {inlineFormat(line.slice(4))}
         </h3>
       );
@@ -128,7 +128,7 @@ function renderContent(content: string) {
     // Blockquote — render as subtle callout
     if (line.startsWith("> ")) {
       elements.push(
-        <div key={`bq-${i}`} className="border-l-2 border-[#3a3a3a] pl-3 my-2 text-gray-500 italic text-base leading-7">
+        <div key={`bq-${i}`} className="border-l-2 border-gray-300 pl-3 my-2 text-gray-500 italic text-base leading-7">
           {inlineFormat(line.slice(2))}
         </div>
       );
@@ -138,7 +138,7 @@ function renderContent(content: string) {
 
     // Horizontal rule
     if (line.match(/^[-*_]{3,}$/)) {
-      elements.push(<hr key={`hr-${i}`} className="border-[#2a2a2a] my-4" />);
+      elements.push(<hr key={`hr-${i}`} className="border-gray-200 my-4" />);
       i++;
       continue;
     }
@@ -266,7 +266,7 @@ export default function Message({ message, onEdit }: MessageProps) {
               onClick={startEdit}
               title="Edit message"
               aria-label="Edit message"
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-white w-6 h-6 rounded-md flex items-center justify-center hover:bg-[#1a1a1a] mr-0.5"
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-900 w-6 h-6 rounded-md flex items-center justify-center hover:bg-gray-100 mr-0.5"
             >
               <Pencil className="w-3 h-3" strokeWidth={1.75} />
             </button>
@@ -276,7 +276,7 @@ export default function Message({ message, onEdit }: MessageProps) {
         </div>
         {/* Bubble */}
         {editing ? (
-          <div className="max-w-[78%] w-full bg-[#1e1e1e] border border-[#3a3a3a] text-gray-100 rounded-2xl rounded-tr-md px-4 py-3 text-base leading-7"
+          <div className="max-w-[78%] w-full bg-white border border-gray-300 text-gray-900 rounded-2xl rounded-tr-md px-4 py-3 text-base leading-7"
                style={{ boxShadow: "0 0 0 2px rgba(169, 154, 249, 0.25)" }}>
             <textarea
               ref={textareaRef}
@@ -291,15 +291,15 @@ export default function Message({ message, onEdit }: MessageProps) {
                 if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); commitEdit(); }
                 else if (e.key === "Escape") { e.preventDefault(); cancelEdit(); }
               }}
-              className="w-full bg-transparent outline-none resize-none text-gray-100 leading-7"
+              className="w-full bg-transparent outline-none resize-none text-gray-900 leading-7"
               rows={1}
             />
-            <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-[#2a2a2a]">
+            <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-gray-200">
               <span className="text-[10px] text-gray-600 mr-auto">⌘↩ to save · Esc to cancel</span>
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-white px-2.5 py-1.5 rounded-md hover:bg-[#2a2a2a] transition-colors"
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-900 px-2.5 py-1.5 rounded-md hover:bg-gray-200 transition-colors"
               >
                 <X className="w-3 h-3" strokeWidth={2} /> Cancel
               </button>
@@ -307,14 +307,14 @@ export default function Message({ message, onEdit }: MessageProps) {
                 type="button"
                 onClick={commitEdit}
                 disabled={!draft.trim() || draft.trim() === message.content.trim()}
-                className="flex items-center gap-1 text-xs font-semibold text-black bg-white hover:bg-gray-100 disabled:bg-[#2a2a2a] disabled:text-gray-600 disabled:cursor-not-allowed px-3 py-1.5 rounded-md transition-colors"
+                className="flex items-center gap-1 text-xs font-semibold text-black bg-white hover:bg-gray-100 disabled:bg-gray-200 disabled:text-gray-600 disabled:cursor-not-allowed px-3 py-1.5 rounded-md transition-colors"
               >
                 <Check className="w-3 h-3" strokeWidth={2.25} /> Save & resend
               </button>
             </div>
           </div>
         ) : (
-          <div className="max-w-[78%] bg-[#1e1e1e] border border-[#2a2a2a] text-gray-100 rounded-2xl rounded-tr-md px-5 py-3.5 text-base leading-7">
+          <div className="max-w-[78%] bg-white border border-gray-200 text-gray-900 rounded-2xl rounded-tr-md px-5 py-3.5 text-base leading-7">
             <p className="whitespace-pre-wrap">{message.content}</p>
           </div>
         )}

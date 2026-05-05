@@ -71,15 +71,15 @@ export default function ResumeCompletionModal({
       onClick={onKeepEditing}
     >
       <div
-        className="w-full max-w-lg bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl"
+        className="w-full max-w-lg bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden shadow-2xl"
         onClick={(e) => e.stopPropagation()}
         style={{ animation: "fadeIn 220ms ease" }}
       >
         {/* Header */}
-        <div className="relative px-6 pt-6 pb-4 border-b border-[#1f1f1f]">
+        <div className="relative px-6 pt-6 pb-4 border-b border-gray-200">
           <button
             onClick={onKeepEditing}
-            className="absolute top-4 right-4 text-gray-500 hover:text-white"
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-900"
             aria-label="Close"
           >
             <X className="w-4 h-4" strokeWidth={2} />
@@ -87,7 +87,7 @@ export default function ResumeCompletionModal({
           <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-1">
             Rewrite cycle complete
           </p>
-          <h2 className="text-xl font-bold text-white leading-tight">
+          <h2 className="text-xl font-bold text-gray-900 leading-tight">
             {verdict.label}
           </h2>
           <p className="text-xs text-gray-400 mt-1">
@@ -96,7 +96,7 @@ export default function ResumeCompletionModal({
         </div>
 
         {/* Score delta */}
-        <div className="px-6 py-5 flex items-center justify-center gap-4 border-b border-[#1f1f1f]">
+        <div className="px-6 py-5 flex items-center justify-center gap-4 border-b border-gray-200">
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-wider text-gray-500">Before</div>
             <div className="text-2xl font-bold text-gray-400">{baseScore}</div>
@@ -119,7 +119,7 @@ export default function ResumeCompletionModal({
         </div>
 
         {/* Signals */}
-        <div className="px-6 py-4 border-b border-[#1f1f1f]">
+        <div className="px-6 py-4 border-b border-gray-200">
           <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-3">
             Happy-path signals ({signalCount}/7)
           </p>
@@ -159,7 +159,7 @@ export default function ResumeCompletionModal({
             }}
             placeholder="e.g. Stripe — Senior DE v1"
             disabled={isSaving}
-            className="w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#555] outline-none transition-colors"
+            className="w-full bg-gray-50 border border-gray-200 focus:border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-[#555] outline-none transition-colors"
           />
           <p className="text-[10px] text-gray-600 mt-1.5">
             This name replaces the Edit tab label and is used as the PDF filename.
@@ -178,20 +178,20 @@ export default function ResumeCompletionModal({
           <div className={`grid ${onWriteCoverLetter ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
             <button
               onClick={onDownloadPdf}
-              className="py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+              className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
             >
               <Download className="w-3 h-3" strokeWidth={1.75} /> Download PDF
             </button>
             <button
               onClick={onCopyShareLink}
-              className="py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+              className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
             >
               <Link2 className="w-3 h-3" strokeWidth={1.75} /> Share link
             </button>
             {onWriteCoverLetter && (
               <button
                 onClick={onWriteCoverLetter}
-                className="py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
               >
                 <Mail className="w-3 h-3" strokeWidth={1.75} /> Cover letter
               </button>

@@ -35,10 +35,10 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-t border-[#3f3f3f]">
+    <div className="border-t border-gray-300">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-[#b0b0b0] hover:text-[#ececec] transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
       >
         {title}
         <ChevronDown
@@ -54,31 +54,31 @@ function Section({
 export default function MarketInsightCard({ analysis }: MarketInsightCardProps) {
   return (
     <div className="w-full max-w-3xl mx-auto px-4 mb-6">
-      <div className="bg-[#1a1a1a] border border-[#3f3f3f] rounded-2xl overflow-hidden">
+      <div className="bg-gray-100 border border-gray-300 rounded-2xl overflow-hidden">
         {/* Header */}
-        <div className="px-4 py-4 bg-[#1e1b4b]/30 border-b border-[#3f3f3f]">
+        <div className="px-4 py-4 bg-violet-50/30 border-b border-gray-300">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-5 h-5 rounded bg-[#6366f1] flex items-center justify-center flex-shrink-0">
-              <BarChart2 className="w-3 h-3 text-white" strokeWidth={2.5} />
+              <BarChart2 className="w-3 h-3 text-gray-900" strokeWidth={2.5} />
             </div>
             <span className="text-xs font-semibold text-[#6366f1] uppercase tracking-wider">
               Market Intelligence
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2 mt-2">
-            <span className="text-sm font-medium text-[#ececec]">
+            <span className="text-sm font-medium text-gray-900">
               {analysis.targetRole}
             </span>
             <DemandBadge level={analysis.demandSignal} />
           </div>
           <div className="flex flex-wrap gap-2 mt-2">
             {analysis.location && (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-[#2f2f2f] border border-[#3f3f3f] text-[#b0b0b0]">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-gray-200 border border-gray-300 text-gray-600">
                 {analysis.location}
               </span>
             )}
             {analysis.seniority && (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-[#2f2f2f] border border-[#3f3f3f] text-[#b0b0b0]">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-gray-200 border border-gray-300 text-gray-600">
                 {analysis.seniority}
               </span>
             )}
@@ -92,7 +92,7 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
               {analysis.sampleJobTitles.map((title, i) => (
                 <span
                   key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-[#1e1b4b] border border-indigo-900/50 text-indigo-300"
+                  className="text-xs px-2.5 py-1 rounded-full bg-violet-50 border border-indigo-900/50 text-indigo-300"
                 >
                   {title}
                 </span>
@@ -108,7 +108,7 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
               {analysis.topKeywords.map((kw, i) => (
                 <span
                   key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-[#1e1b4b] border border-indigo-900/50 text-indigo-300"
+                  className="text-xs px-2.5 py-1 rounded-full bg-violet-50 border border-indigo-900/50 text-indigo-300"
                 >
                   {kw}
                 </span>
@@ -124,7 +124,7 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
               {analysis.commonTools.map((tool, i) => (
                 <span
                   key={i}
-                  className="text-xs px-2.5 py-1 rounded-full bg-[#2f2f2f] border border-[#3f3f3f] text-[#b0b0b0]"
+                  className="text-xs px-2.5 py-1 rounded-full bg-gray-200 border border-gray-300 text-gray-600"
                 >
                   {tool}
                 </span>
@@ -139,25 +139,25 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               {analysis.salaryInsights.junior && (
                 <>
-                  <span className="text-[#9b9b9b]">Junior</span>
-                  <span className="text-[#d1d1d1] font-medium">{analysis.salaryInsights.junior}</span>
+                  <span className="text-gray-500">Junior</span>
+                  <span className="text-gray-700 font-medium">{analysis.salaryInsights.junior}</span>
                 </>
               )}
               {analysis.salaryInsights.mid && (
                 <>
-                  <span className="text-[#9b9b9b]">Mid-level</span>
-                  <span className="text-[#d1d1d1] font-medium">{analysis.salaryInsights.mid}</span>
+                  <span className="text-gray-500">Mid-level</span>
+                  <span className="text-gray-700 font-medium">{analysis.salaryInsights.mid}</span>
                 </>
               )}
               {analysis.salaryInsights.senior && (
                 <>
-                  <span className="text-[#9b9b9b]">Senior</span>
-                  <span className="text-[#d1d1d1] font-medium">{analysis.salaryInsights.senior}</span>
+                  <span className="text-gray-500">Senior</span>
+                  <span className="text-gray-700 font-medium">{analysis.salaryInsights.senior}</span>
                 </>
               )}
             </div>
             {analysis.salaryInsights.notes && (
-              <p className="text-xs text-[#6b6b6b] pt-1 border-t border-[#3f3f3f]">
+              <p className="text-xs text-gray-500 pt-1 border-t border-gray-300">
                 {analysis.salaryInsights.notes}
               </p>
             )}
@@ -169,7 +169,7 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
           <Section title={`Resume Alignment Tips (${analysis.resumeAlignmentTips.length})`} defaultOpen={true}>
             <ol className="space-y-2">
               {analysis.resumeAlignmentTips.map((tip, i) => (
-                <li key={i} className="flex gap-2.5 text-sm text-[#d1d1d1]">
+                <li key={i} className="flex gap-2.5 text-sm text-gray-700">
                   <span className="text-[#6366f1] flex-shrink-0 font-mono text-xs mt-0.5 w-4 text-right">
                     {i + 1}.
                   </span>
@@ -185,7 +185,7 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
           <Section title={`Common Responsibilities (${analysis.commonResponsibilities.length})`}>
             <ul className="space-y-1.5">
               {analysis.commonResponsibilities.map((r, i) => (
-                <li key={i} className="flex gap-2 text-sm text-[#d1d1d1]">
+                <li key={i} className="flex gap-2 text-sm text-gray-700">
                   <span className="text-[#6366f1] flex-shrink-0 mt-0.5">→</span>
                   {r}
                 </li>
@@ -199,7 +199,7 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
           <Section title={`Common Qualifications (${analysis.commonQualifications.length})`}>
             <ul className="space-y-1.5">
               {analysis.commonQualifications.map((q, i) => (
-                <li key={i} className="flex gap-2 text-sm text-[#d1d1d1]">
+                <li key={i} className="flex gap-2 text-sm text-gray-700">
                   <span className="text-[#6366f1] flex-shrink-0 mt-0.5">✓</span>
                   {q}
                 </li>
@@ -215,7 +215,7 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
               {analysis.repeatedPhrases.map((phrase, i) => (
                 <span
                   key={i}
-                  className="text-xs text-[#9b9b9b] bg-[#2f2f2f] border border-[#3f3f3f] rounded-lg px-3 py-1.5 font-mono leading-relaxed"
+                  className="text-xs text-gray-500 bg-gray-200 border border-gray-300 rounded-lg px-3 py-1.5 font-mono leading-relaxed"
                 >
                   &ldquo;{phrase}&rdquo;
                 </span>
@@ -229,8 +229,8 @@ export default function MarketInsightCard({ analysis }: MarketInsightCardProps) 
           <Section title={`Market Notes (${analysis.marketNotes.length})`}>
             <ul className="space-y-1.5">
               {analysis.marketNotes.map((note, i) => (
-                <li key={i} className="flex gap-2 text-sm text-[#d1d1d1]">
-                  <span className="text-[#6b6b6b] flex-shrink-0 mt-0.5">–</span>
+                <li key={i} className="flex gap-2 text-sm text-gray-700">
+                  <span className="text-gray-500 flex-shrink-0 mt-0.5">–</span>
                   {note}
                 </li>
               ))}

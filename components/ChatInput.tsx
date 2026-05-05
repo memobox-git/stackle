@@ -52,7 +52,7 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
 
   return (
     <div className="w-full max-w-3xl mx-auto">
-      <div className="flex items-end gap-3 bg-[#111111] border border-[#2a2a2a] rounded-2xl px-4 py-3 focus-within:border-[#3a3a3a] transition-colors">
+      <div className="flex items-end gap-3 bg-gray-50 border border-gray-200 rounded-2xl px-4 py-3 focus-within:border-gray-300 transition-colors">
 
         {/* Attach button */}
         {onFileUpload && (
@@ -60,7 +60,7 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#2a2a2a] text-[#555] hover:text-gray-300 hover:bg-[#1a1a1a] disabled:opacity-40 transition-all flex-shrink-0 mb-0.5"
+            className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-600 hover:text-gray-300 hover:bg-gray-100 disabled:opacity-40 transition-all flex-shrink-0 mb-0.5"
             title="Attach resume, JD, PDF, DOCX..."
           >
             <Paperclip className="w-4 h-4" strokeWidth={2} />
@@ -75,14 +75,14 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
           disabled={disabled && !busy}
           placeholder={busy ? "Working… press Stop to cancel" : (placeholder ?? "Ask me anything...")}
           rows={1}
-          className="flex-1 resize-none outline-none text-base text-gray-100 placeholder-[#444] bg-transparent leading-7 max-h-48"
+          className="flex-1 resize-none outline-none text-base text-gray-900 placeholder-[#444] bg-transparent leading-7 max-h-48"
         />
 
         {busy && onStop ? (
           <button
             onClick={onStop}
             type="button"
-            className="w-10 h-10 flex items-center justify-center rounded-xl text-white bg-black border border-[#3a3a3a] hover:bg-[#1a1a1a] active:scale-95 transition-all flex-shrink-0"
+            className="w-10 h-10 flex items-center justify-center rounded-xl text-white bg-gray-900 hover:bg-black active:scale-95 transition-all flex-shrink-0"
             aria-label="Stop"
             title="Stop (Esc)"
           >
@@ -101,7 +101,7 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
         )}
       </div>
 
-      <p className="text-center text-[11px] text-[#2a2a2a] mt-2.5">
+      <p className="text-center text-[11px] text-gray-800 mt-2.5">
         Stackle can make mistakes. Verify important career decisions.
       </p>
 

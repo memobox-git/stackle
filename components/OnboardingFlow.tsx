@@ -622,7 +622,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={avatarUrl ?? undefined} alt="avatar" className="w-full h-full object-cover" />
-                <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[11px] font-medium">
+                <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-gray-900 text-[11px] font-medium">
                   Adjust
                 </span>
               </button>
@@ -718,7 +718,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
                 {step === 2 && (
                   <button onClick={handleResumeConfirm} disabled={uploading || extracting || (targetRole === "Other" && !targetRoleCustom.trim())}
-                    className={`w-full py-3 rounded-xl text-white text-sm font-semibold transition-all disabled:cursor-not-allowed shadow-md hover:shadow-lg relative overflow-hidden ${
+                    className={`w-full py-3 rounded-xl text-gray-900 text-sm font-semibold transition-all disabled:cursor-not-allowed shadow-md hover:shadow-lg relative overflow-hidden ${
                       extracting
                         ? "bg-gray-900"
                         : "bg-gray-900 hover:bg-black active:scale-[0.99]"

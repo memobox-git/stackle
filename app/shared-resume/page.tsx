@@ -28,7 +28,7 @@ export default function SharedResumePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0d0d0d] text-gray-400 px-6 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-white text-gray-400 px-6 text-center">
         <div>
           <p className="text-sm">{error}</p>
           <p className="text-xs text-gray-600 mt-2">Ask whoever sent the link to re-copy it from their Drive.</p>
@@ -39,14 +39,14 @@ export default function SharedResumePage() {
 
   if (!extraction) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0d0d0d] text-gray-500 text-sm">
+      <div className="min-h-screen flex items-center justify-center bg-white text-gray-500 text-sm">
         Loading shared resume…
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] py-10">
+    <div className="min-h-screen bg-white py-10">
       <div className="max-w-3xl mx-auto px-4">
         <div className="mb-4 text-[11px] uppercase tracking-wider text-gray-600 flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />

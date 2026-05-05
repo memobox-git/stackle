@@ -52,7 +52,7 @@ export default function ResumeScorecardStrip({ analysis, extraction, onCellClick
   ];
 
   return (
-    <div className="border-b border-[#1f1f1f] bg-[#0a0a0a] px-4 py-2 flex items-center gap-2 overflow-x-auto">
+    <div className="border-b border-gray-200 bg-white px-4 py-2 flex items-center gap-2 overflow-x-auto">
       {cells.map((cell) => {
         const ratio = cell.score !== null && cell.max ? cell.score / cell.max : null;
         const color = ratio === null ? "bg-gray-700" : ratio >= 0.8 ? "bg-emerald-500" : ratio >= 0.6 ? "bg-amber-500" : "bg-rose-500";
@@ -62,7 +62,7 @@ export default function ResumeScorecardStrip({ analysis, extraction, onCellClick
             key={cell.key}
             onClick={() => onCellClick?.(cell.prompt)}
             disabled={isLoading}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#1f1f1f] hover:border-[#2a2a2a] hover:bg-[#111] transition-colors text-[11px] disabled:cursor-default"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-200 hover:bg-gray-50 transition-colors text-[11px] disabled:cursor-default"
           >
             <span className={`w-1.5 h-1.5 rounded-full ${color} ${isLoading ? "animate-pulse" : ""}`} />
             <span className="text-gray-500 font-medium uppercase tracking-wider">{cell.label}</span>
@@ -84,7 +84,7 @@ export default function ResumeScorecardStrip({ analysis, extraction, onCellClick
       {readability && (
         <button
           onClick={() => onCellClick?.(`My readability score is ${readability.score} (${readability.label}). Average sentence is ${readability.avgSentenceLen} words. Should I tighten it up, and if so where?`)}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#1f1f1f] hover:border-[#2a2a2a] hover:bg-[#111] transition-colors text-[11px]"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-200 hover:bg-gray-50 transition-colors text-[11px]"
           title={`Flesch Reading Ease · avg sentence ${readability.avgSentenceLen} words`}
         >
           <span className={`w-1.5 h-1.5 rounded-full ${

@@ -1468,7 +1468,7 @@ export default function ResumeBuilder({
     >
       {/* Mobile tab bar */}
       {hasPanelContent && (
-        <div className="flex md:hidden border-b border-[#1f1f1f] bg-[#0d0d0d] px-3 pt-2 pb-0 gap-1">
+        <div className="flex md:hidden border-b border-gray-200 bg-white px-3 pt-2 pb-0 gap-1">
           {(["chat", "panel"] as const).map((view) => {
             const isActive = mobileView === view;
             const label = view === "chat" ? "Chat" : "Workspace";
@@ -1506,7 +1506,7 @@ export default function ResumeBuilder({
           </div>
           {/* Headline */}
           <div className="text-center">
-            <h2 className="text-xl font-semibold text-white mb-2 tracking-tight">Drop your resume, get your score.</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2 tracking-tight">Drop your resume, get your score.</h2>
             <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
               Upload a PDF or DOCX below — get a full breakdown in under 30 seconds.
             </p>
@@ -1521,7 +1521,7 @@ export default function ResumeBuilder({
             ].map(({ icon, label }) => (
               <div
                 key={label}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[#2a2a2a] bg-[#141414] text-xs text-gray-400"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-xs text-gray-400"
               >
                 <span>{icon}</span>
                 <span>{label}</span>
@@ -1568,7 +1568,7 @@ export default function ResumeBuilder({
           from Fix click → typewriter → Accept/Rewrite/Reject. Only the
           "loading" state remains to signal the writer call is in flight. */}
       {fixFlow && fixFlow.step === "loading" && (
-        <div className="mx-4 mb-2 rounded-xl border border-[#2a2a2a] bg-[#0f0f0f] px-4 py-4 flex items-center gap-3">
+        <div className="mx-4 mb-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 flex items-center gap-3">
           <div className="w-4 h-4 border-2 border-[#a99af9] border-t-transparent rounded-full animate-spin flex-shrink-0" />
           <span className="text-xs text-gray-400">Generating improved version…</span>
         </div>
@@ -1760,7 +1760,7 @@ export default function ResumeBuilder({
   // ── Right workspace panel ────────────────────────────────────────
   const workspacePanel = (
     <div
-      className={`flex-col min-h-0 bg-[#0a0a0a] border-l border-[#1f1f1f] overflow-hidden rb-workspace-panel ${isPanelOpen ? "rb-workspace-panel-open" : ""}
+      className={`flex-col min-h-0 bg-white border-l border-gray-200 overflow-hidden rb-workspace-panel ${isPanelOpen ? "rb-workspace-panel-open" : ""}
         ${mobileView === "panel" ? "flex flex-1" : "hidden md:flex"}`}
       style={{
         width: isPanelOpen ? "60%" : "0",
@@ -1772,7 +1772,7 @@ export default function ResumeBuilder({
       {isPanelOpen && (
         <>
           {/* Panel header — tabs + action buttons + X */}
-          <div className="flex items-center border-b border-[#1f1f1f] px-2 pt-1.5 flex-shrink-0 bg-[#0a0a0a] gap-1">
+          <div className="flex items-center border-b border-gray-200 px-2 pt-1.5 flex-shrink-0 bg-white gap-1">
             <div className="flex flex-1 overflow-x-auto items-center">
               {availableTabs.map((tab) => {
                 const Icon = tab.icon;
@@ -1795,7 +1795,7 @@ export default function ResumeBuilder({
                     }}
                     className={`group relative flex items-center gap-1.5 pl-4 pr-2 py-2.5 text-sm font-medium transition-colors whitespace-nowrap rounded-t-lg flex-shrink-0 cursor-pointer ${
                       isActive
-                        ? "text-white bg-[#1a1a1a] border border-[#2a2a2a] border-b-[#1a1a1a]"
+                        ? "text-gray-900 bg-gray-100 border border-gray-200 border-b-[#1a1a1a]"
                         : "text-gray-500 hover:text-gray-300"
                     }`}
                   >
@@ -1809,8 +1809,8 @@ export default function ResumeBuilder({
                       onClick={(e) => { e.stopPropagation(); handleCloseTab(tab.key); }}
                       title={`Close ${tab.label}`}
                       aria-label={`Close ${tab.label} tab`}
-                      className={`ml-1 w-4 h-4 flex items-center justify-center rounded-sm transition-opacity hover:bg-[#2a2a2a] ${
-                        isActive ? "text-gray-400 hover:text-white opacity-70 hover:opacity-100" : "text-gray-600 hover:text-gray-300 opacity-0 group-hover:opacity-100"
+                      className={`ml-1 w-4 h-4 flex items-center justify-center rounded-sm transition-opacity hover:bg-gray-200 ${
+                        isActive ? "text-gray-400 hover:text-gray-900 opacity-70 hover:opacity-100" : "text-gray-600 hover:text-gray-300 opacity-0 group-hover:opacity-100"
                       }`}
                     >
                       <X className="w-3 h-3" strokeWidth={2.25} />
@@ -1822,7 +1822,7 @@ export default function ResumeBuilder({
                 <button
                   type="button"
                   onClick={handleRestoreTabs}
-                  className="ml-2 text-[10px] font-semibold text-gray-600 hover:text-gray-300 border border-dashed border-[#2a2a2a] hover:border-[#3a3a3a] rounded px-2 py-1 transition-colors flex-shrink-0"
+                  className="ml-2 text-[10px] font-semibold text-gray-600 hover:text-gray-300 border border-dashed border-gray-200 hover:border-gray-300 rounded px-2 py-1 transition-colors flex-shrink-0"
                   title="Show tabs you've closed"
                 >
                   + Restore tabs
@@ -1849,7 +1849,7 @@ export default function ResumeBuilder({
                   onClick={handleDownloadResume}
                   disabled={isDownloadingResume}
                   title="Download resume as PDF"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors text-xs disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs disabled:opacity-50"
                 >
                   <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
                   <span className="hidden sm:inline">{isDownloadingResume ? "Saving…" : "Download"}</span>
@@ -1876,7 +1876,7 @@ export default function ResumeBuilder({
                     onClick={() => { setDownloadOpen((v) => !v); setShareOpen(false); }}
                     disabled={isDownloading || isDownloadingDocx}
                     title="Download"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors text-xs disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs disabled:opacity-50"
                   >
                     <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
                     <span className="hidden sm:inline">
@@ -1887,11 +1887,11 @@ export default function ResumeBuilder({
                   {downloadOpen && (
                     <>
                       <div className="fixed inset-0 z-30" onClick={() => setDownloadOpen(false)} />
-                      <div className="absolute right-0 top-full mt-1 z-40 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg overflow-hidden min-w-[180px]">
+                      <div className="absolute right-0 top-full mt-1 z-40 bg-gray-100 border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[180px]">
                         <button
                           onClick={() => { setDownloadOpen(false); handleDownload(); }}
                           disabled={isDownloading}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-[#252525] hover:text-white transition-colors border-b border-[#2a2a2a] disabled:opacity-50"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
                         >
                           <Download className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
                           <span>PDF</span>
@@ -1899,7 +1899,7 @@ export default function ResumeBuilder({
                         <button
                           onClick={() => { setDownloadOpen(false); handleDownloadDocx(); }}
                           disabled={isDownloadingDocx}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-[#252525] hover:text-white transition-colors disabled:opacity-50"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors disabled:opacity-50"
                         >
                           <FileText className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
                           <span>Word document (.docx)</span>
@@ -1914,7 +1914,7 @@ export default function ResumeBuilder({
                   <button
                     onClick={() => { setShareOpen((v) => !v); setDownloadOpen(false); }}
                     title="Share"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors text-xs"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs"
                   >
                     <Share2 className="w-3.5 h-3.5" strokeWidth={1.75} />
                     <span className="hidden sm:inline">Share</span>
@@ -1923,11 +1923,11 @@ export default function ResumeBuilder({
                   {shareOpen && (
                     <>
                       <div className="fixed inset-0 z-30" onClick={() => setShareOpen(false)} />
-                      <div className="absolute right-0 top-full mt-1 z-40 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg overflow-hidden min-w-[220px]">
+                      <div className="absolute right-0 top-full mt-1 z-40 bg-gray-100 border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[220px]">
                         <button
                           onClick={() => { setShareOpen(false); setCoverLetterOpen(true); }}
                           disabled={!editedExtraction}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-[#252525] hover:text-white transition-colors border-b border-[#2a2a2a] disabled:opacity-50"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
                         >
                           <Mail className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
                           <span>Generate cover letter</span>
@@ -1935,7 +1935,7 @@ export default function ResumeBuilder({
                         <button
                           onClick={() => { setShareOpen(false); handleCopyLink(); }}
                           disabled={isCopying}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-[#252525] hover:text-white transition-colors border-b border-[#2a2a2a] disabled:opacity-50"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
                         >
                           {copiedLink
                             ? <Check className="w-4 h-4 text-green-400" strokeWidth={2} />
@@ -1944,21 +1944,21 @@ export default function ResumeBuilder({
                         </button>
                         <button
                           onClick={() => { setShareOpen(false); handleShareReviewLink(); }}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-[#252525] hover:text-white transition-colors border-b border-[#2a2a2a]"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200"
                         >
                           <Link2 className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
                           <span>Copy peer-review link</span>
                         </button>
                         <button
                           onClick={() => { setShareOpen(false); handleShare("linkedin"); }}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-[#252525] hover:text-white transition-colors"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors"
                         >
                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
                           <span>Share on LinkedIn</span>
                         </button>
                         <button
                           onClick={() => { setShareOpen(false); handleShare("email"); }}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-[#252525] hover:text-white transition-colors"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors"
                         >
                           <Mail className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
                           <span>Share via email</span>
@@ -1973,7 +1973,7 @@ export default function ResumeBuilder({
             {/* X button — desktop only */}
             <button
               onClick={() => setIsPanelOpen(false)}
-              className="hidden md:flex ml-1 p-1.5 rounded-md text-gray-500 hover:text-white hover:bg-[#1a1a1a] transition-colors flex-shrink-0"
+              className="hidden md:flex ml-1 p-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors flex-shrink-0"
             >
               <X className="w-4 h-4" strokeWidth={1.75} />
             </button>
@@ -2034,20 +2034,20 @@ export default function ResumeBuilder({
                         <div className="flex-1 min-w-0">
                           <p className="text-[11px] font-semibold tracking-widest uppercase text-violet-400 mb-1">AI Coach</p>
                           <p className="text-sm text-gray-200 leading-snug">
-                            I found <span className="font-semibold text-white">{issueCount} issue{issueCount === 1 ? "" : "s"}</span>. The fastest win is fixing your <span className="font-semibold text-white">{sectionLabel.toLowerCase()}</span>.
+                            I found <span className="font-semibold text-gray-900">{issueCount} issue{issueCount === 1 ? "" : "s"}</span>. The fastest win is fixing your <span className="font-semibold text-gray-900">{sectionLabel.toLowerCase()}</span>.
                           </p>
                           <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{topPriority}</p>
                           <div className="flex items-center gap-2 mt-3">
                             <button
                               onClick={() => handleFixItem(topPriority, 0)}
                               disabled={isEditStreaming}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                             >
                               Fix {sectionLabel}
                             </button>
                             <button
                               onClick={() => reportRef.current?.scrollTo({ top: 9999, behavior: "smooth" })}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] text-gray-300 hover:text-white transition-colors border border-[#2a2a2a]"
+                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-300 hover:text-gray-900 transition-colors border border-gray-200"
                             >
                               View full report
                             </button>
@@ -2060,12 +2060,12 @@ export default function ResumeBuilder({
 
                 {/* JD match CTA — sits above the general report. The general
                     report is role-agnostic; this is the JD-specific one. */}
-                <div className="mb-4 rounded-xl border border-[#2a2a2a] bg-[#0d0d0d] px-4 py-3 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center flex-shrink-0">
+                <div className="mb-4 rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
                     <Target className="w-4 h-4 text-gray-300" strokeWidth={1.75} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white">Match against a specific job</p>
+                    <p className="text-sm font-medium text-gray-900">Match against a specific job</p>
                     <p className="text-[11px] text-gray-500 mt-0.5">
                       Paste, upload, or link a JD. Get a fit score + targeted rewrites.
                     </p>
@@ -2095,8 +2095,8 @@ export default function ResumeBuilder({
               <div style={{ animation: "fadeIn 200ms ease" }}>
                 {/* Score banner + View Original button */}
                 <div style={{
-                  background: "#111",
-                  borderBottom: "1px solid #1f1f1f",
+                  background: "#fafafa",
+                  borderBottom: "1px solid #e5e7eb",
                   padding: "8px 16px",
                   display: "flex",
                   alignItems: "center",
@@ -2175,13 +2175,13 @@ export default function ResumeBuilder({
                             width: "480px",
                             maxHeight: "70vh",
                             overflowY: "auto",
-                            background: "#0d0d0d",
+                            background: "#ffffff",
                             border: "1px solid #2a2a2a",
                             borderRadius: "10px",
                             boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
                           }}
                         >
-                          <div style={{ padding: "8px 12px", borderBottom: "1px solid #1f1f1f", fontSize: "11px", color: "#555", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                          <div style={{ padding: "8px 12px", borderBottom: "1px solid #e5e7eb", fontSize: "11px", color: "#555", fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase" }}>
                             Original Resume
                           </div>
                           {resumeDocHtml ? (
@@ -2239,7 +2239,7 @@ export default function ResumeBuilder({
   const toggleButton = hasPanelContent && !isPanelOpen ? (
     <button
       onClick={() => setIsPanelOpen(true)}
-      className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-40 flex-col items-center justify-center w-5 h-16 bg-[#1a1a1a] border border-r-0 border-[#2a2a2a] rounded-l-lg text-gray-400 hover:text-white hover:bg-[#222] transition-colors"
+      className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-40 flex-col items-center justify-center w-5 h-16 bg-gray-100 border border-r-0 border-gray-200 rounded-l-lg text-gray-400 hover:text-gray-900 hover:bg-gray-200 transition-colors"
       title="Open workspace panel"
     >
       <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2} />

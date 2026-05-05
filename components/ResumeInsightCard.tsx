@@ -26,7 +26,7 @@ function StatusBadge({ status }: { status: ScoreCategory["status"] }) {
 function ScoreBar({ score, max, color }: { score: number; max: number; color: string }) {
   const pct = Math.min(1, score / max);
   return (
-    <div className="flex-1 h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
+    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
       <div className="h-full rounded-full transition-all" style={{ width: `${pct * 100}%`, background: color }} />
     </div>
   );
@@ -41,8 +41,8 @@ function scoreColor(pct: number): string {
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-t border-[#3f3f3f]">
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-[#b0b0b0] hover:text-[#ececec] transition-colors">
+    <div className="border-t border-gray-300">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center justify-between px-4 py-3 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors">
         {title}
         <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} strokeWidth={2} />
       </button>
@@ -91,25 +91,25 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
 
   return (
     <div className="w-full max-w-3xl mx-auto px-4 mb-6">
-      <div className="bg-[#1a1a1a] border border-[#3f3f3f] rounded-2xl overflow-hidden">
+      <div className="bg-gray-100 border border-gray-300 rounded-2xl overflow-hidden">
 
         {/* Header */}
-        <div className="px-4 py-4 bg-[#212121] border-b border-[#3f3f3f]">
+        <div className="px-4 py-4 bg-gray-100 border-b border-gray-300">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-5 h-5 rounded bg-[#10a37f] flex items-center justify-center flex-shrink-0">
-              <FileText className="w-3 h-3 text-white" strokeWidth={2.5} />
+              <FileText className="w-3 h-3 text-gray-900" strokeWidth={2.5} />
             </div>
             <span className="text-xs font-semibold text-[#10a37f] uppercase tracking-wider">Resume Intelligence</span>
           </div>
-          <p className="text-sm text-[#d1d1d1] leading-relaxed mb-3">{analysis.overallAssessment}</p>
+          <p className="text-sm text-gray-700 leading-relaxed mb-3">{analysis.overallAssessment}</p>
           <div className="flex flex-wrap gap-2">
             {analysis.likelyTargetRole && (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-[#2f2f2f] border border-[#3f3f3f] text-[#b0b0b0]">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-gray-200 border border-gray-300 text-gray-600">
                 Target: {analysis.likelyTargetRole}
               </span>
             )}
             {analysis.seniorityEstimate && (
-              <span className="text-xs px-2.5 py-1 rounded-full bg-[#2f2f2f] border border-[#3f3f3f] text-[#b0b0b0]">
+              <span className="text-xs px-2.5 py-1 rounded-full bg-gray-200 border border-gray-300 text-gray-600">
                 Level: {analysis.seniorityEstimate}
               </span>
             )}
@@ -117,11 +117,11 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
         </div>
 
         {/* Score Summary */}
-        <div className="px-4 py-4 border-b border-[#3f3f3f]">
+        <div className="px-4 py-4 border-b border-gray-300">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#666]">Score Summary</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Score Summary</span>
             <span className="text-xl font-bold tabular-nums" style={{ color: totalColor }}>
-              {total}<span className="text-xs font-normal text-[#555] ml-0.5">/100</span>
+              {total}<span className="text-xs font-normal text-gray-600 ml-0.5">/100</span>
             </span>
           </div>
           <div className="space-y-2">
@@ -130,7 +130,7 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
               const color = scoreColor(pct);
               return (
                 <div key={cat.label} className="flex items-center gap-3">
-                  <span className="text-[11px] text-[#888] w-36 flex-shrink-0">{cat.label}</span>
+                  <span className="text-[11px] text-gray-500 w-36 flex-shrink-0">{cat.label}</span>
                   <ScoreBar score={cat.score} max={cat.max} color={color} />
                   <span className="text-[11px] font-semibold tabular-nums w-12 text-right flex-shrink-0" style={{ color }}>
                     {cat.score}/{cat.max}
@@ -140,7 +140,7 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
               );
             })}
           </div>
-          <div className="mt-3 text-[11px] text-[#555]">
+          <div className="mt-3 text-[11px] text-gray-600">
             Projected after fixes: <span className="text-[#10a37f] font-semibold">{scores.projectedPostFix}/100</span>
           </div>
         </div>
@@ -150,7 +150,7 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
           <Section title={`Strengths (${analysis.strengths.length})`} defaultOpen={true}>
             <ul className="space-y-1.5">
               {analysis.strengths.map((s, i) => (
-                <li key={i} className="flex gap-2 text-sm text-[#d1d1d1]">
+                <li key={i} className="flex gap-2 text-sm text-gray-700">
                   <span className="text-[#10a37f] flex-shrink-0 mt-0.5">✓</span>{s}
                 </li>
               ))}
@@ -163,7 +163,7 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
           <Section title={`Weaknesses (${analysis.weaknesses.length})`} defaultOpen={true}>
             <ul className="space-y-1.5">
               {analysis.weaknesses.map((w, i) => (
-                <li key={i} className="flex gap-2 text-sm text-[#d1d1d1]">
+                <li key={i} className="flex gap-2 text-sm text-gray-700">
                   <span className="text-yellow-400 flex-shrink-0 mt-0.5">!</span>{w}
                 </li>
               ))}
@@ -202,20 +202,20 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
           <Section title="ATS Notes">
             <div className="space-y-2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-xs text-[#9b9b9b]">Formatting risk</span>
+                <span className="text-xs text-gray-500">Formatting risk</span>
                 <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${analysis.atsHeuristics.formattingRisk === "low" ? "text-[#10a37f] bg-[#10a37f]/10 border-[#10a37f]/30" : analysis.atsHeuristics.formattingRisk === "medium" ? "text-yellow-400 bg-yellow-400/10 border-yellow-400/30" : "text-red-400 bg-red-400/10 border-red-400/30"}`}>
                   {analysis.atsHeuristics.formattingRisk}
                 </span>
               </div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-[#9b9b9b]">Scanability risk</span>
+                <span className="text-xs text-gray-500">Scanability risk</span>
                 <span className={`text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full border ${analysis.atsHeuristics.scanabilityRisk === "low" ? "text-[#10a37f] bg-[#10a37f]/10 border-[#10a37f]/30" : analysis.atsHeuristics.scanabilityRisk === "medium" ? "text-yellow-400 bg-yellow-400/10 border-yellow-400/30" : "text-red-400 bg-red-400/10 border-red-400/30"}`}>
                   {analysis.atsHeuristics.scanabilityRisk}
                 </span>
               </div>
               <ul className="space-y-1">
                 {analysis.atsHeuristics.notes.map((note, i) => (
-                  <li key={i} className="text-xs text-[#9b9b9b] flex gap-1.5">
+                  <li key={i} className="text-xs text-gray-500 flex gap-1.5">
                     <span className="flex-shrink-0">–</span>{note}
                   </li>
                 ))}
@@ -229,8 +229,8 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
           <Section title={`Rewrite Priorities (${analysis.rewritePriorities.length})`}>
             <ol className="space-y-2">
               {analysis.rewritePriorities.map((p, i) => (
-                <li key={i} className="flex gap-2.5 text-sm text-[#d1d1d1]">
-                  <span className="text-[#6b6b6b] flex-shrink-0 w-4 text-right font-mono text-xs mt-0.5">{i + 1}.</span>
+                <li key={i} className="flex gap-2.5 text-sm text-gray-700">
+                  <span className="text-gray-500 flex-shrink-0 w-4 text-right font-mono text-xs mt-0.5">{i + 1}.</span>
                   {p}
                 </li>
               ))}
@@ -243,7 +243,7 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
           <Section title={`Weak Bullets (${analysis.weakBullets.length})`}>
             <ul className="space-y-2">
               {analysis.weakBullets.map((b, i) => (
-                <li key={i} className="text-xs text-[#9b9b9b] bg-[#2f2f2f] border border-[#3f3f3f] rounded-lg px-3 py-2 font-mono leading-relaxed">
+                <li key={i} className="text-xs text-gray-500 bg-gray-200 border border-gray-300 rounded-lg px-3 py-2 font-mono leading-relaxed">
                   &ldquo;{b}&rdquo;
                 </li>
               ))}
@@ -256,7 +256,7 @@ export default function ResumeInsightCard({ analysis }: ResumeInsightCardProps) 
           <Section title="Suggested Next Steps" defaultOpen={true}>
             <ul className="space-y-2">
               {analysis.suggestedNextSteps.map((step, i) => (
-                <li key={i} className="flex gap-2.5 text-sm text-[#d1d1d1]">
+                <li key={i} className="flex gap-2.5 text-sm text-gray-700">
                   <span className="text-[#10a37f] flex-shrink-0 mt-0.5">→</span>{step}
                 </li>
               ))}

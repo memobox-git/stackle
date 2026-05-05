@@ -149,24 +149,24 @@ export default function JDMatchModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-3xl bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col"
+        className="w-full max-w-3xl bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden shadow-2xl max-h-[92vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
         style={{ animation: "fadeIn 220ms ease" }}
       >
         {/* Header */}
-        <div className="px-6 pt-5 pb-4 border-b border-[#1f1f1f] flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">
+        <div className="px-6 pt-5 pb-4 border-b border-gray-200 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
             <Target className="w-4 h-4 text-gray-300" strokeWidth={1.75} />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-white">Match against a job description</h2>
+            <h2 className="text-base font-semibold text-gray-900">Match against a job description</h2>
             <p className="text-[11px] text-gray-500 mt-0.5">
               Score the resume against a specific JD. Get keyword coverage + targeted rewrites.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-white w-7 h-7 rounded-md flex items-center justify-center hover:bg-[#1a1a1a]"
+            className="text-gray-500 hover:text-gray-900 w-7 h-7 rounded-md flex items-center justify-center hover:bg-gray-100"
             aria-label="Close"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
@@ -179,7 +179,7 @@ export default function JDMatchModal({
           {!report && (
             <div className="px-6 py-4 space-y-3">
               {/* Mode tabs */}
-              <div className="flex items-center gap-1 border-b border-[#1f1f1f] pb-2">
+              <div className="flex items-center gap-1 border-b border-gray-200 pb-2">
                 {([
                   { key: "paste", label: "Paste", icon: FileText },
                   { key: "upload", label: "Upload", icon: Paperclip },
@@ -193,7 +193,7 @@ export default function JDMatchModal({
                       onClick={() => { setMode(m.key); setError(null); }}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-colors ${
                         active
-                          ? "bg-[#1a1a1a] text-white border border-[#2a2a2a]"
+                          ? "bg-gray-100 text-gray-900 border border-gray-200"
                           : "text-gray-500 hover:text-gray-300"
                       }`}
                     >
@@ -218,12 +218,12 @@ export default function JDMatchModal({
                       onChange={(e) => setUrl(e.target.value)}
                       placeholder="https://company.com/careers/role"
                       disabled={isWorking}
-                      className="flex-1 bg-[#141414] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#555] outline-none transition-colors"
+                      className="flex-1 bg-gray-50 border border-gray-200 focus:border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-[#555] outline-none transition-colors"
                     />
                     <button
                       onClick={handleUrlFetch}
                       disabled={isWorking || !url.trim()}
-                      className="px-4 py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium disabled:opacity-50"
+                      className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium disabled:opacity-50"
                     >
                       Fetch
                     </button>
@@ -239,7 +239,7 @@ export default function JDMatchModal({
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isWorking}
-                    className="w-full py-6 rounded-lg bg-[#141414] border border-dashed border-[#2a2a2a] hover:border-[#3a3a3a] text-gray-400 hover:text-white text-sm transition-colors disabled:opacity-50 flex flex-col items-center gap-1"
+                    className="w-full py-6 rounded-lg bg-gray-50 border border-dashed border-gray-200 hover:border-gray-300 text-gray-400 hover:text-gray-900 text-sm transition-colors disabled:opacity-50 flex flex-col items-center gap-1"
                   >
                     <Paperclip className="w-4 h-4" strokeWidth={1.75} />
                     Click to upload a JD (PDF or DOCX)
@@ -261,7 +261,7 @@ export default function JDMatchModal({
                 placeholder="Paste the job description here…"
                 rows={mode === "paste" ? 12 : 8}
                 disabled={isWorking}
-                className="w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#555] outline-none transition-colors resize-y leading-6"
+                className="w-full bg-gray-50 border border-gray-200 focus:border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-[#555] outline-none transition-colors resize-y leading-6"
               />
 
               {error && (
@@ -350,8 +350,8 @@ export default function JDMatchModal({
 
               {/* Rewrites */}
               {report.rewriteRecommendations.length > 0 && (
-                <div className="rounded-xl border border-[#2a2a2a] bg-[#0d0d0d] overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-[#1f1f1f] flex items-center gap-2">
+                <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 flex items-center gap-2">
                     <Sparkles className="w-3.5 h-3.5 text-purple-400" strokeWidth={1.75} />
                     <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
                       Rewrites for this JD ({report.rewriteRecommendations.length})
@@ -384,7 +384,7 @@ export default function JDMatchModal({
                               className={`text-[10px] font-semibold px-2.5 py-1.5 rounded-md transition-colors flex-shrink-0 flex items-center gap-1 ${
                                 applied
                                   ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900/50 cursor-default"
-                                  : "bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 hover:text-white"
+                                  : "bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 hover:text-gray-900"
                               }`}
                             >
                               {applied
@@ -403,13 +403,13 @@ export default function JDMatchModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-[#1f1f1f] flex items-center gap-2 flex-wrap">
+        <div className="px-6 py-3 border-t border-gray-200 flex items-center gap-2 flex-wrap">
           {!report ? (
             <>
               {isWorking && (
                 <button
                   onClick={handleStop}
-                  className="text-[11px] text-gray-500 hover:text-white border border-[#2a2a2a] rounded-md px-2 py-1"
+                  className="text-[11px] text-gray-500 hover:text-gray-900 border border-gray-200 rounded-md px-2 py-1"
                 >
                   Stop
                 </button>
@@ -440,7 +440,7 @@ export default function JDMatchModal({
             <>
               <button
                 onClick={reset}
-                className="text-xs text-gray-500 hover:text-white border border-[#2a2a2a] rounded-md px-2 py-1.5"
+                className="text-xs text-gray-500 hover:text-gray-900 border border-gray-200 rounded-md px-2 py-1.5"
               >
                 ← New JD
               </button>
@@ -454,7 +454,7 @@ export default function JDMatchModal({
                       jobDescription: jdText,
                     })
                   }
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium"
                 >
                   <Mail className="w-3.5 h-3.5" strokeWidth={1.75} />
                   Cover letter for this
@@ -487,8 +487,8 @@ function KeywordPanel({
 }) {
   const accent = tone === "positive" ? "#16a34a" : "#dc2626";
   return (
-    <div className="rounded-xl border border-[#2a2a2a] bg-[#0d0d0d] overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-[#1f1f1f] flex items-center justify-between">
+    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">{title}</span>
         <span className="text-[10px] font-mono text-gray-600">{keywords.length}</span>
       </div>
@@ -530,8 +530,8 @@ function FitPanel({
 }) {
   const accent = fits ? "#16a34a" : "#d97706";
   return (
-    <div className="rounded-xl border border-[#2a2a2a] bg-[#0d0d0d] overflow-hidden">
-      <div className="px-4 py-2.5 border-b border-[#1f1f1f] flex items-center justify-between">
+    <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <div className="px-4 py-2.5 border-b border-gray-200 flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">{title}</span>
         <span className="text-[10px] font-mono" style={{ color: accent }}>{fits ? "FITS" : "GAP"}</span>
       </div>

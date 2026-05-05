@@ -19,8 +19,8 @@ export default function ResumeWelcomeCard({ analysis }: ResumeWelcomeCardProps) 
       className="w-full max-w-3xl mx-auto px-4 mb-8"
       style={{ animation: "fadeIn 240ms ease" }}
     >
-      <div className="rounded-2xl border border-[#1f1f1f] bg-[#0d0d0d] overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#1f1f1f] flex items-center gap-2">
+      <div className="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-200 flex items-center gap-2">
           <span className="text-[10px] font-medium tracking-[0.1em] uppercase text-gray-500">
             {loading ? "Scanning resume…" : "First read"}
           </span>

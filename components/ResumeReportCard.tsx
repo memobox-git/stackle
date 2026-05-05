@@ -12,10 +12,10 @@ function scoreColor(pct: number): string {
 
 function statusBadgeStyle(status: ScoreCategory["status"]): React.CSSProperties {
   const map: Record<ScoreCategory["status"], { bg: string; color: string }> = {
-    STRONG: { bg: "#1d4ed8", color: "#fff" },
-    GOOD:   { bg: "#16a34a", color: "#fff" },
-    REVIEW: { bg: "#d97706", color: "#fff" },
-    WEAK:   { bg: "#dc2626", color: "#fff" },
+    STRONG: { bg: "#1d4ed8", color: "#111827" },
+    GOOD:   { bg: "#16a34a", color: "#111827" },
+    REVIEW: { bg: "#d97706", color: "#111827" },
+    WEAK:   { bg: "#dc2626", color: "#111827" },
   };
   const s = map[status] ?? map.WEAK;
   return {
@@ -232,7 +232,7 @@ export default function ResumeReportCard({
               {analysis.seniorityEstimate}
             </span>
           )}
-          <span style={{ fontSize: "11px", padding: "2px 10px", borderRadius: "100px", background: badge.color, color: "#fff", fontWeight: "700", fontFamily: "system-ui, sans-serif", letterSpacing: "0.05em" }}>
+          <span style={{ fontSize: "11px", padding: "2px 10px", borderRadius: "100px", background: badge.color, color: "#111827", fontWeight: "700", fontFamily: "system-ui, sans-serif", letterSpacing: "0.05em" }}>
             {badge.label}
           </span>
         </div>
@@ -281,7 +281,7 @@ export default function ResumeReportCard({
                 {short.map((line, i) => (
                   <div key={i} style={{ fontSize: "9px", fontWeight: "600", color: "#374151", letterSpacing: "0.02em", lineHeight: "1.3", textTransform: "uppercase" }}>{line}</div>
                 ))}
-                <div style={{ fontSize: "9px", padding: "1px 6px", borderRadius: "3px", background: color, color: "#fff", fontWeight: "700", letterSpacing: "0.04em", marginTop: "3px", display: "inline-block" }}>
+                <div style={{ fontSize: "9px", padding: "1px 6px", borderRadius: "3px", background: color, color: "#111827", fontWeight: "700", letterSpacing: "0.04em", marginTop: "3px", display: "inline-block" }}>
                   {cat.status}
                 </div>
               </div>
@@ -309,7 +309,7 @@ export default function ResumeReportCard({
           </div>
           <div style={{ textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
             <div style={{ fontSize: "9px", fontWeight: "600", color: "#374151", letterSpacing: "0.02em", textTransform: "uppercase", lineHeight: "1.3" }}>TOTAL</div>
-            <div style={{ fontSize: "9px", padding: "1px 6px", borderRadius: "3px", background: badge.color, color: "#fff", fontWeight: "700", letterSpacing: "0.04em", marginTop: "3px", display: "inline-block" }}>
+            <div style={{ fontSize: "9px", padding: "1px 6px", borderRadius: "3px", background: badge.color, color: "#111827", fontWeight: "700", letterSpacing: "0.04em", marginTop: "3px", display: "inline-block" }}>
               {badge.label}
             </div>
           </div>
@@ -510,7 +510,7 @@ export default function ResumeReportCard({
               const remaining = analysis.rewritePriorities.filter((_, i) => !(completedActions?.has(i) ?? false)).length;
               if (remaining === 0) return null; // all handled — hide the button
               return (
-                <button onClick={onFixAll} style={{ fontFamily: "system-ui, sans-serif", fontSize: "10px", fontWeight: "600", padding: "4px 12px", border: "1px solid #111", borderRadius: "4px", background: "#111", color: "#fff", cursor: "pointer", letterSpacing: "0.03em", marginBottom: "10px" }}>
+                <button onClick={onFixAll} style={{ fontFamily: "system-ui, sans-serif", fontSize: "10px", fontWeight: "600", padding: "4px 12px", border: "1px solid #111", borderRadius: "4px", background: "#fafafa", color: "#111827", cursor: "pointer", letterSpacing: "0.03em", marginBottom: "10px" }}>
                   Fix All ({remaining} left)
                 </button>
               );
@@ -565,7 +565,7 @@ export default function ResumeReportCard({
                     {/* Status check */}
                     <td style={{ padding: "8px 4px 8px 8px", width: "22px", verticalAlign: "top" }}>
                       {status === "accepted" ? (
-                        <span title="Accepted" aria-label="Accepted" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "16px", height: "16px", borderRadius: "3px", background: "#16a34a", color: "#fff", fontSize: "11px", fontWeight: "700", lineHeight: 1 }}>✓</span>
+                        <span title="Accepted" aria-label="Accepted" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "16px", height: "16px", borderRadius: "3px", background: "#16a34a", color: "#111827", fontSize: "11px", fontWeight: "700", lineHeight: 1 }}>✓</span>
                       ) : status === "rejected" ? (
                         <span title="Skipped" aria-label="Skipped" style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: "16px", height: "16px", borderRadius: "3px", background: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca", fontSize: "10px", fontWeight: "700", lineHeight: 1 }}>✗</span>
                       ) : (

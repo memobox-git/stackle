@@ -29,7 +29,7 @@ export default function SuggestionChips({ onSelect, onUploadResume }: Suggestion
                 onSelect(chip.prompt);
               }
             }}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-[#2a2a2a] text-gray-400 text-sm bg-[#161616] hover:bg-[#1e1e1e] hover:border-[#3a3a3a] hover:text-white transition-all cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-gray-200 text-gray-400 text-sm bg-gray-50 hover:bg-white hover:border-gray-300 hover:text-gray-900 transition-all cursor-pointer"
           >
             <Icon className="w-3.5 h-3.5 flex-shrink-0 text-gray-300" strokeWidth={1.75} />
             {chip.label}

@@ -52,16 +52,16 @@ export default function HomeInput({ value, onChange, onSend, onFileUpload, disab
 
   return (
     <div className="w-full max-w-2xl mx-auto">
-      <div className="bg-[#161616] border border-[#3a3a3a] rounded-3xl overflow-hidden">
+      <div className="bg-gray-50 border border-gray-300 rounded-3xl overflow-hidden">
 
         {/* Uploaded file badge */}
         {uploadedFile && (
-          <div className="flex items-center gap-2 mx-5 mt-4 px-3 py-2 bg-[#1e1e1e] border border-[#2a2a2a] rounded-xl">
-            <CheckCircle2 className="w-3.5 h-3.5 text-[#e0e0e0] flex-shrink-0" strokeWidth={2} />
-            <span className="text-xs text-[#e0e0e0] truncate">{uploadedFile}</span>
+          <div className="flex items-center gap-2 mx-5 mt-4 px-3 py-2 bg-white border border-gray-200 rounded-xl">
+            <CheckCircle2 className="w-3.5 h-3.5 text-gray-800 flex-shrink-0" strokeWidth={2} />
+            <span className="text-xs text-gray-800 truncate">{uploadedFile}</span>
             <button
               onClick={() => setUploadedFile(null)}
-              className="ml-auto text-[#888888] hover:text-white text-xs transition-colors"
+              className="ml-auto text-gray-500 hover:text-gray-900 text-xs transition-colors"
             ><X className="w-3 h-3" /></button>
           </div>
         )}
@@ -83,12 +83,12 @@ export default function HomeInput({ value, onChange, onSend, onFileUpload, disab
             disabled={disabled || uploading}
             placeholder="What's your next move in data or AI?"
             rows={3}
-            className="w-full resize-none outline-none text-base text-gray-100 placeholder-[#666666] bg-transparent leading-7 min-h-[80px]"
+            className="w-full resize-none outline-none text-base text-gray-900 placeholder-[#666666] bg-transparent leading-7 min-h-[80px]"
           />
         </div>
 
         {/* Divider */}
-        <div className="h-px bg-[#2a2a2a] mx-4" />
+        <div className="h-px bg-gray-200 mx-4" />
 
         {/* Bottom bar */}
         <div className="flex items-center justify-between px-4 py-3">
@@ -98,7 +98,7 @@ export default function HomeInput({ value, onChange, onSend, onFileUpload, disab
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="w-9 h-9 flex items-center justify-center rounded-xl border border-[#2a2a2a] text-[#4a4a4a] hover:text-gray-300 hover:bg-[#1a1a1a] disabled:opacity-40 transition-all"
+              className="w-9 h-9 flex items-center justify-center rounded-xl border border-gray-200 text-gray-700 hover:text-gray-300 hover:bg-gray-100 disabled:opacity-40 transition-all"
               title="Attach file — resume, JD, PDF, DOCX, JSON, CSV, TXT..."
             >
               {uploading ? (
@@ -107,7 +107,7 @@ export default function HomeInput({ value, onChange, onSend, onFileUpload, disab
                 <Paperclip className="w-4 h-4" strokeWidth={2} />
               )}
             </button>
-            <span className="text-[11px] text-[#3a3a3a]">
+            <span className="text-[11px] text-gray-700">
               PDF, DOCX, TXT, JSON, CSV...
             </span>
           </div>

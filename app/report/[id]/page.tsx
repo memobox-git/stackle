@@ -23,7 +23,7 @@ export default async function SharedReportPage({ params }: { params: Promise<{ i
   const candidateName = data.candidate_name ?? undefined;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#0d0d0d", padding: "32px 16px" }}>
+    <div style={{ minHeight: "100vh", background: "#ffffff", padding: "32px 16px" }}>
       {/* Stackle brand bar */}
       <div style={{
         maxWidth: "860px",
@@ -59,7 +59,7 @@ export default async function SharedReportPage({ params }: { params: Promise<{ i
             display: "inline-block",
             padding: "10px 24px",
             background: "#7c6af7",
-            color: "#fff",
+            color: "#111827",
             borderRadius: "8px",
             fontSize: "13px",
             fontWeight: 600,

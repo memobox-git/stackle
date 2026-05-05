@@ -85,7 +85,7 @@ export default function CareerProfile({
     "chat";
 
   return (
-    <div className="min-h-screen w-full bg-[#0d0d0d] text-white overflow-y-auto">
+    <div className="min-h-screen w-full bg-white text-gray-900 overflow-y-auto">
       {/* Soft hero gradient backdrop */}
       <div
         aria-hidden
@@ -105,7 +105,7 @@ export default function CareerProfile({
             <p className="text-[10px] uppercase tracking-[0.3em] text-gray-500 font-semibold mb-2">
               Career Profile
             </p>
-            <h1 className="text-3xl font-bold text-white leading-tight">
+            <h1 className="text-3xl font-bold text-gray-900 leading-tight">
               Here's where you stand, {firstName}.
             </h1>
             <p className="text-sm text-gray-400 mt-2 leading-relaxed">
@@ -117,15 +117,15 @@ export default function CareerProfile({
             onClick={onClose}
             title="Skip — go to chat"
             aria-label="Close"
-            className="text-gray-500 hover:text-white w-8 h-8 rounded-md flex items-center justify-center hover:bg-[#1a1a1a]"
+            className="text-gray-500 hover:text-gray-900 w-8 h-8 rounded-md flex items-center justify-center hover:bg-gray-100"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
           </button>
         </div>
 
         {/* Best-fit roles */}
-        <div className="rounded-2xl border border-[#2a2a2a] bg-[#0f0f0f] overflow-hidden mb-6">
-          <div className="px-5 py-3 border-b border-[#1f1f1f]">
+        <div className="rounded-2xl border border-gray-200 bg-gray-50 overflow-hidden mb-6">
+          <div className="px-5 py-3 border-b border-gray-200">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
               You are currently closest to
             </p>
@@ -145,7 +145,7 @@ export default function CareerProfile({
                     </span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
-                        <span className="text-sm font-semibold text-white truncate">
+                        <span className="text-sm font-semibold text-gray-900 truncate">
                           {r.title}
                         </span>
                         <span
@@ -158,7 +158,7 @@ export default function CareerProfile({
                       {r.reason && (
                         <p className="text-[11px] text-gray-500 leading-5">{r.reason}</p>
                       )}
-                      <div className="mt-2 h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
+                      <div className="mt-2 h-1 bg-gray-100 rounded-full overflow-hidden">
                         <div
                           className="h-full rounded-full transition-all duration-700"
                           style={{ width: `${r.matchPct}%`, background: barColor }}
@@ -174,8 +174,8 @@ export default function CareerProfile({
 
         {/* Strengths + Gaps */}
         <div className="grid md:grid-cols-2 gap-4 mb-6">
-          <div className="rounded-2xl border border-[#2a2a2a] bg-[#0f0f0f] overflow-hidden">
-            <div className="px-5 py-3 border-b border-[#1f1f1f] flex items-center gap-2">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" strokeWidth={2.25} />
               <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
                 Main strengths
@@ -195,8 +195,8 @@ export default function CareerProfile({
             </ul>
           </div>
 
-          <div className="rounded-2xl border border-[#2a2a2a] bg-[#0f0f0f] overflow-hidden">
-            <div className="px-5 py-3 border-b border-[#1f1f1f] flex items-center gap-2">
+          <div className="rounded-2xl border border-gray-200 bg-gray-50 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-200 flex items-center gap-2">
               <AlertCircle className="w-3.5 h-3.5 text-amber-500" strokeWidth={2.25} />
               <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold">
                 Biggest gaps
@@ -219,7 +219,7 @@ export default function CareerProfile({
 
         {/* Goal restatement */}
         {careerGoal && (
-          <div className="rounded-xl border border-[#1f1f1f] bg-[#0f0f0f] px-5 py-3 mb-6">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-5 py-3 mb-6">
             <p className="text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-1">
               Your goal
             </p>
@@ -281,18 +281,18 @@ function CtaCard({
       className={`text-left rounded-2xl border p-4 transition-all hover:-translate-y-0.5 ${
         primary
           ? "bg-white text-black border-white hover:shadow-[0_8px_24px_-12px_rgba(255,255,255,0.4)]"
-          : "bg-[#0f0f0f] text-white border-[#2a2a2a] hover:border-[#3a3a3a] hover:bg-[#141414]"
+          : "bg-gray-50 text-gray-900 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
       }`}
     >
       <div className="flex items-center gap-3 mb-2">
         <div
           className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-            primary ? "bg-black text-white" : "bg-[#1a1a1a] text-gray-300"
+            primary ? "bg-black text-white" : "bg-gray-100 text-gray-300"
           }`}
         >
           {icon}
         </div>
-        <span className={`text-sm font-semibold ${primary ? "text-black" : "text-white"}`}>
+        <span className={`text-sm font-semibold ${primary ? "text-black" : "text-gray-900"}`}>
           {title}
         </span>
         <ArrowRight className={`w-3.5 h-3.5 ml-auto ${primary ? "text-black" : "text-gray-500"}`} strokeWidth={2} />

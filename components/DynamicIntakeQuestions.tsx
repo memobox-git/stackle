@@ -47,17 +47,17 @@ export default function DynamicIntakeQuestions({
     .every((q) => !!answers[q.id]);
 
   return (
-    <div className="w-full max-w-sm rounded-2xl border border-[#2a2a2a] bg-[#111] overflow-hidden">
+    <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-gray-50 overflow-hidden">
       {/* Message */}
-      <div className="px-4 pt-4 pb-3 border-b border-[#1e1e1e]">
-        <p className="text-sm text-[#c8c8c8] leading-relaxed">{message}</p>
+      <div className="px-4 pt-4 pb-3 border-b border-gray-200">
+        <p className="text-sm text-gray-600 leading-relaxed">{message}</p>
       </div>
 
       {/* Questions */}
       <div className="px-4 py-3 space-y-5">
         {questions.map((q) => (
           <div key={q.id}>
-            <p className="text-xs text-[#888] mb-2 leading-relaxed">{q.text}</p>
+            <p className="text-xs text-gray-500 mb-2 leading-relaxed">{q.text}</p>
 
             {q.chips ? (
               /* Chip question */
@@ -71,7 +71,7 @@ export default function DynamicIntakeQuestions({
                       className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                         selected
                           ? "bg-white text-black border-white font-medium"
-                          : "border-[#2a2a2a] text-[#888] hover:text-white hover:border-[#3a3a3a]"
+                          : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
                       }`}
                     >
                       {chip}
@@ -86,7 +86,7 @@ export default function DynamicIntakeQuestions({
                 onChange={(e) => setAnswer(q.id, e.target.value)}
                 placeholder="Paste JD here, or type 'no JD'..."
                 rows={3}
-                className="w-full resize-none text-xs text-gray-300 placeholder-[#444] bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl px-3 py-2.5 outline-none focus:border-[#3a3a3a] transition-colors leading-relaxed"
+                className="w-full resize-none text-xs text-gray-300 placeholder-[#444] bg-white border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-300 transition-colors leading-relaxed"
               />
             )}
           </div>
@@ -101,7 +101,7 @@ export default function DynamicIntakeQuestions({
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
             allRequired
               ? "text-black active:scale-95 hover:opacity-90"
-              : "bg-[#1e1e1e] text-[#444] border border-[#2a2a2a] cursor-not-allowed"
+              : "bg-white text-gray-700 border border-gray-200 cursor-not-allowed"
           }`}
         >
           Start review

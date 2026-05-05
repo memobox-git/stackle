@@ -197,7 +197,7 @@ function EditableSection({
                 style={{
                   width: "28px", height: "26px", borderRadius: "6px",
                   background: isRewriting ? "#9ca3af" : "#16a34a",
-                  color: "#fff", border: "none",
+                  color: "#111827", border: "none",
                   cursor: isRewriting ? "not-allowed" : "pointer",
                   display: "inline-flex", alignItems: "center", justifyContent: "center",
                   opacity: isRewriting ? 0.6 : 1,
@@ -296,7 +296,7 @@ function EditableSection({
                   style={{
                     width: "32px", height: "28px", borderRadius: "6px",
                     background: (customInstruction ?? "").trim() ? "#0f172a" : "#cbd5e1",
-                    color: "#fff", border: "none",
+                    color: "#111827", border: "none",
                     cursor: (customInstruction ?? "").trim() ? "pointer" : "not-allowed",
                     display: "inline-flex", alignItems: "center", justifyContent: "center",
                   }}
@@ -497,7 +497,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         >
           {title}
         </span>
-        <div style={{ flex: 1, height: "1.5px", background: "#111" }} />
+        <div style={{ flex: 1, height: "1.5px", background: "#fafafa" }} />
       </div>
       {children}
     </div>

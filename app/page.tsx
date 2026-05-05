@@ -48,7 +48,7 @@ type ActiveView = "chat" | "resume-builder" | "drive";
 function SidebarTooltip({ label }: { label: string }) {
   return (
     <span
-      className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded-md bg-[#1a1a1a] border border-[#2a2a2a] text-xs font-medium text-gray-200 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-lg z-50"
+      className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-2 px-2 py-1 rounded-md bg-gray-100 border border-gray-200 text-xs font-medium text-gray-200 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-150 shadow-lg z-50"
       role="tooltip"
     >
       {label}
@@ -1363,7 +1363,7 @@ export default function Page() {
         <div className="relative group">
           <button
             onClick={handleNewConversation}
-            className={`flex items-center ${expanded ? "gap-2 px-3 w-full" : "justify-center w-full px-0"} py-2 rounded-lg bg-[#1e1e1e] border border-[#2a2a2a] text-gray-300 hover:bg-[#252525] hover:text-white transition-colors`}
+            className={`flex items-center ${expanded ? "gap-2 px-3 w-full" : "justify-center w-full px-0"} py-2 rounded-lg bg-white border border-gray-200 text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors`}
           >
             <Plus className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
             {expanded && <span className="text-sm truncate">New conversation</span>}
@@ -1383,11 +1383,11 @@ export default function Page() {
                 onClick={() => { setActiveView(item.key); setIsSidebarOpen(false); }}
                 className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg font-medium transition-all ${
                   isActive
-                    ? "text-white bg-[#1e1e1e] border border-[#2a2a2a]"
-                    : "text-gray-500 hover:text-gray-300 hover:bg-[#1a1a1a] border border-transparent"
+                    ? "text-gray-900 bg-white border border-gray-200"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-gray-100 border border-transparent"
                 }`}
               >
-                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-white" : "text-gray-600"}`} strokeWidth={1.75} />
+                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-gray-900" : "text-gray-600"}`} strokeWidth={1.75} />
                 {expanded && <span className="text-sm truncate">{item.label}</span>}
               </button>
               {!expanded && <SidebarTooltip label={item.label} />}
@@ -1403,7 +1403,7 @@ export default function Page() {
                 setOpenReportSignal((n) => n + 1);
                 setIsSidebarOpen(false);
               }}
-              className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg font-medium transition-all text-gray-500 hover:text-gray-300 hover:bg-[#1a1a1a] border border-transparent`}
+              className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg font-medium transition-all text-gray-500 hover:text-gray-300 hover:bg-gray-100 border border-transparent`}
             >
               <ClipboardList className="w-4 h-4 flex-shrink-0 text-gray-600" strokeWidth={1.75} />
               {expanded && <span className="text-sm truncate">Report</span>}
@@ -1429,8 +1429,8 @@ export default function Page() {
                   onClick={() => handleSwitchChat(chat.id)}
                   className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-colors pr-8 truncate ${
                     activeChatId === chat.id
-                      ? "bg-[#1e1e1e] text-white border border-[#2a2a2a]"
-                      : "text-gray-500 hover:bg-[#1a1a1a] hover:text-gray-300 border border-transparent"
+                      ? "bg-white text-gray-900 border border-gray-200"
+                      : "text-gray-500 hover:bg-gray-100 hover:text-gray-300 border border-transparent"
                   }`}
                 >
                   {chat.title}
@@ -1463,7 +1463,7 @@ export default function Page() {
         <div className="relative group">
           <button
             onClick={handleSignOut}
-            className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg text-gray-600 hover:text-gray-400 hover:bg-[#1a1a1a] transition-colors border border-transparent`}
+            className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg text-gray-600 hover:text-gray-400 hover:bg-gray-100 transition-colors border border-transparent`}
           >
             <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
             {expanded && <span className="text-sm">Sign out</span>}
@@ -1528,10 +1528,10 @@ export default function Page() {
 
   // ── Main app ──────────────────────────────────────────
   return (
-    <div className="flex h-screen bg-[#0d0d0d] text-white overflow-hidden">
+    <div className="flex h-screen bg-white text-gray-900 overflow-hidden">
       {/* Desktop sidebar */}
       <aside
-        className="flex-shrink-0 bg-[#111111] border-r border-[#1f1f1f] flex-col hidden md:flex transition-all duration-200 relative overflow-visible"
+        className="flex-shrink-0 bg-gray-50 border-r border-gray-200 flex-col hidden md:flex transition-all duration-200 relative overflow-visible"
         style={{ width: isSidebarExpanded ? "224px" : "52px" }}
       >
         <SidebarContent expanded={isSidebarExpanded} />
@@ -1544,10 +1544,10 @@ export default function Page() {
             className="absolute inset-0 bg-black/60"
             onClick={() => setIsSidebarOpen(false)}
           />
-          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-[#111111] border-r border-[#1f1f1f] flex flex-col z-10 overflow-y-auto">
+          <aside className="absolute left-0 top-0 bottom-0 w-64 bg-gray-50 border-r border-gray-200 flex flex-col z-10 overflow-y-auto">
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-10"
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-900 transition-colors z-10"
             >
               <X className="w-4 h-4" />
             </button>
@@ -1559,11 +1559,11 @@ export default function Page() {
       {/* Main */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a] flex-shrink-0">
+        <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors mr-1"
+              className="md:hidden p-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors mr-1"
             >
               <Menu className="w-5 h-5" strokeWidth={1.75} />
             </button>
@@ -1575,7 +1575,7 @@ export default function Page() {
 
           <div className="flex items-center gap-2">
             {activeMode && activeView === "chat" && (
-              <span className="text-xs font-medium px-2.5 py-1 rounded-full border text-[#e0e0e0] bg-[#1e1e1e] border-[#2a2a2a]">
+              <span className="text-xs font-medium px-2.5 py-1 rounded-full border text-gray-800 bg-white border-gray-200">
                 {MODE_LABELS[activeMode] ?? activeMode}
               </span>
             )}
@@ -1586,7 +1586,7 @@ export default function Page() {
                 <button
                   onClick={() => setUserMenuOpen((v) => !v)}
                   title={user?.email ?? "Account"}
-                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-[#2a2a2a] bg-[#1a1a1a] text-gray-300 hover:bg-[#252525] hover:text-white transition-colors max-w-[180px]"
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-gray-200 bg-gray-100 text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors max-w-[180px]"
                 >
                   <span className="w-5 h-5 rounded-full bg-white text-black text-[10px] font-bold flex items-center justify-center flex-shrink-0">
                     {(user?.email ?? "?").slice(0, 1).toUpperCase()}
@@ -1596,8 +1596,8 @@ export default function Page() {
                 {userMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 z-40 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-lg overflow-hidden min-w-[200px]">
-                      <div className="px-3 py-2 border-b border-[#2a2a2a]">
+                    <div className="absolute right-0 top-full mt-1 z-40 bg-gray-100 border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[200px]">
+                      <div className="px-3 py-2 border-b border-gray-200">
                         <p className="text-[10px] uppercase tracking-widest text-gray-600">Signed in as</p>
                         <p className="text-xs text-gray-300 truncate mt-0.5">{user?.email ?? "—"}</p>
                       </div>
@@ -1632,7 +1632,7 @@ export default function Page() {
                 </div>
 
                 {/* Headline */}
-                <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight text-center mb-3">
+                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight text-center mb-3">
                   Career advice for<br />data & AI roles.
                 </h1>
                 <p className="text-sm text-gray-500 text-center max-w-xs leading-relaxed">
@@ -1671,7 +1671,7 @@ export default function Page() {
                 }}
               />
             )}
-            <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-[#0d0d0d]">
+            <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-white">
               <ChatInput
                 value={chatInput}
                 onChange={setChatInput}
@@ -1690,12 +1690,12 @@ export default function Page() {
           </div>
         ) : activeView === "drive" ? (
           /* Drive view — Dropbox-style */
-          <div className="flex-1 overflow-y-auto bg-[#0d0d0d]">
+          <div className="flex-1 overflow-y-auto bg-white">
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-[#0d0d0d] border-b border-[#1a1a1a] px-6 py-4">
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
               <div className="max-w-3xl mx-auto flex items-center justify-between">
                 <div>
-                  <h2 className="text-base font-semibold text-white">My Drive</h2>
+                  <h2 className="text-base font-semibold text-gray-900">My Drive</h2>
                   <p className="text-[11px] text-gray-600 mt-0.5">
                     {driveLoading ? "Loading…" : `${driveFiles.length} file${driveFiles.length !== 1 ? "s" : ""}`}
                   </p>
@@ -1713,11 +1713,11 @@ export default function Page() {
                 /* Loading skeleton */
                 <div className="space-y-2">
                   {[1,2,3].map(i => (
-                    <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#111] border border-[#1a1a1a] animate-pulse">
-                      <div className="w-9 h-9 rounded-lg bg-[#1e1e1e] flex-shrink-0" />
+                    <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 animate-pulse">
+                      <div className="w-9 h-9 rounded-lg bg-white flex-shrink-0" />
                       <div className="flex-1 space-y-2">
-                        <div className="h-3 bg-[#1e1e1e] rounded w-48" />
-                        <div className="h-2 bg-[#1a1a1a] rounded w-28" />
+                        <div className="h-3 bg-white rounded w-48" />
+                        <div className="h-2 bg-gray-100 rounded w-28" />
                       </div>
                     </div>
                   ))}
@@ -1725,7 +1725,7 @@ export default function Page() {
               ) : driveFiles.length === 0 ? (
                 /* Empty state */
                 <div className="flex flex-col items-center justify-center py-24 gap-4">
-                  <div className="w-16 h-16 rounded-2xl bg-[#111] border border-[#1f1f1f] flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-200 flex items-center justify-center">
                     <FolderOpen className="w-7 h-7 text-gray-700" strokeWidth={1.25} />
                   </div>
                   <div className="text-center">
@@ -1734,7 +1734,7 @@ export default function Page() {
                   </div>
                   <button
                     onClick={() => setActiveView("resume-builder")}
-                    className="mt-2 text-xs px-4 py-2 rounded-lg border border-[#2a2a2a] text-gray-400 hover:text-white hover:border-[#3a3a3a] transition-colors"
+                    className="mt-2 text-xs px-4 py-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-900 hover:border-gray-300 transition-colors"
                   >
                     Go to Resume Builder
                   </button>
@@ -1742,7 +1742,7 @@ export default function Page() {
               ) : (
                 <div className="space-y-6">
                   {/* Column headers */}
-                  <div className="grid grid-cols-[1fr_120px_100px_80px_80px] gap-3 px-4 pb-1 border-b border-[#1a1a1a]">
+                  <div className="grid grid-cols-[1fr_120px_100px_80px_80px] gap-3 px-4 pb-1 border-b border-gray-200">
                     <span className="text-[10px] uppercase tracking-wider text-gray-700 font-medium">Name</span>
                     <span className="text-[10px] uppercase tracking-wider text-gray-700 font-medium">Candidate</span>
                     <span className="text-[10px] uppercase tracking-wider text-gray-700 font-medium">Modified</span>
@@ -1756,10 +1756,10 @@ export default function Page() {
                       <p className="text-[10px] uppercase tracking-wider text-gray-700 font-medium mb-2 flex items-center gap-1.5 px-1">
                         <FolderOpen className="w-3 h-3" /> Resumes
                       </p>
-                      <div className="rounded-xl border border-[#1a1a1a] overflow-hidden divide-y divide-[#161616]">
+                      <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-[#161616]">
                         {driveFiles.filter(f => f.file_type !== "report").map(f => {
                           const typeColors: Record<string, string> = {
-                            original: "text-gray-500 border-[#2a2a2a]",
+                            original: "text-gray-500 border-gray-200",
                             working_copy: "text-purple-400 border-purple-400/20",
                             version: "text-[#4fc9a4] border-[#4fc9a4]/20",
                           };
@@ -1769,19 +1769,19 @@ export default function Page() {
                             version: `v${f.version_number ?? 1}`,
                           };
                           return (
-                            <div key={f.id} className="grid grid-cols-[1fr_120px_100px_80px_80px] gap-3 items-center px-4 py-3 bg-[#111] hover:bg-[#141414] transition-colors group">
+                            <div key={f.id} className="grid grid-cols-[1fr_120px_100px_80px_80px] gap-3 items-center px-4 py-3 bg-gray-50 hover:bg-gray-50 transition-colors group">
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-lg bg-[#1a1a1a] border border-[#222] flex items-center justify-center flex-shrink-0">
+                                <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
                                   <FileText className="w-4 h-4 text-gray-500" strokeWidth={1.5} />
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-sm text-white truncate">{f.display_name.replace(/_/g, " ")}</p>
+                                  <p className="text-sm text-gray-900 truncate">{f.display_name.replace(/_/g, " ")}</p>
                                   {f.target_role && <p className="text-[11px] text-gray-600 truncate">{f.target_role}</p>}
                                 </div>
                               </div>
                               <span className="text-xs text-gray-500 truncate">{f.candidate_name ?? "—"}</span>
                               <span className="text-xs text-gray-600">{new Date(f.updated_at || f.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
-                              <span className={`text-[10px] font-medium border rounded px-1.5 py-0.5 w-fit ${typeColors[f.file_type] ?? "text-gray-600 border-[#2a2a2a]"}`}>
+                              <span className={`text-[10px] font-medium border rounded px-1.5 py-0.5 w-fit ${typeColors[f.file_type] ?? "text-gray-600 border-gray-200"}`}>
                                 {typeLabel[f.file_type] ?? f.file_type}
                               </span>
                               <div className="flex items-center justify-end gap-1">
@@ -1790,7 +1790,7 @@ export default function Page() {
                                   disabled={driveDownloadingId === f.id || !f.extraction_json}
                                   title={driveDownloadingId === f.id ? "Exporting…" : "Download as PDF"}
                                   aria-label="Download as PDF"
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-[#1e1e1e] border border-transparent hover:border-[#2a2a2a] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 hover:bg-white border border-transparent hover:border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                 >
                                   <Download className={`w-3.5 h-3.5 ${driveDownloadingId === f.id ? "animate-pulse" : ""}`} strokeWidth={1.75} />
                                 </button>
@@ -1799,7 +1799,7 @@ export default function Page() {
                                   disabled={!f.extraction_json}
                                   title={driveCopiedId === f.id ? "Link copied" : "Copy share link"}
                                   aria-label="Copy share link"
-                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-white hover:bg-[#1e1e1e] border border-transparent hover:border-[#2a2a2a] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                  className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-500 hover:text-gray-900 hover:bg-white border border-transparent hover:border-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                 >
                                   {driveCopiedId === f.id
                                     ? <Check className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2.25} />
@@ -1819,17 +1819,17 @@ export default function Page() {
                       <p className="text-[10px] uppercase tracking-wider text-gray-700 font-medium mb-2 flex items-center gap-1.5 px-1">
                         <ClipboardList className="w-3 h-3" /> Reports
                       </p>
-                      <div className="rounded-xl border border-[#1a1a1a] overflow-hidden divide-y divide-[#161616]">
+                      <div className="rounded-xl border border-gray-200 overflow-hidden divide-y divide-[#161616]">
                         {driveFiles.filter(f => f.file_type === "report").map(f => {
                           const score = f.analysis_json?.scores?.total;
                           return (
-                            <div key={f.id} className="grid grid-cols-[1fr_120px_100px_80px_80px] gap-3 items-center px-4 py-3 bg-[#111] hover:bg-[#141414] transition-colors group">
+                            <div key={f.id} className="grid grid-cols-[1fr_120px_100px_80px_80px] gap-3 items-center px-4 py-3 bg-gray-50 hover:bg-gray-50 transition-colors group">
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-lg bg-[#1a1a2e] border border-[#2a2a4a] flex items-center justify-center flex-shrink-0">
+                                <div className="w-9 h-9 rounded-lg bg-[#1a1a2e] border border-violet-200 flex items-center justify-center flex-shrink-0">
                                   <ClipboardList className="w-4 h-4 text-[#7c7cff]" strokeWidth={1.5} />
                                 </div>
                                 <div className="min-w-0">
-                                  <p className="text-sm text-white truncate">{f.display_name.replace(/_/g, " ")}</p>
+                                  <p className="text-sm text-gray-900 truncate">{f.display_name.replace(/_/g, " ")}</p>
                                   {score != null && (
                                     <p className="text-[11px] text-gray-600">Score: <span className="text-[#4fc9a4] font-medium">{score}{"/100"}</span></p>
                                   )}
@@ -1917,9 +1917,9 @@ export default function Page() {
           />
         ) : (
           /* Landing — no resume yet */
-          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-12 bg-[#0d0d0d]">
+          <div className="flex-1 flex flex-col items-center justify-center px-6 pb-12 bg-white">
             <div className="flex flex-col items-center gap-2 mb-10">
-              <h1 className="text-3xl md:text-4xl font-bold text-white tracking-tight text-center">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight text-center">
                 Get your resume<br />reviewed.
               </h1>
               <p className="text-base text-gray-500 text-center">

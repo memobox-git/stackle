@@ -135,24 +135,24 @@ export default function CoverLetterModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-2xl bg-[#0f0f0f] border border-[#2a2a2a] rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
+        className="w-full max-w-2xl bg-gray-50 border border-gray-200 rounded-2xl overflow-hidden shadow-2xl max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
         style={{ animation: "fadeIn 220ms ease" }}
       >
         {/* Header */}
-        <div className="relative px-6 pt-5 pb-4 border-b border-[#1f1f1f] flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center">
+        <div className="relative px-6 pt-5 pb-4 border-b border-gray-200 flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
             <Mail className="w-4 h-4 text-gray-300" strokeWidth={1.75} />
           </div>
           <div className="flex-1 min-w-0">
-            <h2 className="text-base font-semibold text-white">Cover letter</h2>
+            <h2 className="text-base font-semibold text-gray-900">Cover letter</h2>
             <p className="text-[11px] text-gray-500 mt-0.5">
               Grounded in your resume. No invented facts.
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-white w-7 h-7 rounded-md flex items-center justify-center hover:bg-[#1a1a1a]"
+            className="text-gray-500 hover:text-gray-900 w-7 h-7 rounded-md flex items-center justify-center hover:bg-gray-100"
             aria-label="Close"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
@@ -163,7 +163,7 @@ export default function CoverLetterModal({
         <div className="flex-1 overflow-y-auto">
           {/* Inputs */}
           {inputsExpanded && (
-            <div className="px-6 py-4 space-y-3 border-b border-[#1f1f1f]">
+            <div className="px-6 py-4 space-y-3 border-b border-gray-200">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] uppercase tracking-widest text-gray-500 font-semibold mb-1.5">
@@ -175,7 +175,7 @@ export default function CoverLetterModal({
                     onChange={(e) => setCompanyName(e.target.value)}
                     placeholder="e.g. Stripe"
                     disabled={isGenerating}
-                    className="w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#555] outline-none transition-colors"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-[#555] outline-none transition-colors"
                   />
                 </div>
                 <div>
@@ -188,7 +188,7 @@ export default function CoverLetterModal({
                     onChange={(e) => setRoleTitle(e.target.value)}
                     placeholder={defaultRole || "e.g. Senior Data Engineer"}
                     disabled={isGenerating}
-                    className="w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#555] outline-none transition-colors"
+                    className="w-full bg-gray-50 border border-gray-200 focus:border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-[#555] outline-none transition-colors"
                   />
                 </div>
               </div>
@@ -202,7 +202,7 @@ export default function CoverLetterModal({
                   placeholder="Paste the JD here…"
                   rows={5}
                   disabled={isGenerating}
-                  className="w-full bg-[#141414] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-3 py-2 text-sm text-white placeholder-[#555] outline-none transition-colors resize-y font-mono leading-6"
+                  className="w-full bg-gray-50 border border-gray-200 focus:border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder-[#555] outline-none transition-colors resize-y font-mono leading-6"
                 />
               </div>
             </div>
@@ -225,7 +225,7 @@ export default function CoverLetterModal({
                   <span className="text-sm">Writing your letter…</span>
                   <button
                     onClick={handleStop}
-                    className="text-[11px] text-gray-500 hover:text-white ml-2 border border-[#2a2a2a] rounded-md px-2 py-1"
+                    className="text-[11px] text-gray-500 hover:text-gray-900 ml-2 border border-gray-200 rounded-md px-2 py-1"
                   >
                     Stop
                   </button>
@@ -235,7 +235,7 @@ export default function CoverLetterModal({
                   value={letter}
                   onChange={(e) => setLetter(e.target.value)}
                   rows={14}
-                  className="w-full bg-[#0a0a0a] border border-[#2a2a2a] focus:border-[#3a3a3a] rounded-lg px-4 py-3 text-sm text-gray-100 placeholder-[#555] outline-none transition-colors resize-y leading-7 whitespace-pre-wrap"
+                  className="w-full bg-white border border-gray-200 focus:border-gray-300 rounded-lg px-4 py-3 text-sm text-gray-900 placeholder-[#555] outline-none transition-colors resize-y leading-7 whitespace-pre-wrap"
                   placeholder="Your letter will appear here."
                   aria-label="Cover letter"
                 />
@@ -254,7 +254,7 @@ export default function CoverLetterModal({
         </div>
 
         {/* Actions footer */}
-        <div className="px-6 py-3 border-t border-[#1f1f1f] flex items-center gap-2 flex-wrap">
+        <div className="px-6 py-3 border-t border-gray-200 flex items-center gap-2 flex-wrap">
           {!hasLetter ? (
             <button
               onClick={() => generate()}
@@ -275,7 +275,7 @@ export default function CoverLetterModal({
               <button
                 onClick={handleCopy}
                 disabled={isGenerating}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2.25} /> : <Copy className="w-3.5 h-3.5" strokeWidth={1.75} />}
                 {copied ? "Copied" : "Copy"}
@@ -283,7 +283,7 @@ export default function CoverLetterModal({
               <button
                 onClick={handleDownload}
                 disabled={isGenerating}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
               >
                 <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
                 Download
@@ -291,7 +291,7 @@ export default function CoverLetterModal({
               <button
                 onClick={() => generate({ isRegenerate: true })}
                 disabled={isGenerating}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1a1a1a] hover:bg-[#252525] border border-[#2a2a2a] text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
                 title="Try a different angle"
               >
                 <RotateCcw className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} strokeWidth={1.75} />

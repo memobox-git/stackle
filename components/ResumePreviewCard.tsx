@@ -24,7 +24,7 @@ export default function ResumePreviewCard({ filename, text }: ResumePreviewCardP
               <FileText className="w-3 h-3 text-[#6B7280]" strokeWidth={2} />
             </div>
             <span className="text-xs font-medium text-[#6B7280]">Extracted from</span>
-            <span className="text-xs font-semibold text-[#111827] truncate max-w-[200px]">{filename}</span>
+            <span className="text-xs font-semibold text-gray-900 truncate max-w-[200px]">{filename}</span>
           </div>
           <span className="text-[10px] text-[#D1D5DB]">{text.length.toLocaleString()} chars</span>
         </div>

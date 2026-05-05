@@ -95,16 +95,16 @@ body.theme-dark {
 }
 
 body {
-  background: #0d0d0d;
-  color: #f0f0f0;
+  background: #ffffff;
+  color: #111827;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
 ::-webkit-scrollbar       { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track  { background: transparent; }
-::-webkit-scrollbar-thumb  { background: #2a2a2a; border-radius: 999px; }
-::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+::-webkit-scrollbar-thumb  { background: #d1d5db; border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
 
 /* Hide Next.js dev tools button — dev only, not shown in production */
 nextjs-portal { display: none !important; }

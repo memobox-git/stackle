@@ -17,10 +17,10 @@ function Section({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="border-t border-[#2a2a2a]">
+    <div className="border-t border-gray-200">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between py-3 text-sm font-medium text-gray-300 hover:text-white transition-colors"
+        className="w-full flex items-center justify-between py-3 text-sm font-medium text-gray-300 hover:text-gray-900 transition-colors"
       >
         <span className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
@@ -42,7 +42,7 @@ const PRIORITY_COLORS: Record<string, string> = {
 export default function InterviewPrepCard({ plan }: { plan: InterviewPrepPlan }) {
   return (
     <div className="w-full max-w-3xl mx-auto px-4 mb-4">
-      <div className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-5 py-4">
+      <div className="bg-gray-100 border border-gray-200 rounded-xl px-5 py-4">
         {/* Header */}
         <div className="flex items-center gap-2 mb-1">
           <Target className="w-4 h-4 text-blue-400" strokeWidth={2} />
@@ -51,8 +51,8 @@ export default function InterviewPrepCard({ plan }: { plan: InterviewPrepPlan })
           </span>
         </div>
         <div className="flex items-center gap-2 flex-wrap mb-3">
-          <span className="text-lg font-semibold text-white">{plan.role}</span>
-          <span className="text-xs px-2 py-0.5 rounded-full border border-[#3a3a3a] text-gray-400 capitalize">
+          <span className="text-lg font-semibold text-gray-900">{plan.role}</span>
+          <span className="text-xs px-2 py-0.5 rounded-full border border-gray-300 text-gray-400 capitalize">
             {plan.level}
           </span>
           <span className="text-xs px-2 py-0.5 rounded-full border border-blue-500/30 text-blue-400 capitalize">
@@ -69,7 +69,7 @@ export default function InterviewPrepCard({ plan }: { plan: InterviewPrepPlan })
                   {t.priority}
                 </span>
                 <div>
-                  <span className="text-sm text-white font-medium">{t.topic}</span>
+                  <span className="text-sm text-gray-900 font-medium">{t.topic}</span>
                   <p className="text-xs text-gray-500 mt-0.5">{t.notes}</p>
                 </div>
               </div>
@@ -91,7 +91,7 @@ export default function InterviewPrepCard({ plan }: { plan: InterviewPrepPlan })
           <Section title={`STAR Examples (${plan.starExamples.length})`} icon={Star}>
             <div className="space-y-3">
               {plan.starExamples.map((s, i) => (
-                <div key={i} className="bg-[#141414] border border-[#252525] rounded-lg p-3">
+                <div key={i} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-gray-500 font-medium">Situation:</span>
@@ -143,12 +143,12 @@ function QuestionItem({
 }) {
   const [showAnswer, setShowAnswer] = useState(false);
   return (
-    <div className="bg-[#141414] border border-[#252525] rounded-lg p-3">
+    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] text-gray-600 font-mono">Q{index}</span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded border border-[#3a3a3a] text-gray-500">{question.category}</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded border border-gray-300 text-gray-500">{question.category}</span>
             <span className="text-[10px] text-gray-600 capitalize">{question.difficulty}</span>
           </div>
           <p className="text-sm text-gray-200">{question.question}</p>
@@ -161,7 +161,7 @@ function QuestionItem({
         </button>
       </div>
       {showAnswer && (
-        <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-[#252525] leading-relaxed">
+        <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-200 leading-relaxed">
           {question.modelAnswer}
         </p>
       )}

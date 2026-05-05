@@ -245,7 +245,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
           color: "#111",
           whiteSpace: "nowrap",
         }}>{title}</span>
-        <div style={{ flex: 1, height: "1.5px", background: "#111" }} />
+        <div style={{ flex: 1, height: "1.5px", background: "#fafafa" }} />
       </div>
       {children}
     </div>

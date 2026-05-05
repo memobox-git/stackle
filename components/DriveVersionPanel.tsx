@@ -48,7 +48,7 @@ function RowAction({
       onClick={(e) => { e.stopPropagation(); onClick(e); }}
       title={label}
       aria-label={label}
-      className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-white hover:bg-[#2a2a2a] transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+      className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
     >
       {children}
     </button>
@@ -113,7 +113,7 @@ export default function DriveVersionPanel({
   const hasReports = reports.length > 0;
 
   return (
-    <div className="mt-3 pt-3 border-t border-[#1f1f1f]">
+    <div className="mt-3 pt-3 border-t border-gray-200">
       <p className="text-[10px] text-gray-600 uppercase tracking-wider px-3 mb-2 flex items-center gap-1.5">
         <FileText className="w-2.5 h-2.5" />
         Drive
@@ -129,7 +129,7 @@ export default function DriveVersionPanel({
               return (
                 <div key={orig.id}>
                   {/* Original — locked, always at top */}
-                  <div className="group flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-500 hover:bg-[#141414]">
+                  <div className="group flex items-center gap-2 px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-50">
                     <Lock className="w-2.5 h-2.5 flex-shrink-0 text-gray-600" />
                     <span className="text-[11px] truncate flex-1">{orig.candidate_name ?? "Resume"}</span>
                     <div className="flex items-center gap-0.5">
@@ -164,14 +164,14 @@ export default function DriveVersionPanel({
                         }}
                         className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left transition-colors group ml-2 cursor-pointer ${
                           isCurrent
-                            ? "bg-[#1e1e1e] border border-[#2a2a2a]"
-                            : "hover:bg-[#1a1a1a] border border-transparent"
+                            ? "bg-white border border-gray-200"
+                            : "hover:bg-gray-100 border border-transparent"
                         }`}
                       >
                         {fileIcon(child.file_type)}
                         <span
                           className={`text-[11px] truncate flex-1 ${
-                            isCurrent ? "text-white" : "text-gray-500 group-hover:text-gray-300"
+                            isCurrent ? "text-gray-900" : "text-gray-500 group-hover:text-gray-300"
                           }`}
                         >
                           {shortName(child.display_name)}
@@ -213,7 +213,7 @@ export default function DriveVersionPanel({
                 <button
                   key={f.id}
                   onClick={() => onRestoreVersion(f)}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left hover:bg-[#1a1a1a] border border-transparent transition-colors group"
+                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-left hover:bg-gray-100 border border-transparent transition-colors group"
                 >
                   {fileIcon(f.file_type)}
                   <span className="text-[11px] text-gray-500 truncate flex-1 group-hover:text-gray-300">

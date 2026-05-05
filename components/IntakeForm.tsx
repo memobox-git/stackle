@@ -29,16 +29,16 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
   };
 
   return (
-    <div className="w-full max-w-sm rounded-2xl border border-[#2a2a2a] bg-[#111] overflow-hidden">
-      <div className="px-4 pt-4 pb-3 border-b border-[#1e1e1e]">
-        <p className="text-sm font-semibold text-white">Set your review context</p>
-        <p className="text-xs text-[#555] mt-0.5">This shapes the analysis and scoring</p>
+    <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-gray-50 overflow-hidden">
+      <div className="px-4 pt-4 pb-3 border-b border-gray-200">
+        <p className="text-sm font-semibold text-gray-900">Set your review context</p>
+        <p className="text-xs text-gray-600 mt-0.5">This shapes the analysis and scoring</p>
       </div>
 
       <div className="px-4 py-3 space-y-4">
         {/* Review type */}
         <div>
-          <p className="text-[11px] text-[#555] uppercase tracking-wider mb-2">Review type</p>
+          <p className="text-[11px] text-gray-600 uppercase tracking-wider mb-2">Review type</p>
           <div className="flex flex-wrap gap-1.5">
             {REVIEW_TYPES.map((t) => (
               <button
@@ -47,7 +47,7 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
                 className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                   reviewType === t
                     ? "bg-white text-black border-white font-medium"
-                    : "border-[#2a2a2a] text-[#888] hover:text-white hover:border-[#3a3a3a]"
+                    : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
                 }`}
               >
                 {t}
@@ -58,7 +58,7 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
 
         {/* Target market */}
         <div>
-          <p className="text-[11px] text-[#555] uppercase tracking-wider mb-2">Target market</p>
+          <p className="text-[11px] text-gray-600 uppercase tracking-wider mb-2">Target market</p>
           <div className="flex flex-wrap gap-1.5">
             {TARGET_MARKETS.map((m) => (
               <button
@@ -67,7 +67,7 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
                 className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                   targetMarket === m
                     ? "bg-white text-black border-white font-medium"
-                    : "border-[#2a2a2a] text-[#888] hover:text-white hover:border-[#3a3a3a]"
+                    : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
                 }`}
               >
                 {m}
@@ -78,7 +78,7 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
 
         {/* Seniority */}
         <div>
-          <p className="text-[11px] text-[#555] uppercase tracking-wider mb-2">Seniority level</p>
+          <p className="text-[11px] text-gray-600 uppercase tracking-wider mb-2">Seniority level</p>
           <div className="flex flex-wrap gap-1.5">
             {SENIORITY_LEVELS.map((s) => (
               <button
@@ -87,7 +87,7 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
                 className={`text-xs px-3 py-1.5 rounded-lg border transition-colors ${
                   seniorityLevel === s
                     ? "bg-white text-black border-white font-medium"
-                    : "border-[#2a2a2a] text-[#888] hover:text-white hover:border-[#3a3a3a]"
+                    : "border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300"
                 }`}
               >
                 {s}
@@ -100,9 +100,9 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
         <div>
           <button
             onClick={() => setShowJD(!showJD)}
-            className="text-xs text-[#555] hover:text-[#888] transition-colors flex items-center gap-1"
+            className="text-xs text-gray-600 hover:text-gray-500 transition-colors flex items-center gap-1"
           >
-            <span className="text-[#333]">{showJD ? "▾" : "▸"}</span>
+            <span className="text-gray-800">{showJD ? "▾" : "▸"}</span>
             {showJD ? "Hide job description" : "Paste job description (optional)"}
           </button>
           {showJD && (
@@ -111,7 +111,7 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste the job description here..."
               rows={4}
-              className="mt-2 w-full resize-none text-xs text-gray-300 placeholder-[#444] bg-[#0d0d0d] border border-[#2a2a2a] rounded-xl px-3 py-2.5 outline-none focus:border-[#3a3a3a] transition-colors leading-relaxed"
+              className="mt-2 w-full resize-none text-xs text-gray-300 placeholder-[#444] bg-white border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-300 transition-colors leading-relaxed"
             />
           )}
         </div>
