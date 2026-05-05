@@ -208,9 +208,9 @@ export default function ResumeReportCard({
     <div style={{
       background: "#fff", color: "#111",
       fontFamily: "Calibri, 'Segoe UI', system-ui, sans-serif",
-      fontSize: "13px", lineHeight: "1.6",
-      maxWidth: "780px", margin: "0 auto",
-      padding: "40px 48px 48px",
+      fontSize: "15px", lineHeight: "1.65",
+      maxWidth: "100%", margin: "0",
+      padding: "32px 40px 48px",
     }}>
 
       {/* ── 1. HEADER ── */}
@@ -249,21 +249,21 @@ export default function ResumeReportCard({
       </div>
 
       {/* ── 3. SCORE RINGS ── */}
-      <div style={{ display: "flex", gap: "12px", marginBottom: "28px", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "24px", marginBottom: "36px", flexWrap: "wrap" }}>
         {cats.map((cat) => {
           const pct = cat.score / cat.max;
           const color = scoreColor(pct);
-          const r = 26;
+          const r = 32;
           const circ = 2 * Math.PI * r;
           const filled = circ * pct;
           const short = cat.label.replace(" & ", "\n& ").split("\n");
           return (
-            <div key={cat.key} style={{ flex: "1 1 80px", minWidth: "80px", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-              <div style={{ position: "relative", width: "68px", height: "68px" }}>
-                <svg width="68" height="68" viewBox="0 0 68 68" style={{ transform: "rotate(-90deg)" }}>
-                  <circle cx="34" cy="34" r={r} fill="none" stroke="#f3f4f6" strokeWidth="6" />
+            <div key={cat.key} style={{ flex: "1 1 96px", minWidth: "96px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+              <div style={{ position: "relative", width: "84px", height: "84px" }}>
+                <svg width="84" height="84" viewBox="0 0 84 84" style={{ transform: "rotate(-90deg)" }}>
+                  <circle cx="42" cy="42" r={r} fill="none" stroke="#f3f4f6" strokeWidth="6" />
                   <circle
-                    cx="34" cy="34" r={r}
+                    cx="42" cy="42" r={r}
                     fill="none"
                     stroke={color}
                     strokeWidth="6"
@@ -273,15 +273,15 @@ export default function ResumeReportCard({
                   />
                 </svg>
                 <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" }}>
-                  <span style={{ fontSize: "14px", fontWeight: "700", color, lineHeight: 1 }}>{cat.score}</span>
-                  <span style={{ fontSize: "9px", color: "#9ca3af", lineHeight: 1.2 }}>/{cat.max}</span>
+                  <span style={{ fontSize: "18px", fontWeight: "700", color, lineHeight: 1 }}>{cat.score}</span>
+                  <span style={{ fontSize: "10px", color: "#9ca3af", lineHeight: 1.2 }}>/{cat.max}</span>
                 </div>
               </div>
               <div style={{ textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
                 {short.map((line, i) => (
-                  <div key={i} style={{ fontSize: "9px", fontWeight: "600", color: "#374151", letterSpacing: "0.02em", lineHeight: "1.3", textTransform: "uppercase" }}>{line}</div>
+                  <div key={i} style={{ fontSize: "10px", fontWeight: "600", color: "#374151", letterSpacing: "0.02em", lineHeight: "1.3", textTransform: "uppercase" }}>{line}</div>
                 ))}
-                <div style={{ fontSize: "9px", padding: "1px 6px", borderRadius: "3px", background: color, color: "#111827", fontWeight: "700", letterSpacing: "0.04em", marginTop: "3px", display: "inline-block" }}>
+                <div style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "3px", background: color, color: "#111827", fontWeight: "700", letterSpacing: "0.04em", marginTop: "4px", display: "inline-block" }}>
                   {cat.status}
                 </div>
               </div>
@@ -289,27 +289,27 @@ export default function ResumeReportCard({
           );
         })}
         {/* Total ring */}
-        <div style={{ flex: "1 1 80px", minWidth: "80px", display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-          <div style={{ position: "relative", width: "68px", height: "68px" }}>
-            <svg width="68" height="68" viewBox="0 0 68 68" style={{ transform: "rotate(-90deg)" }}>
-              <circle cx="34" cy="34" r={26} fill="none" stroke="#f3f4f6" strokeWidth="6" />
+        <div style={{ flex: "1 1 96px", minWidth: "96px", display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+          <div style={{ position: "relative", width: "84px", height: "84px" }}>
+            <svg width="84" height="84" viewBox="0 0 84 84" style={{ transform: "rotate(-90deg)" }}>
+              <circle cx="42" cy="42" r={32} fill="none" stroke="#f3f4f6" strokeWidth="6" />
               <circle
-                cx="34" cy="34" r={26}
+                cx="42" cy="42" r={32}
                 fill="none"
                 stroke={badge.color}
                 strokeWidth="6"
-                strokeDasharray={`${2 * Math.PI * 26 * total / 100} ${2 * Math.PI * 26}`}
+                strokeDasharray={`${2 * Math.PI * 32 * total / 100} ${2 * Math.PI * 32}`}
                 strokeLinecap="round"
               />
             </svg>
             <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "system-ui, sans-serif" }}>
-              <span style={{ fontSize: "16px", fontWeight: "700", color: badge.color, lineHeight: 1 }}>{total}</span>
-              <span style={{ fontSize: "9px", color: "#9ca3af", lineHeight: 1.2 }}>/100</span>
+              <span style={{ fontSize: "20px", fontWeight: "700", color: badge.color, lineHeight: 1 }}>{total}</span>
+              <span style={{ fontSize: "10px", color: "#9ca3af", lineHeight: 1.2 }}>/100</span>
             </div>
           </div>
           <div style={{ textAlign: "center", fontFamily: "system-ui, sans-serif" }}>
-            <div style={{ fontSize: "9px", fontWeight: "600", color: "#374151", letterSpacing: "0.02em", textTransform: "uppercase", lineHeight: "1.3" }}>TOTAL</div>
-            <div style={{ fontSize: "9px", padding: "1px 6px", borderRadius: "3px", background: badge.color, color: "#111827", fontWeight: "700", letterSpacing: "0.04em", marginTop: "3px", display: "inline-block" }}>
+            <div style={{ fontSize: "10px", fontWeight: "600", color: "#374151", letterSpacing: "0.02em", textTransform: "uppercase", lineHeight: "1.3" }}>TOTAL</div>
+            <div style={{ fontSize: "10px", padding: "2px 7px", borderRadius: "3px", background: badge.color, color: "#111827", fontWeight: "700", letterSpacing: "0.04em", marginTop: "4px", display: "inline-block" }}>
               {badge.label}
             </div>
           </div>

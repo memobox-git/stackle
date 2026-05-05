@@ -51,7 +51,7 @@ export default function Sidebar({ active, recentChats }: Props) {
       </nav>
 
       <div className="mt-6 flex-1 flex flex-col min-h-0">
-        <div className="px-6 mb-2 text-[11px] font-medium tracking-wider text-gray-400 uppercase">
+        <div className="px-6 mb-2 text-[11px] font-medium tracking-wider text-gray-500 uppercase">
           Recent chats
         </div>
         <ul className="px-3 flex-1 overflow-y-auto flex flex-col gap-0.5 pb-4">
@@ -67,7 +67,7 @@ export default function Sidebar({ active, recentChats }: Props) {
             </li>
           ))}
           {recentChats.length === 0 && (
-            <li className="px-3 py-1.5 text-xs text-gray-400">No chats yet</li>
+            <li className="px-3 py-1.5 text-xs text-gray-500">No chats yet</li>
           )}
         </ul>
       </div>

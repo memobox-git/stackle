@@ -40,7 +40,7 @@ function inlineFormat(text: string): React.ReactNode {
     }
     if (part.startsWith("*") && part.endsWith("*") && part.length > 2) {
       return (
-        <em key={i} className="italic text-gray-300">
+        <em key={i} className="italic text-gray-700">
           {part.slice(1, -1)}
         </em>
       );
@@ -83,7 +83,7 @@ function renderContent(content: string) {
               {lang}
             </div>
           )}
-          <pre className="bg-[#0d1117] px-4 py-3 text-sm font-mono text-gray-200 overflow-x-auto leading-6">
+          <pre className="bg-gray-100 border border-gray-200 px-4 py-3 text-sm font-mono text-gray-900 overflow-x-auto leading-6">
             <code>{codeLines.join("\n")}</code>
           </pre>
         </div>
@@ -128,7 +128,7 @@ function renderContent(content: string) {
     // Blockquote — render as subtle callout
     if (line.startsWith("> ")) {
       elements.push(
-        <div key={`bq-${i}`} className="border-l-2 border-gray-300 pl-3 my-2 text-gray-500 italic text-base leading-7">
+        <div key={`bq-${i}`} className="border-l-2 border-gray-300 pl-3 my-2 text-gray-500 italic text-[15px] leading-6">
           {inlineFormat(line.slice(2))}
         </div>
       );
@@ -153,7 +153,7 @@ function renderContent(content: string) {
       elements.push(
         <ul key={`ul-${i}`} className="space-y-2 my-3">
           {items.map((item, idx) => (
-            <li key={idx} className="flex gap-2.5 text-base leading-7 text-gray-300">
+            <li key={idx} className="flex gap-2.5 text-[15px] leading-6 text-gray-700">
               <span className="text-gray-600 flex-shrink-0 mt-1">•</span>
               <span>{inlineFormat(item)}</span>
             </li>
@@ -173,7 +173,7 @@ function renderContent(content: string) {
       elements.push(
         <ol key={`ol-${i}`} className="space-y-2 my-3">
           {items.map((item, idx) => (
-            <li key={idx} className="flex gap-3 text-base leading-7 text-gray-300">
+            <li key={idx} className="flex gap-3 text-[15px] leading-6 text-gray-700">
               <span className="text-gray-600 flex-shrink-0 font-medium tabular-nums">{idx + 1}.</span>
               <span>{inlineFormat(item)}</span>
             </li>
@@ -193,7 +193,7 @@ function renderContent(content: string) {
     // Emoji-prefixed chip-style line that wasn't parsed as a chip — render as styled hint
     if (/^[\p{Emoji}]\s/u.test(line.trim())) {
       elements.push(
-        <p key={`p-${i}`} className="text-base leading-7 text-gray-400 italic">
+        <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-500 italic">
           {inlineFormat(line)}
         </p>
       );
@@ -203,7 +203,7 @@ function renderContent(content: string) {
 
     // Regular paragraph
     elements.push(
-      <p key={`p-${i}`} className="text-base leading-7 text-gray-300">
+      <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-700">
         {inlineFormat(line)}
       </p>
     );
@@ -276,7 +276,7 @@ export default function Message({ message, onEdit }: MessageProps) {
         </div>
         {/* Bubble */}
         {editing ? (
-          <div className="max-w-[78%] w-full bg-white border border-gray-300 text-gray-900 rounded-2xl rounded-tr-md px-4 py-3 text-base leading-7"
+          <div className="max-w-[78%] w-full bg-white border border-gray-300 text-gray-900 rounded-2xl rounded-tr-md px-4 py-3 text-[15px] leading-6"
                style={{ boxShadow: "0 0 0 2px rgba(169, 154, 249, 0.25)" }}>
             <textarea
               ref={textareaRef}
@@ -299,7 +299,7 @@ export default function Message({ message, onEdit }: MessageProps) {
               <button
                 type="button"
                 onClick={cancelEdit}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-900 px-2.5 py-1.5 rounded-md hover:bg-gray-200 transition-colors"
+                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900 px-2.5 py-1.5 rounded-md hover:bg-gray-200 transition-colors"
               >
                 <X className="w-3 h-3" strokeWidth={2} /> Cancel
               </button>
@@ -314,7 +314,7 @@ export default function Message({ message, onEdit }: MessageProps) {
             </div>
           </div>
         ) : (
-          <div className="max-w-[78%] bg-white border border-gray-200 text-gray-900 rounded-2xl rounded-tr-md px-5 py-3.5 text-base leading-7">
+          <div className="max-w-[78%] bg-white border border-gray-200 text-gray-900 rounded-2xl rounded-tr-md px-5 py-3.5 text-[15px] leading-6">
             <p className="whitespace-pre-wrap">{message.content}</p>
           </div>
         )}

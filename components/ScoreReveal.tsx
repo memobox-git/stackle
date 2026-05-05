@@ -162,7 +162,7 @@ export default function ScoreReveal({
             >
               {displayedScore}
             </span>
-            <span className="text-3xl font-medium text-gray-400">/100</span>
+            <span className="text-3xl font-medium text-gray-500">/100</span>
           </div>
         ) : (
           <div className="relative my-6 w-40 h-40 rounded-full flex items-center justify-center score-loading-pulse">
@@ -254,7 +254,7 @@ export default function ScoreReveal({
           {analysis && <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2.25} />}
         </button>
 
-        <p className="text-xs text-gray-400 mt-6">
+        <p className="text-xs text-gray-500 mt-6">
           Stackle reads your resume the way a senior recruiter would. You can fix everything in the next screen.
         </p>
       </div>

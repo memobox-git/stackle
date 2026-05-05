@@ -75,7 +75,7 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
           disabled={disabled && !busy}
           placeholder={busy ? "Working… press Stop to cancel" : (placeholder ?? "Ask me anything...")}
           rows={1}
-          className="flex-1 resize-none outline-none text-base text-gray-900 placeholder-[#444] bg-transparent leading-7 max-h-48"
+          className="flex-1 resize-none outline-none text-[15px] text-gray-900 placeholder-[#666] bg-transparent leading-6 max-h-48"
         />
 
         {busy && onStop ? (
@@ -101,9 +101,8 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
         )}
       </div>
 
-      <p className="text-center text-[11px] text-gray-800 mt-2.5">
-        Stackle can make mistakes. Verify important career decisions.
-      </p>
+      {/* Disclaimer line removed per launch UX request — kept the
+          input area clean. Truthful disclaimer covered in landing/legal. */}
 
       <input
         ref={fileInputRef}

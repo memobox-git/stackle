@@ -1363,7 +1363,7 @@ export default function Page() {
         <div className="relative group">
           <button
             onClick={handleNewConversation}
-            className={`flex items-center ${expanded ? "gap-2 px-3 w-full" : "justify-center w-full px-0"} py-2 rounded-lg bg-white border border-gray-200 text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors`}
+            className={`flex items-center ${expanded ? "gap-2 px-3 w-full" : "justify-center w-full px-0"} py-2 rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors`}
           >
             <Plus className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
             {expanded && <span className="text-sm truncate">New conversation</span>}
@@ -1381,13 +1381,13 @@ export default function Page() {
             <div key={item.key} className="relative group">
               <button
                 onClick={() => { setActiveView(item.key); setIsSidebarOpen(false); }}
-                className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg font-medium transition-all ${
+                className={`flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors ${
                   isActive
-                    ? "text-gray-900 bg-white border border-gray-200"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-100 border border-transparent"
+                    ? "text-gray-900"
+                    : "text-gray-500 hover:text-gray-900"
                 }`}
               >
-                <Icon className={`w-4 h-4 flex-shrink-0 ${isActive ? "text-gray-900" : "text-gray-600"}`} strokeWidth={1.75} />
+                <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} />
                 {expanded && <span className="text-sm truncate">{item.label}</span>}
               </button>
               {!expanded && <SidebarTooltip label={item.label} />}
@@ -1403,9 +1403,9 @@ export default function Page() {
                 setOpenReportSignal((n) => n + 1);
                 setIsSidebarOpen(false);
               }}
-              className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg font-medium transition-all text-gray-500 hover:text-gray-900 hover:bg-gray-100 border border-transparent`}
+              className={`flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors text-gray-500 hover:text-gray-900`}
             >
-              <ClipboardList className="w-4 h-4 flex-shrink-0 text-gray-600" strokeWidth={1.75} />
+              <ClipboardList className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} />
               {expanded && <span className="text-sm truncate">Report</span>}
             </button>
             {!expanded && <SidebarTooltip label="Report" />}
@@ -1463,7 +1463,7 @@ export default function Page() {
         <div className="relative group">
           <button
             onClick={handleSignOut}
-            className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg text-gray-600 hover:text-gray-400 hover:bg-gray-100 transition-colors border border-transparent`}
+            className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg text-gray-600 hover:text-gray-500 hover:bg-gray-100 transition-colors border border-transparent`}
           >
             <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
             {expanded && <span className="text-sm">Sign out</span>}
@@ -1563,13 +1563,13 @@ export default function Page() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors mr-1"
+              className="md:hidden p-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors mr-1"
             >
               <Menu className="w-5 h-5" strokeWidth={1.75} />
             </button>
           </div>
 
-          <div className="text-sm font-medium text-gray-400">
+          <div className="text-sm font-medium text-gray-500">
             {isSignedUp && activeView === "resume-builder" ? "Resume Builder" : ""}
           </div>
 
@@ -1586,7 +1586,7 @@ export default function Page() {
                 <button
                   onClick={() => setUserMenuOpen((v) => !v)}
                   title={user?.email ?? "Account"}
-                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-gray-200 bg-gray-100 text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors max-w-[180px]"
+                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-gray-200 bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors max-w-[180px]"
                 >
                   <span className="w-5 h-5 rounded-full bg-white text-black text-[10px] font-bold flex items-center justify-center flex-shrink-0">
                     {(user?.email ?? "?").slice(0, 1).toUpperCase()}
@@ -1599,7 +1599,7 @@ export default function Page() {
                     <div className="absolute right-0 top-full mt-1 z-40 bg-gray-100 border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[200px]">
                       <div className="px-3 py-2 border-b border-gray-200">
                         <p className="text-[10px] uppercase tracking-widest text-gray-600">Signed in as</p>
-                        <p className="text-xs text-gray-300 truncate mt-0.5">{user?.email ?? "—"}</p>
+                        <p className="text-xs text-gray-700 truncate mt-0.5">{user?.email ?? "—"}</p>
                       </div>
                       <button
                         onClick={() => { setUserMenuOpen(false); handleSignOut(); }}
@@ -1729,12 +1729,12 @@ export default function Page() {
                     <FolderOpen className="w-7 h-7 text-gray-700" strokeWidth={1.25} />
                   </div>
                   <div className="text-center">
-                    <p className="text-sm font-medium text-gray-400">No files yet</p>
+                    <p className="text-sm font-medium text-gray-500">No files yet</p>
                     <p className="text-xs text-gray-600 mt-1">Upload a resume to get started</p>
                   </div>
                   <button
                     onClick={() => setActiveView("resume-builder")}
-                    className="mt-2 text-xs px-4 py-2 rounded-lg border border-gray-200 text-gray-400 hover:text-gray-900 hover:border-gray-300 transition-colors"
+                    className="mt-2 text-xs px-4 py-2 rounded-lg border border-gray-200 text-gray-500 hover:text-gray-900 hover:border-gray-300 transition-colors"
                   >
                     Go to Resume Builder
                   </button>
@@ -1825,13 +1825,13 @@ export default function Page() {
                           return (
                             <div key={f.id} className="grid grid-cols-[1fr_120px_100px_80px_80px] gap-3 items-center px-4 py-3 bg-gray-50 hover:bg-gray-50 transition-colors group">
                               <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-lg bg-[#1a1a2e] border border-violet-200 flex items-center justify-center flex-shrink-0">
-                                  <ClipboardList className="w-4 h-4 text-[#7c7cff]" strokeWidth={1.5} />
+                                <div className="w-9 h-9 rounded-lg bg-violet-50 border border-violet-200 flex items-center justify-center flex-shrink-0">
+                                  <ClipboardList className="w-4 h-4 text-violet-600" strokeWidth={1.5} />
                                 </div>
                                 <div className="min-w-0">
                                   <p className="text-sm text-gray-900 truncate">{f.display_name.replace(/_/g, " ")}</p>
                                   {score != null && (
-                                    <p className="text-[11px] text-gray-600">Score: <span className="text-[#4fc9a4] font-medium">{score}{"/100"}</span></p>
+                                    <p className="text-[11px] text-gray-600">Score: <span className="text-emerald-600 font-medium">{score}{"/100"}</span></p>
                                   )}
                                 </div>
                               </div>

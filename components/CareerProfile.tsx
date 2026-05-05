@@ -108,7 +108,7 @@ export default function CareerProfile({
             <h1 className="text-3xl font-bold text-gray-900 leading-tight">
               Here's where you stand, {firstName}.
             </h1>
-            <p className="text-sm text-gray-400 mt-2 leading-relaxed">
+            <p className="text-sm text-gray-500 mt-2 leading-relaxed">
               Based on your resume — three best-fit roles, what's strong, what's missing,
               and your three best next moves.
             </p>
@@ -186,7 +186,7 @@ export default function CareerProfile({
                 <li className="text-[12px] text-gray-600 italic">No strengths flagged yet.</li>
               ) : (
                 strengths.map((s, i) => (
-                  <li key={i} className="text-[13px] text-gray-300 leading-5 flex gap-2">
+                  <li key={i} className="text-[13px] text-gray-700 leading-5 flex gap-2">
                     <span className="text-emerald-500 flex-shrink-0">✓</span>
                     <span>{s}</span>
                   </li>
@@ -207,7 +207,7 @@ export default function CareerProfile({
                 <li className="text-[12px] text-gray-600 italic">No gaps flagged yet.</li>
               ) : (
                 weaknesses.map((w, i) => (
-                  <li key={i} className="text-[13px] text-gray-300 leading-5 flex gap-2">
+                  <li key={i} className="text-[13px] text-gray-700 leading-5 flex gap-2">
                     <span className="text-amber-500 flex-shrink-0">!</span>
                     <span>{w}</span>
                   </li>

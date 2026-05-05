@@ -111,7 +111,7 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
               onChange={(e) => setJobDescription(e.target.value)}
               placeholder="Paste the job description here..."
               rows={4}
-              className="mt-2 w-full resize-none text-xs text-gray-300 placeholder-[#444] bg-white border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-300 transition-colors leading-relaxed"
+              className="mt-2 w-full resize-none text-xs text-gray-700 placeholder-[#444] bg-white border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-300 transition-colors leading-relaxed"
             />
           )}
         </div>

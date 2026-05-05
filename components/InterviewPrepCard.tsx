@@ -20,7 +20,7 @@ function Section({
     <div className="border-t border-gray-200">
       <button
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between py-3 text-sm font-medium text-gray-300 hover:text-gray-900 transition-colors"
+        className="w-full flex items-center justify-between py-3 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
       >
         <span className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
@@ -52,7 +52,7 @@ export default function InterviewPrepCard({ plan }: { plan: InterviewPrepPlan })
         </div>
         <div className="flex items-center gap-2 flex-wrap mb-3">
           <span className="text-lg font-semibold text-gray-900">{plan.role}</span>
-          <span className="text-xs px-2 py-0.5 rounded-full border border-gray-300 text-gray-400 capitalize">
+          <span className="text-xs px-2 py-0.5 rounded-full border border-gray-300 text-gray-500 capitalize">
             {plan.level}
           </span>
           <span className="text-xs px-2 py-0.5 rounded-full border border-blue-500/30 text-blue-400 capitalize">
@@ -95,19 +95,19 @@ export default function InterviewPrepCard({ plan }: { plan: InterviewPrepPlan })
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
                       <span className="text-gray-500 font-medium">Situation:</span>
-                      <p className="text-gray-300 mt-0.5">{s.situation}</p>
+                      <p className="text-gray-700 mt-0.5">{s.situation}</p>
                     </div>
                     <div>
                       <span className="text-gray-500 font-medium">Task:</span>
-                      <p className="text-gray-300 mt-0.5">{s.task}</p>
+                      <p className="text-gray-700 mt-0.5">{s.task}</p>
                     </div>
                     <div>
                       <span className="text-gray-500 font-medium">Action:</span>
-                      <p className="text-gray-300 mt-0.5">{s.action}</p>
+                      <p className="text-gray-700 mt-0.5">{s.action}</p>
                     </div>
                     <div>
                       <span className="text-gray-500 font-medium">Result:</span>
-                      <p className="text-gray-300 mt-0.5">{s.result}</p>
+                      <p className="text-gray-700 mt-0.5">{s.result}</p>
                     </div>
                   </div>
                 </div>
@@ -121,7 +121,7 @@ export default function InterviewPrepCard({ plan }: { plan: InterviewPrepPlan })
           <Section title={`Tips (${plan.tips.length})`} icon={Lightbulb}>
             <ul className="space-y-1.5">
               {plan.tips.map((tip, i) => (
-                <li key={i} className="flex items-start gap-2 text-sm text-gray-400">
+                <li key={i} className="flex items-start gap-2 text-sm text-gray-500">
                   <span className="text-gray-600 mt-0.5">→</span>
                   {tip}
                 </li>
@@ -161,7 +161,7 @@ function QuestionItem({
         </button>
       </div>
       {showAnswer && (
-        <p className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-200 leading-relaxed">
+        <p className="text-xs text-gray-500 mt-2 pt-2 border-t border-gray-200 leading-relaxed">
           {question.modelAnswer}
         </p>
       )}

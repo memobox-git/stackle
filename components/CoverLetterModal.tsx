@@ -142,7 +142,7 @@ export default function CoverLetterModal({
         {/* Header */}
         <div className="relative px-6 pt-5 pb-4 border-b border-gray-200 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
-            <Mail className="w-4 h-4 text-gray-300" strokeWidth={1.75} />
+            <Mail className="w-4 h-4 text-gray-700" strokeWidth={1.75} />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-gray-900">Cover letter</h2>
@@ -220,7 +220,7 @@ export default function CoverLetterModal({
                 </button>
               )}
               {isGenerating && !hasLetter ? (
-                <div className="flex items-center gap-3 py-10 justify-center text-gray-400">
+                <div className="flex items-center gap-3 py-10 justify-center text-gray-500">
                   <Loader2 className="w-4 h-4 animate-spin" strokeWidth={1.75} />
                   <span className="text-sm">Writing your letter…</span>
                   <button
@@ -275,7 +275,7 @@ export default function CoverLetterModal({
               <button
                 onClick={handleCopy}
                 disabled={isGenerating}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 text-xs font-medium transition-colors disabled:opacity-60"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" strokeWidth={2.25} /> : <Copy className="w-3.5 h-3.5" strokeWidth={1.75} />}
                 {copied ? "Copied" : "Copy"}
@@ -283,7 +283,7 @@ export default function CoverLetterModal({
               <button
                 onClick={handleDownload}
                 disabled={isGenerating}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 text-xs font-medium transition-colors disabled:opacity-60"
               >
                 <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
                 Download
@@ -291,7 +291,7 @@ export default function CoverLetterModal({
               <button
                 onClick={() => generate({ isRegenerate: true })}
                 disabled={isGenerating}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 text-xs font-medium transition-colors disabled:opacity-60"
                 title="Try a different angle"
               >
                 <RotateCcw className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} strokeWidth={1.75} />

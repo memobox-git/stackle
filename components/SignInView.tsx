@@ -41,7 +41,7 @@ export default function SignInView() {
         Continue with Google
       </button>
 
-      <p className="text-xs text-gray-400 mt-6 text-center max-w-xs">
+      <p className="text-xs text-gray-500 mt-6 text-center max-w-xs">
         By continuing, you agree to Stackle&apos;s Terms of Service and Privacy Policy.
       </p>
     </div>

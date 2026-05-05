@@ -97,7 +97,7 @@ export default function ResumeScorecardStrip({ analysis, extraction, onCellClick
 
       {analysis?.scores.total !== undefined && (
         <span className="ml-auto text-[11px] text-gray-500 font-mono flex-shrink-0">
-          Total <span className="text-gray-300">{analysis.scores.total}</span>
+          Total <span className="text-gray-700">{analysis.scores.total}</span>
         </span>
       )}
     </div>

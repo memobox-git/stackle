@@ -583,7 +583,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
               {/* Zoom slider */}
               <div className="flex items-center gap-3 w-56">
-                <span className="text-xs text-gray-400">Zoom</span>
+                <span className="text-xs text-gray-500">Zoom</span>
                 <input
                   type="range"
                   min={1}
@@ -595,7 +595,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                 />
               </div>
 
-              <p className="text-xs text-gray-400">Drag to reposition</p>
+              <p className="text-xs text-gray-500">Drag to reposition</p>
 
               <button
                 onClick={() => {
@@ -657,7 +657,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
               {q2.displayed}
               <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q2.done ? "opacity-0" : "animate-pulse"}`} />
             </p>
-            <p className="text-sm text-gray-400 -mt-2 text-center">
+            <p className="text-sm text-gray-500 -mt-2 text-center">
               I&apos;ll pull your details from it automatically.
             </p>
 
@@ -816,7 +816,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                   })}
                   <button
                     onClick={() => { setCareerGoal(null); setStep(4); }}
-                    className="text-xs text-gray-400 hover:text-gray-600 mt-1 self-start"
+                    className="text-xs text-gray-500 hover:text-gray-600 mt-1 self-start"
                   >
                     Skip — I'll figure it out as I go
                   </button>
@@ -837,7 +837,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
             {q4.done && <div className="flex flex-col gap-3">
               <div className="flex gap-3">
                 <div className="flex-1 flex flex-col gap-1">
-                  <label className="text-xs text-gray-400">First name</label>
+                  <label className="text-xs text-gray-500">First name</label>
                   <input
                     type="text"
                     value={fieldsReady ? contact.firstName : fnTW.displayed}
@@ -847,7 +847,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                   />
                 </div>
                 <div className="flex-1 flex flex-col gap-1">
-                  <label className="text-xs text-gray-400">Last name</label>
+                  <label className="text-xs text-gray-500">Last name</label>
                   <input
                     type="text"
                     value={fieldsReady ? contact.lastName : lnTW.displayed}
@@ -859,7 +859,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400">Email</label>
+                <label className="text-xs text-gray-500">Email</label>
                 <input
                   type="email"
                   value={fieldsReady ? contact.email : emTW.displayed}
@@ -870,7 +870,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-gray-400">Phone</label>
+                <label className="text-xs text-gray-500">Phone</label>
                 <input
                   type="text"
                   value={fieldsReady ? contact.phone : phTW.displayed}
@@ -882,7 +882,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
               <div className="flex gap-3">
                 <div className="flex-1 flex flex-col gap-1">
-                  <label className="text-xs text-gray-400">City</label>
+                  <label className="text-xs text-gray-500">City</label>
                   <input
                     type="text"
                     value={fieldsReady ? contact.city : ciTW.displayed}
@@ -892,7 +892,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                   />
                 </div>
                 <div className="flex-1 flex flex-col gap-1">
-                  <label className="text-xs text-gray-400">State</label>
+                  <label className="text-xs text-gray-500">State</label>
                   <input
                     type="text"
                     value={fieldsReady ? contact.state : stTW.displayed}

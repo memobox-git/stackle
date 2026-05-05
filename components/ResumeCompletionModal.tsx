@@ -90,7 +90,7 @@ export default function ResumeCompletionModal({
           <h2 className="text-xl font-bold text-gray-900 leading-tight">
             {verdict.label}
           </h2>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-500 mt-1">
             {accepted} accepted · {rejected} rejected
           </p>
         </div>
@@ -99,7 +99,7 @@ export default function ResumeCompletionModal({
         <div className="px-6 py-5 flex items-center justify-center gap-4 border-b border-gray-200">
           <div className="text-center">
             <div className="text-[10px] uppercase tracking-wider text-gray-500">Before</div>
-            <div className="text-2xl font-bold text-gray-400">{baseScore}</div>
+            <div className="text-2xl font-bold text-gray-500">{baseScore}</div>
           </div>
           <div className="text-gray-600 text-xl">→</div>
           <div className="text-center">
@@ -133,7 +133,7 @@ export default function ResumeCompletionModal({
                   ) : (
                     <span className="w-3.5 h-3.5 rounded-full border border-gray-700 flex-shrink-0" />
                   )}
-                  <span className={hit ? "text-gray-300" : "text-gray-600"}>
+                  <span className={hit ? "text-gray-700" : "text-gray-600"}>
                     {SIGNAL_LABELS[key]}
                   </span>
                 </li>
@@ -178,20 +178,20 @@ export default function ResumeCompletionModal({
           <div className={`grid ${onWriteCoverLetter ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
             <button
               onClick={onDownloadPdf}
-              className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+              className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
             >
               <Download className="w-3 h-3" strokeWidth={1.75} /> Download PDF
             </button>
             <button
               onClick={onCopyShareLink}
-              className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+              className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
             >
               <Link2 className="w-3 h-3" strokeWidth={1.75} /> Share link
             </button>
             {onWriteCoverLetter && (
               <button
                 onClick={onWriteCoverLetter}
-                className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                className="py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
               >
                 <Mail className="w-3 h-3" strokeWidth={1.75} /> Cover letter
               </button>

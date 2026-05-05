@@ -28,7 +28,7 @@ export default function SharedResumePage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white text-gray-400 px-6 text-center">
+      <div className="min-h-screen flex items-center justify-center bg-white text-gray-500 px-6 text-center">
         <div>
           <p className="text-sm">{error}</p>
           <p className="text-xs text-gray-600 mt-2">Ask whoever sent the link to re-copy it from their Drive.</p>

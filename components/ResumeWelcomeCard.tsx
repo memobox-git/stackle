@@ -47,7 +47,7 @@ export default function ResumeWelcomeCard({ analysis }: ResumeWelcomeCardProps) 
                   <li className="text-sm text-gray-500">Nothing specific flagged.</li>
                 ) : (
                   strengths.map((s, i) => (
-                    <li key={i} className="flex gap-2.5 text-[13px] leading-5 text-gray-300">
+                    <li key={i} className="flex gap-2.5 text-[13px] leading-5 text-gray-700">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
                       <span>{s}</span>
                     </li>
@@ -70,7 +70,7 @@ export default function ResumeWelcomeCard({ analysis }: ResumeWelcomeCardProps) 
                   <li className="text-sm text-gray-500">No major issues flagged.</li>
                 ) : (
                   weaknesses.map((w, i) => (
-                    <li key={i} className="flex gap-2.5 text-[13px] leading-5 text-gray-300">
+                    <li key={i} className="flex gap-2.5 text-[13px] leading-5 text-gray-700">
                       <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mt-1.5 flex-shrink-0" />
                       <span>{w}</span>
                     </li>

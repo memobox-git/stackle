@@ -121,7 +121,7 @@ function PrioritiesCard({
                 >
                   {done ? "✓" : `P${i + 1}`}
                 </span>
-                <span className={`flex-1 text-xs leading-snug ${done ? "text-gray-500 line-through" : "text-gray-300"}`}>{display}</span>
+                <span className={`flex-1 text-xs leading-snug ${done ? "text-gray-500 line-through" : "text-gray-700"}`}>{display}</span>
                 <span
                   className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
                   style={{ background: done ? "#14532d" : c.bg, color: done ? "#4ade80" : c.color }}
@@ -401,7 +401,7 @@ function AnalysisProgress() {
           />
         </div>
         {/* Step label — fades in on change */}
-        <p className="text-xs text-gray-400" key={`${stepIdx}-${finIdx}`} style={{ animation: "fadeIn 400ms ease" }}>
+        <p className="text-xs text-gray-500" key={`${stepIdx}-${finIdx}`} style={{ animation: "fadeIn 400ms ease" }}>
           {label}
         </p>
         {/* Step dots */}
@@ -605,7 +605,7 @@ export default function ChatWindow({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-900 truncate">{candidateName}</p>
                     {resumeAnalysis.likelyTargetRole && (
-                      <p className="text-[11px] text-gray-400 mt-0.5 truncate">{resumeAnalysis.likelyTargetRole}</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5 truncate">{resumeAnalysis.likelyTargetRole}</p>
                     )}
                     {topStrength && (
                       <p className="text-[11px] text-gray-500 mt-1.5 line-clamp-2">✓ {topStrength}</p>
@@ -781,7 +781,7 @@ export default function ChatWindow({
       {!isNearBottom && (
         <button
           onClick={scrollToBottom}
-          className="sticky bottom-4 left-1/2 -translate-x-1/2 flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-300 text-gray-400 hover:text-gray-900 hover:bg-gray-200 transition-all shadow-lg"
+          className="sticky bottom-4 left-1/2 -translate-x-1/2 flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-300 text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition-all shadow-lg"
           style={{ marginLeft: "auto", marginRight: "16px", display: "flex" }}
           title="Scroll to bottom"
         >

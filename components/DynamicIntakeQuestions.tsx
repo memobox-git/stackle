@@ -86,7 +86,7 @@ export default function DynamicIntakeQuestions({
                 onChange={(e) => setAnswer(q.id, e.target.value)}
                 placeholder="Paste JD here, or type 'no JD'..."
                 rows={3}
-                className="w-full resize-none text-xs text-gray-300 placeholder-[#444] bg-white border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-300 transition-colors leading-relaxed"
+                className="w-full resize-none text-xs text-gray-700 placeholder-[#444] bg-white border border-gray-200 rounded-xl px-3 py-2.5 outline-none focus:border-gray-300 transition-colors leading-relaxed"
               />
             )}
           </div>

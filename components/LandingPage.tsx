@@ -132,7 +132,7 @@ export default function LandingPage() {
         )}
 
         {/* Social proof */}
-        <p className="text-sm text-gray-400 mt-6">
+        <p className="text-sm text-gray-500 mt-6">
           700+ professionals already using Stackle
         </p>
       </div>

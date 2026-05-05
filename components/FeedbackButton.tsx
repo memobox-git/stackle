@@ -91,7 +91,7 @@ export default function FeedbackButton() {
         onClick={() => setOpen(true)}
         title="Send feedback"
         aria-label="Send feedback"
-        className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-gray-100 border border-gray-200 text-gray-300 hover:bg-gray-200 hover:text-gray-900 shadow-lg transition-all"
+        className="fixed bottom-4 right-4 z-40 flex items-center gap-1.5 px-3 py-2 rounded-full bg-gray-100 border border-gray-200 text-gray-700 hover:bg-gray-200 hover:text-gray-900 shadow-lg transition-all"
         style={{ backdropFilter: "blur(8px)" }}
       >
         <MessageSquareWarning className="w-3.5 h-3.5" strokeWidth={1.75} />
@@ -112,7 +112,7 @@ export default function FeedbackButton() {
             {/* Header */}
             <div className="px-5 pt-4 pb-3 border-b border-gray-200 flex items-center gap-3">
               <div className="w-7 h-7 rounded-md bg-gray-100 border border-gray-200 flex items-center justify-center">
-                <MessageSquareWarning className="w-3.5 h-3.5 text-gray-300" strokeWidth={1.75} />
+                <MessageSquareWarning className="w-3.5 h-3.5 text-gray-700" strokeWidth={1.75} />
               </div>
               <div className="flex-1 min-w-0">
                 <h2 className="text-sm font-semibold text-gray-900">Send feedback</h2>

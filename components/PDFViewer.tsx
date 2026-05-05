@@ -96,7 +96,7 @@ export default function PDFViewer({ fileUrl }: PDFViewerProps) {
         style={{ display: loading ? "none" : "block" }}
       />
       {!loading && numPages > 0 && (
-        <p className="text-center text-xs text-gray-400 pb-2">{numPages} page{numPages !== 1 ? "s" : ""}</p>
+        <p className="text-center text-xs text-gray-500 pb-2">{numPages} page{numPages !== 1 ? "s" : ""}</p>
       )}
     </div>
   );

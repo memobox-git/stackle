@@ -34,7 +34,7 @@ export default function ResumeExtractionCard({ extraction }: ResumeExtractionCar
             <div className="w-5 h-5 rounded bg-white flex items-center justify-center flex-shrink-0">
               <User className="w-3 h-3 text-black" strokeWidth={2.5} />
             </div>
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Resume Extracted</span>
+            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Resume Extracted</span>
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-0.5">{extraction.name}</h2>
           {mostRecentRole && (
@@ -54,7 +54,7 @@ export default function ResumeExtractionCard({ extraction }: ResumeExtractionCar
           </div>
           <div className="flex flex-wrap gap-3 mt-3">
             {extraction.email && (
-              <a href={`mailto:${extraction.email}`} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-900">
+              <a href={`mailto:${extraction.email}`} className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-900">
                 <Mail className="w-3 h-3" /> {extraction.email}
               </a>
             )}

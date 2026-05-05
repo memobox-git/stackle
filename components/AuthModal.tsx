@@ -57,7 +57,7 @@ export default function AuthModal({ onClose }: Props) {
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-600 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -75,7 +75,7 @@ export default function AuthModal({ onClose }: Props) {
         <h2 className="text-lg font-semibold text-gray-900 text-center mb-1">
           Sign in to Stackle
         </h2>
-        <p className="text-sm text-gray-400 text-center mb-6">
+        <p className="text-sm text-gray-500 text-center mb-6">
           Career advisor for data & AI roles
         </p>
 
@@ -96,7 +96,7 @@ export default function AuthModal({ onClose }: Props) {
         {/* Divider */}
         <div className="flex items-center gap-3 mb-4">
           <div className="flex-1 h-px bg-gray-100" />
-          <span className="text-xs text-gray-400">or</span>
+          <span className="text-xs text-gray-500">or</span>
           <div className="flex-1 h-px bg-gray-100" />
         </div>
 
@@ -127,7 +127,7 @@ export default function AuthModal({ onClose }: Props) {
           </div>
         )}
 
-        <p className="text-xs text-gray-400 text-center mt-5">
+        <p className="text-xs text-gray-500 text-center mt-5">
           By continuing you agree to Stackle&apos;s{" "}
           <span className="underline cursor-pointer">Terms</span> and{" "}
           <span className="underline cursor-pointer">Privacy Policy</span>

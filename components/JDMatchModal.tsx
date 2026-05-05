@@ -156,7 +156,7 @@ export default function JDMatchModal({
         {/* Header */}
         <div className="px-6 pt-5 pb-4 border-b border-gray-200 flex items-center gap-3">
           <div className="w-8 h-8 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center">
-            <Target className="w-4 h-4 text-gray-300" strokeWidth={1.75} />
+            <Target className="w-4 h-4 text-gray-700" strokeWidth={1.75} />
           </div>
           <div className="flex-1 min-w-0">
             <h2 className="text-base font-semibold text-gray-900">Match against a job description</h2>
@@ -223,7 +223,7 @@ export default function JDMatchModal({
                     <button
                       onClick={handleUrlFetch}
                       disabled={isWorking || !url.trim()}
-                      className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium disabled:opacity-50"
+                      className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 text-xs font-medium disabled:opacity-50"
                     >
                       Fetch
                     </button>
@@ -239,7 +239,7 @@ export default function JDMatchModal({
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isWorking}
-                    className="w-full py-6 rounded-lg bg-gray-50 border border-dashed border-gray-200 hover:border-gray-300 text-gray-400 hover:text-gray-900 text-sm transition-colors disabled:opacity-50 flex flex-col items-center gap-1"
+                    className="w-full py-6 rounded-lg bg-gray-50 border border-dashed border-gray-200 hover:border-gray-300 text-gray-500 hover:text-gray-900 text-sm transition-colors disabled:opacity-50 flex flex-col items-center gap-1"
                   >
                     <Paperclip className="w-4 h-4" strokeWidth={1.75} />
                     Click to upload a JD (PDF or DOCX)
@@ -272,7 +272,7 @@ export default function JDMatchModal({
               )}
 
               {isWorking && workingLabel && (
-                <div className="text-[12px] text-gray-400 flex items-center gap-2">
+                <div className="text-[12px] text-gray-500 flex items-center gap-2">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.75} />
                   {workingLabel}
                 </div>
@@ -384,7 +384,7 @@ export default function JDMatchModal({
                               className={`text-[10px] font-semibold px-2.5 py-1.5 rounded-md transition-colors flex-shrink-0 flex items-center gap-1 ${
                                 applied
                                   ? "bg-emerald-950/30 text-emerald-400 border border-emerald-900/50 cursor-default"
-                                  : "bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 hover:text-gray-900"
+                                  : "bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 hover:text-gray-900"
                               }`}
                             >
                               {applied
@@ -454,7 +454,7 @@ export default function JDMatchModal({
                       jobDescription: jdText,
                     })
                   }
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-300 text-xs font-medium"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 text-xs font-medium"
                 >
                   <Mail className="w-3.5 h-3.5" strokeWidth={1.75} />
                   Cover letter for this
@@ -462,7 +462,7 @@ export default function JDMatchModal({
               )}
               <button
                 onClick={onClose}
-                className="text-xs text-gray-300 bg-white text-black px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold"
+                className="text-xs text-gray-700 bg-white text-black px-3 py-2 rounded-lg hover:bg-gray-100 font-semibold"
               >
                 Done
               </button>

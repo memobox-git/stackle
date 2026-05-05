@@ -1521,7 +1521,7 @@ export default function ResumeBuilder({
             ].map(({ icon, label }) => (
               <div
                 key={label}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-xs text-gray-400"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-xs text-gray-500"
               >
                 <span>{icon}</span>
                 <span>{label}</span>
@@ -1570,7 +1570,7 @@ export default function ResumeBuilder({
       {fixFlow && fixFlow.step === "loading" && (
         <div className="mx-4 mb-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 flex items-center gap-3">
           <div className="w-4 h-4 border-2 border-[#a99af9] border-t-transparent rounded-full animate-spin flex-shrink-0" />
-          <span className="text-xs text-gray-400">Generating improved version…</span>
+          <span className="text-xs text-gray-500">Generating improved version…</span>
         </div>
       )}
 
@@ -1583,10 +1583,10 @@ export default function ResumeBuilder({
       {scoreToast && (
         <div
           className="mx-4 mb-2 px-4 py-2.5 rounded-xl flex items-center gap-2.5 pointer-events-none relative overflow-visible"
-          style={{ background: "#091a09", border: "1px solid #153a15", animation: "fadeIn 300ms ease" }}
+          style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", animation: "fadeIn 300ms ease" }}
         >
-          <span className={`text-green-400 text-base ${confettiBurst ? "stackle-score-pulse" : ""}`}>✓</span>
-          <span className={`text-xs font-semibold text-green-400 ${confettiBurst ? "stackle-score-pulse" : ""}`}>
+          <span className={`text-green-700 text-base ${confettiBurst ? "stackle-score-pulse" : ""}`}>✓</span>
+          <span className={`text-xs font-semibold text-green-800 ${confettiBurst ? "stackle-score-pulse" : ""}`}>
             Fix accepted — +{scoreToast.pts} pts added to your score
           </span>
           {savedGhost && (
@@ -1810,7 +1810,7 @@ export default function ResumeBuilder({
                       title={`Close ${tab.label}`}
                       aria-label={`Close ${tab.label} tab`}
                       className={`ml-1 w-4 h-4 flex items-center justify-center rounded-sm transition-opacity hover:bg-gray-200 ${
-                        isActive ? "text-gray-400 hover:text-gray-900 opacity-70 hover:opacity-100" : "text-gray-600 hover:text-gray-900 opacity-0 group-hover:opacity-100"
+                        isActive ? "text-gray-500 hover:text-gray-900 opacity-70 hover:opacity-100" : "text-gray-600 hover:text-gray-900 opacity-0 group-hover:opacity-100"
                       }`}
                     >
                       <X className="w-3 h-3" strokeWidth={2.25} />
@@ -1849,7 +1849,7 @@ export default function ResumeBuilder({
                   onClick={handleDownloadResume}
                   disabled={isDownloadingResume}
                   title="Download resume as PDF"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs disabled:opacity-50"
                 >
                   <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
                   <span className="hidden sm:inline">{isDownloadingResume ? "Saving…" : "Download"}</span>
@@ -1876,7 +1876,7 @@ export default function ResumeBuilder({
                     onClick={() => { setDownloadOpen((v) => !v); setShareOpen(false); }}
                     disabled={isDownloading || isDownloadingDocx}
                     title="Download"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs disabled:opacity-50"
                   >
                     <Download className="w-3.5 h-3.5" strokeWidth={1.75} />
                     <span className="hidden sm:inline">
@@ -1891,17 +1891,17 @@ export default function ResumeBuilder({
                         <button
                           onClick={() => { setDownloadOpen(false); handleDownload(); }}
                           disabled={isDownloading}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
                         >
-                          <Download className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
+                          <Download className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
                           <span>PDF</span>
                         </button>
                         <button
                           onClick={() => { setDownloadOpen(false); handleDownloadDocx(); }}
                           disabled={isDownloadingDocx}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors disabled:opacity-50"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors disabled:opacity-50"
                         >
-                          <FileText className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
+                          <FileText className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
                           <span>Word document (.docx)</span>
                         </button>
                       </div>
@@ -1914,7 +1914,7 @@ export default function ResumeBuilder({
                   <button
                     onClick={() => { setShareOpen((v) => !v); setDownloadOpen(false); }}
                     title="Share"
-                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-400 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors text-xs"
                   >
                     <Share2 className="w-3.5 h-3.5" strokeWidth={1.75} />
                     <span className="hidden sm:inline">Share</span>
@@ -1927,40 +1927,40 @@ export default function ResumeBuilder({
                         <button
                           onClick={() => { setShareOpen(false); setCoverLetterOpen(true); }}
                           disabled={!editedExtraction}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
                         >
-                          <Mail className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
+                          <Mail className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
                           <span>Generate cover letter</span>
                         </button>
                         <button
                           onClick={() => { setShareOpen(false); handleCopyLink(); }}
                           disabled={isCopying}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200 disabled:opacity-50"
                         >
                           {copiedLink
                             ? <Check className="w-4 h-4 text-green-400" strokeWidth={2} />
-                            : <Link2 className="w-4 h-4 text-gray-400" strokeWidth={1.75} />}
+                            : <Link2 className="w-4 h-4 text-gray-500" strokeWidth={1.75} />}
                           <span>{copiedLink ? "Copied!" : "Copy shareable link"}</span>
                         </button>
                         <button
                           onClick={() => { setShareOpen(false); handleShareReviewLink(); }}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors border-b border-gray-200"
                         >
-                          <Link2 className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
+                          <Link2 className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
                           <span>Copy peer-review link</span>
                         </button>
                         <button
                           onClick={() => { setShareOpen(false); handleShare("linkedin"); }}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors"
                         >
                           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="#0A66C2"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
                           <span>Share on LinkedIn</span>
                         </button>
                         <button
                           onClick={() => { setShareOpen(false); handleShare("email"); }}
-                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-300 hover:bg-gray-200 hover:text-gray-900 transition-colors"
+                          className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors"
                         >
-                          <Mail className="w-4 h-4 text-gray-400" strokeWidth={1.75} />
+                          <Mail className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
                           <span>Share via email</span>
                         </button>
                       </div>
@@ -2026,28 +2026,28 @@ export default function ResumeBuilder({
                         ? "Experience bullets"
                         : "Top priority";
                   return (
-                    <div className="mb-4 rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-950/30 via-[#0d0d0d] to-[#0d0d0d] px-4 py-4">
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/30 flex items-center justify-center flex-shrink-0">
-                          <Sparkles className="w-4 h-4 text-violet-300" strokeWidth={2} />
+                    <div className="mb-6 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-white px-6 py-5 shadow-sm">
+                      <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-violet-100 border border-violet-200 flex items-center justify-center flex-shrink-0">
+                          <Sparkles className="w-5 h-5 text-violet-600" strokeWidth={2} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-[11px] font-semibold tracking-widest uppercase text-violet-400 mb-1">AI Coach</p>
-                          <p className="text-sm text-gray-200 leading-snug">
-                            I found <span className="font-semibold text-gray-900">{issueCount} issue{issueCount === 1 ? "" : "s"}</span>. The fastest win is fixing your <span className="font-semibold text-gray-900">{sectionLabel.toLowerCase()}</span>.
+                          <p className="text-[11px] font-semibold tracking-widest uppercase text-violet-700 mb-1.5">AI Coach</p>
+                          <p className="text-base text-gray-900 leading-snug">
+                            I found <span className="font-semibold">{issueCount} issue{issueCount === 1 ? "" : "s"}</span>. The fastest win is fixing your <span className="font-semibold">{sectionLabel.toLowerCase()}</span>.
                           </p>
-                          <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{topPriority}</p>
-                          <div className="flex items-center gap-2 mt-3">
+                          <p className="text-sm text-gray-600 mt-2 leading-relaxed">{topPriority}</p>
+                          <div className="flex items-center gap-2 mt-4">
                             <button
                               onClick={() => handleFixItem(topPriority, 0)}
                               disabled={isEditStreaming}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-violet-500 hover:bg-violet-400 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                              className="text-sm font-semibold px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
                             >
                               Fix {sectionLabel}
                             </button>
                             <button
                               onClick={() => reportRef.current?.scrollTo({ top: 9999, behavior: "smooth" })}
-                              className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-300 hover:text-gray-900 transition-colors border border-gray-200"
+                              className="text-sm font-medium px-4 py-2 rounded-lg bg-white hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors border border-gray-300"
                             >
                               View full report
                             </button>
@@ -2058,26 +2058,9 @@ export default function ResumeBuilder({
                   );
                 })()}
 
-                {/* JD match CTA — sits above the general report. The general
-                    report is role-agnostic; this is the JD-specific one. */}
-                <div className="mb-4 rounded-xl border border-gray-200 bg-white px-4 py-3 flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center flex-shrink-0">
-                    <Target className="w-4 h-4 text-gray-300" strokeWidth={1.75} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">Match against a specific job</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      Paste, upload, or link a JD. Get a fit score + targeted rewrites.
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setJdMatchOpen(true)}
-                    disabled={!editedExtraction && !resumeExtraction}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-white hover:bg-gray-100 text-black disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                  >
-                    Match a JD →
-                  </button>
-                </div>
+                {/* JD-match strip retired from the report top. To return as
+                    a dedicated tab where the user pastes a JD into the chat
+                    and Match-a-JD becomes part of that flow. */}
 
                 <ResumeReportCard
                   analysis={effectiveAnalysis}
@@ -2106,7 +2089,7 @@ export default function ResumeBuilder({
                   flexShrink: 0,
                   position: "relative",
                 }}>
-                  <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase", color: "#4fc9a4", background: "#0a1f18", border: "1px solid #1a3d2e", borderRadius: "4px", padding: "1px 6px", marginRight: "4px" }}>Working Copy</span>
+                  <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase", color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "4px", padding: "1px 6px", marginRight: "4px" }}>Working Copy</span>
                   <span style={{ color: "#555" }}>Score</span>
                   <span
                     key={`base-${baseScore}`}
@@ -2239,7 +2222,7 @@ export default function ResumeBuilder({
   const toggleButton = hasPanelContent && !isPanelOpen ? (
     <button
       onClick={() => setIsPanelOpen(true)}
-      className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-40 flex-col items-center justify-center w-5 h-16 bg-gray-100 border border-r-0 border-gray-200 rounded-l-lg text-gray-400 hover:text-gray-900 hover:bg-gray-200 transition-colors"
+      className="hidden md:flex fixed right-0 top-1/2 -translate-y-1/2 z-40 flex-col items-center justify-center w-5 h-16 bg-gray-100 border border-r-0 border-gray-200 rounded-l-lg text-gray-500 hover:text-gray-900 hover:bg-gray-200 transition-colors"
       title="Open workspace panel"
     >
       <ChevronLeft className="w-3.5 h-3.5" strokeWidth={2} />

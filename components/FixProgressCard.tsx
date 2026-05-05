@@ -103,7 +103,7 @@ export default function FixProgressCard({
                     )}
                     <span
                       className={`text-[12px] leading-5 ${
-                        isDone ? "line-through text-gray-500" : isCurrent ? "text-gray-900 font-medium" : "text-gray-300"
+                        isDone ? "line-through text-gray-500" : isCurrent ? "text-gray-900 font-medium" : "text-gray-700"
                       }`}
                     >
                       {display}

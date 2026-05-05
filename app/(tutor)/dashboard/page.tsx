@@ -55,7 +55,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-3 gap-3 mt-6">
             {metrics.map((m) => (
               <div key={m.label} className="bg-gray-100 rounded-xl px-4 py-3.5">
-                <div className="text-[11px] font-medium tracking-wider text-gray-400 uppercase">
+                <div className="text-[11px] font-medium tracking-wider text-gray-500 uppercase">
                   {m.label}
                 </div>
                 <div className="text-[22px] font-semibold text-gray-900 mt-1.5 leading-none">
@@ -103,7 +103,7 @@ export default function DashboardPage() {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm text-gray-900">
                       {s.student}
-                      <span className="text-gray-300 mx-1.5">·</span>
+                      <span className="text-gray-700 mx-1.5">·</span>
                       <span className="text-gray-500">{s.course}</span>
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5 truncate">{s.topic}</div>
@@ -134,7 +134,7 @@ export default function DashboardPage() {
                     <div className="text-sm text-gray-900">{f.student}</div>
                     <div className="text-xs text-gray-500 mt-0.5 truncate">{f.reason}</div>
                   </div>
-                  <div className="text-xs text-gray-400 shrink-0 ml-3">{f.time}</div>
+                  <div className="text-xs text-gray-500 shrink-0 ml-3">{f.time}</div>
                 </li>
               ))}
             </ul>
@@ -171,7 +171,7 @@ export default function DashboardPage() {
             <button
               type="button"
               aria-label="Send"
-              className="text-gray-400 hover:text-gray-700 transition-colors"
+              className="text-gray-500 hover:text-gray-700 transition-colors"
             >
               <Send className="w-3.5 h-3.5" strokeWidth={2} />
             </button>
