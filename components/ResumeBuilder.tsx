@@ -1370,14 +1370,17 @@ export default function ResumeBuilder({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openReportSignal]);
 
-  // Auto-open panel when extraction first arrives
+  // Auto-open panel when extraction first arrives. If the analysis is
+  // already present (user just finished onboarding and lands here), open
+  // the Report tab — that's the wow moment they expect. Otherwise default
+  // to the Resume preview tab.
   useEffect(() => {
     if (resumeExtraction && !didAutoOpenForExtraction.current) {
       didAutoOpenForExtraction.current = true;
       setIsPanelOpen(true);
-      setActiveTab("resume");
+      setActiveTab(resumeAnalysis ? "report" : "resume");
     }
-  }, [resumeExtraction]);
+  }, [resumeExtraction, resumeAnalysis]);
 
   // When analysis arrives, DON'T auto-switch to Report — that was annoying.
   // Just mark Report as "new" so the tab has a small dot indicating fresh
@@ -1639,7 +1642,7 @@ export default function ResumeBuilder({
             onStopAgent?.();
           }}
           onFileUpload={onFileUpload}
-          placeholder="Upload your resume or ask me anything about it..."
+          placeholder="Ask anything about your resume..."
         />
       </div>
 

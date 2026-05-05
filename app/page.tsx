@@ -383,16 +383,19 @@ export default function Page() {
   useEffect(() => {
     if (activeView !== "resume-builder") return;
     if (!resumeExtraction) return;
-    if (!activeChatId) return;
-    if (welcomeFiredRef.current.has(activeChatId)) return;
+    // Use a fallback id for unauth / pre-loadChats users so the welcome
+    // doesn't sit silently while activeChatId is still null. Same pattern
+    // as the auto-save-original effect uses.
+    const effectiveChatId = activeChatId ?? "local-chat";
+    if (welcomeFiredRef.current.has(effectiveChatId)) return;
     if (chatMessages.length > 0) return;
-    welcomeFiredRef.current.add(activeChatId);
+    welcomeFiredRef.current.add(effectiveChatId);
 
     // Pull the most recent finalized version for this chat so the greeting
     // can say "your saved resume is X" on re-entry instead of the generic
     // first-impression pitch.
     const chatVersions = driveFiles.filter(
-      (f) => f.chat_id === activeChatId && f.file_type === "version"
+      (f) => f.chat_id === effectiveChatId && f.file_type === "version"
     );
     const latestFinal = chatVersions.sort(
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
@@ -405,7 +408,9 @@ export default function Page() {
     ];
     setChatMessages(welcomeMsgs);
 
-    // Persist to the active chat so the welcome doesn't re-fire on reload
+    // Persist to the active chat so the welcome doesn't re-fire on reload.
+    // Only persist when we have a real Supabase chat id — local-chat is the
+    // unauth fallback and doesn't have a row to write to.
     if (activeChatId) {
       persistChat(activeChatId, welcomeMsgs, "resume_builder", {
         resumeText,
@@ -1679,7 +1684,7 @@ export default function Page() {
                   agentAbortRef.current = null;
                   setIsLoading(false);
                 }}
-                placeholder="Ask anything about data & AI careers..."
+                placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
               />
             </div>
           </div>
