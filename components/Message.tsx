@@ -276,7 +276,7 @@ export default function Message({ message, onEdit }: MessageProps) {
         </div>
         {/* Bubble */}
         {editing ? (
-          <div className="max-w-[78%] w-full bg-white border border-gray-300 text-gray-900 rounded-2xl rounded-tr-md px-4 py-3 text-[15px] leading-6"
+          <div className="max-w-[78%] w-full bg-white border border-gray-300 text-gray-900 rounded-2xl rounded-tr-lg px-4 py-3 text-[15px] leading-6"
                style={{ boxShadow: "0 0 0 2px rgba(169, 154, 249, 0.25)" }}>
             <textarea
               ref={textareaRef}
@@ -314,7 +314,7 @@ export default function Message({ message, onEdit }: MessageProps) {
             </div>
           </div>
         ) : (
-          <div className="max-w-[78%] bg-white border border-gray-200 text-gray-900 rounded-2xl rounded-tr-md px-5 py-3.5 text-[15px] leading-6">
+          <div className="max-w-[78%] bg-white border border-gray-200 text-gray-900 rounded-2xl rounded-tr-lg px-5 py-3.5 text-[15px] leading-6">
             <p className="whitespace-pre-wrap">{message.content}</p>
           </div>
         )}

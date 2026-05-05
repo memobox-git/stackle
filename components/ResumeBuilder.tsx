@@ -1461,14 +1461,14 @@ export default function ResumeBuilder({
     <div
       className={`flex flex-col min-h-0 rb-chat-panel ${isPanelOpen ? "rb-chat-panel-open" : ""} ${mobileView === "panel" ? "hidden md:flex" : "flex"}`}
       style={{
-        width: isPanelOpen ? "40%" : "100%",
+        width: isPanelOpen ? "35%" : "100%",
         transition: "width 300ms ease",
         minWidth: 0,
       }}
     >
       {/* Mobile tab bar */}
       {hasPanelContent && (
-        <div className="flex md:hidden border-b border-gray-200 bg-white px-3 pt-2 pb-0 gap-1">
+        <div className="flex md:hidden bg-white px-3 pt-2 pb-1 gap-1">
           {(["chat", "panel"] as const).map((view) => {
             const isActive = mobileView === view;
             const label = view === "chat" ? "Chat" : "Workspace";
@@ -1619,8 +1619,11 @@ export default function ResumeBuilder({
         </div>
       )}
 
-      <div className="relative px-4 pb-4 pt-0">
-        <div className="absolute inset-x-0 -top-10 h-10 bg-gradient-to-t from-[#0d0d0d] to-transparent pointer-events-none" />
+      <div className="relative px-4 pb-4 pt-2">
+        {/* Soft fade so the last message doesn't butt up against the input.
+            Was a hard dark gradient (#0d0d0d) from when the app was dark-themed —
+            that read as a black band on light bg. Now subtle white fade. */}
+        <div className="absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
         <ChatInput
           value={input}
           onChange={onInputChange}
@@ -1760,19 +1763,21 @@ export default function ResumeBuilder({
   // ── Right workspace panel ────────────────────────────────────────
   const workspacePanel = (
     <div
-      className={`flex-col min-h-0 bg-white border-l border-gray-200 overflow-hidden rb-workspace-panel ${isPanelOpen ? "rb-workspace-panel-open" : ""}
+      className={`flex-col min-h-0 bg-white overflow-hidden rb-workspace-panel ${isPanelOpen ? "rb-workspace-panel-open" : ""}
         ${mobileView === "panel" ? "flex flex-1" : "hidden md:flex"}`}
       style={{
-        width: isPanelOpen ? "60%" : "0",
+        width: isPanelOpen ? "65%" : "0",
         minWidth: isPanelOpen ? "0" : "0",
         transition: "width 300ms ease",
         flexShrink: 0,
+        boxShadow: isPanelOpen ? "inset 1px 0 0 rgba(0, 0, 0, 0.04)" : "none",
       }}
     >
       {isPanelOpen && (
         <>
-          {/* Panel header — tabs + action buttons + X */}
-          <div className="flex items-center border-b border-gray-200 px-2 pt-1.5 flex-shrink-0 bg-white gap-1">
+          {/* Panel header — tabs + action buttons + X. Floating tabs, no
+              underline beneath the tab strip (Lovable / Linear pattern). */}
+          <div className="flex items-center px-3 pt-2 pb-1 flex-shrink-0 bg-white gap-1">
             <div className="flex flex-1 overflow-x-auto items-center">
               {availableTabs.map((tab) => {
                 const Icon = tab.icon;
@@ -2243,8 +2248,8 @@ export default function ResumeBuilder({
         }
         /* Tablet (iPad): slightly wider chat column */
         @media (min-width: 768px) and (max-width: 1199px) {
-          .rb-chat-panel-open { width: 45% !important; }
-          .rb-workspace-panel-open { width: 55% !important; }
+          .rb-chat-panel-open { width: 35% !important; }
+          .rb-workspace-panel-open { width: 65% !important; }
         }
       `}</style>
 

@@ -95,7 +95,7 @@ body.theme-dark {
 }
 
 body {
-  background: #ffffff;
+  background: #fafaf7;
   color: #111827;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;

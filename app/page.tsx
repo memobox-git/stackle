@@ -1528,10 +1528,10 @@ export default function Page() {
 
   // ── Main app ──────────────────────────────────────────
   return (
-    <div className="flex h-screen bg-white text-gray-900 overflow-hidden">
+    <div className="flex h-screen bg-[#fafaf7] text-gray-900 overflow-hidden">
       {/* Desktop sidebar */}
       <aside
-        className="flex-shrink-0 bg-gray-50 border-r border-gray-200 flex-col hidden md:flex transition-all duration-200 relative overflow-visible"
+        className="flex-shrink-0 bg-gray-50 flex-col hidden md:flex transition-all duration-200 relative overflow-visible"
         style={{ width: isSidebarExpanded ? "224px" : "52px" }}
       >
         <SidebarContent expanded={isSidebarExpanded} />
@@ -1559,7 +1559,7 @@ export default function Page() {
       {/* Main */}
       <div className="flex flex-col flex-1 min-w-0">
         {/* Header */}
-        <header className="flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0">
+        <header className="flex items-center justify-between px-4 py-3 flex-shrink-0">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setIsSidebarOpen(true)}
