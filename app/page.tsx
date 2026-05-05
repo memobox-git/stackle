@@ -1387,7 +1387,7 @@ export default function Page() {
                     : "text-gray-500 hover:text-gray-900"
                 }`}
               >
-                <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} />
+                <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={1.75} />
                 {expanded && <span className="text-sm truncate">{item.label}</span>}
               </button>
               {!expanded && <SidebarTooltip label={item.label} />}
@@ -1405,7 +1405,7 @@ export default function Page() {
               }}
               className={`flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors text-gray-500 hover:text-gray-900`}
             >
-              <ClipboardList className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={1.75} />
+              <ClipboardList className="w-5 h-5 flex-shrink-0" strokeWidth={1.75} />
               {expanded && <span className="text-sm truncate">Report</span>}
             </button>
             {!expanded && <SidebarTooltip label="Report" />}

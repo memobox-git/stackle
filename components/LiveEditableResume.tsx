@@ -541,12 +541,12 @@ export default function LiveEditableResume({
         background: "#fff",
         color: "#111",
         fontFamily: "'Georgia', 'Times New Roman', serif",
-        fontSize: "13px",
-        lineHeight: "1.55",
-        padding: "48px 52px",
+        fontSize: "15px",
+        lineHeight: "1.6",
+        padding: "44px 52px",
         minHeight: "100%",
-        maxWidth: "780px",
-        margin: "0 auto",
+        maxWidth: "100%",
+        margin: "0",
       }}
     >
       <style>{`
