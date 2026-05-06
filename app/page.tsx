@@ -536,12 +536,26 @@ export default function Page() {
     const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || "there";
     const realJob = firstRealJob(resumeExtraction);
     const years = resumeExtraction.totalYearsExperience;
+    // Round fractional years to clean copy ("1.4 years" → "about 1 year").
+    const describeYears = (y: number | null | undefined): string => {
+      if (typeof y !== "number" || !isFinite(y) || y <= 0) return "";
+      if (y < 1) return "less than 1 year of experience";
+      const floor = Math.floor(y);
+      const frac = y - floor;
+      if (frac < 0.25) return floor === 1 ? "1 year of experience" : `${floor} years of experience`;
+      if (frac >= 0.75) {
+        const rounded = floor + 1;
+        return rounded === 1 ? "almost 1 year of experience" : `almost ${rounded} years of experience`;
+      }
+      return floor === 1 ? "about 1 year of experience" : `about ${floor} years of experience`;
+    };
+    const yearsPhrase = describeYears(years);
     // Header — punchy, references real role + tenure when we have them.
     let header: string;
     if (realJob) {
-      header = `Hey ${firstName} — read through your resume. ${realJob.title} at ${realJob.company}${typeof years === "number" && years > 0 ? `, ${years} years in.` : "."}`;
-    } else if (typeof years === "number" && years > 0) {
-      header = `Hey ${firstName} — read through your resume. ${years} years of experience.`;
+      header = `Hey ${firstName} — read through your resume. ${realJob.title} at ${realJob.company}${yearsPhrase ? `, ${yearsPhrase}.` : "."}`;
+    } else if (yearsPhrase) {
+      header = `Hey ${firstName} — read through your resume. ${yearsPhrase.charAt(0).toUpperCase() + yearsPhrase.slice(1)}.`;
     } else {
       header = `Hey ${firstName} — read through your resume.`;
     }

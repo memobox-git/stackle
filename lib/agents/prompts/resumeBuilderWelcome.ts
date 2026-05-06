@@ -51,8 +51,44 @@ export function buildResumeBuilderWelcome(
   return [para1, para2, para3].join("\n\n");
 }
 
+// Round fractional years into a clean phrase. Decimals like "1.4 years"
+// read awkwardly in human copy. Mirrors describeYears() in ScoreReveal.tsx
+// — kept duplicated rather than extracted to a shared module to avoid
+// adding cross-import surface for two functions.
+function describeYears(years: number | null | undefined): string {
+  if (typeof years !== "number" || !isFinite(years) || years <= 0) return "";
+  if (years < 1) return "less than a year in";
+  const floor = Math.floor(years);
+  const frac = years - floor;
+  if (frac < 0.25) return floor === 1 ? "1 year in" : `${floor} years in`;
+  if (frac >= 0.75) {
+    const rounded = floor + 1;
+    return rounded === 1 ? "almost 1 year in" : `almost ${rounded} years in`;
+  }
+  return floor === 1 ? "about 1 year in" : `about ${floor} years in`;
+}
+
+// Pick "a" or "an" based on the first word's leading sound. Vowel-letter
+// heuristic with light vowel-sound exceptions ("UI", "FE" → "a"; "MBA",
+// "HR" → "an"). Mirrors articleFor() in ScoreReveal.tsx.
+function articleFor(phrase: string): string {
+  const word = phrase.trim().split(/\s+/)[0] ?? "";
+  if (!word) return "a";
+  const upper = word.toUpperCase();
+  const vowelSoundAcronyms = ["MBA", "MS", "MD", "FBI", "HR", "HTML", "HTTP", "L1", "L2"];
+  const consonantSoundAcronyms = ["UI", "UX", "URL", "USB", "U.S.", "EU"];
+  if (consonantSoundAcronyms.some((a) => upper.startsWith(a))) return "a";
+  if (vowelSoundAcronyms.some((a) => upper.startsWith(a))) return "an";
+  return /^[aeiou]/i.test(word) ? "an" : "a";
+}
+
 // ── Score (mirrors components/ScoreReveal.tsx + ResumeBuilder.tsx deriveScore)
 function computeScore(a: ResumeAnalysis): number {
+  // Same fix as ScoreReveal — prefer the agent-computed total when present
+  // so the welcome's score matches what the user just saw on the reveal.
+  if (a.scores && typeof a.scores.total === "number" && a.scores.total > 0) {
+    return Math.max(0, Math.min(100, Math.round(a.scores.total)));
+  }
   let score = 55;
   score += Math.min(a.strengths.length * 4, 20);
   score -= Math.min(a.weaknesses.length * 3, 15);
@@ -220,15 +256,17 @@ function buildLegacyWelcome(ext: ResumeExtraction, firstName: string): string {
   const field = inferField(ext);
   const realJob = firstRealJob(ext);
 
+  const yearsPhrase = describeYears(years); // "about 1 year in" / "almost 5 years in"
   const headerParts: string[] = [`Hey ${firstName} —`];
   if (realJob?.title && realJob?.company) {
-    headerParts.push(`I've read through your resume. ${realJob.title} at ${realJob.company}`);
-    if (typeof years === "number" && years > 0) {
-      headerParts.push(`, ${years} years in ${field}`);
+    const article = articleFor(realJob.title);
+    headerParts.push(`I've read through your resume. ${article.charAt(0).toUpperCase() + article.slice(1)} ${realJob.title} at ${realJob.company}`);
+    if (yearsPhrase) {
+      headerParts.push(`, ${yearsPhrase} ${field}`);
     }
     headerParts.push(".");
-  } else if (typeof years === "number" && years > 0) {
-    headerParts.push(`read through your resume. ${years} years in ${field}.`);
+  } else if (yearsPhrase) {
+    headerParts.push(`read through your resume. ${yearsPhrase.charAt(0).toUpperCase() + yearsPhrase.slice(1)} ${field}.`);
   } else {
     headerParts.push(`read through your resume.`);
   }
