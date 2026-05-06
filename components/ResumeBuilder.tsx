@@ -343,13 +343,89 @@ export default function ResumeBuilder({
     }
   }
 
-  // Initialize editedExtraction once when extraction first arrives, and auto-switch to structured view
+  // Initialize editedExtraction once when extraction first arrives.
+  // PRIORITY ORDER:
+  //   1. Drive working copy for this chat (preserves accepted edits across refresh)
+  //   2. Original extraction from props (first ever load — no fixes yet)
+  // The Drive load happens async; while waiting we seed from props so the
+  // Edit tab is never empty. If the Drive load lands later with a richer
+  // working copy, we replace.
   useEffect(() => {
-    if (resumeExtraction && !hasInitializedEdit.current) {
-      hasInitializedEdit.current = true;
-      setEditedExtraction(structuredClone(resumeExtraction));
+    if (!resumeExtraction || hasInitializedEdit.current) return;
+    hasInitializedEdit.current = true;
+    // Seed from props synchronously.
+    setEditedExtraction(structuredClone(resumeExtraction));
+    // Then check Drive for a working copy keyed to this chat.
+    if (!chatId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const files = await loadDriveFiles(chatId);
+        if (cancelled) return;
+        const wc = files.find(
+          (f) => f.file_type === "working_copy" && f.chat_id === chatId && f.extraction_json,
+        );
+        if (wc?.extraction_json) {
+          setEditedExtraction(structuredClone(wc.extraction_json));
+          setWorkingCopyId(wc.id);
+          // Restore the accepted-fix state from localStorage so score
+          // bumps + action-plan badges reflect what the user already
+          // accepted before refresh. Keyed on chatId.
+          try {
+            const raw = localStorage.getItem(`stackle_accepted_${chatId}`);
+            if (raw) {
+              const saved = JSON.parse(raw) as {
+                acceptedIndices?: number[];
+                acceptedSections?: string[];
+                completedActions?: number[];
+                acceptedPoints?: number;
+                rejectedCount?: number;
+              };
+              if (Array.isArray(saved.acceptedIndices)) setAcceptedIndices(new Set(saved.acceptedIndices));
+              if (Array.isArray(saved.acceptedSections)) setAcceptedSections(new Set(saved.acceptedSections));
+              if (Array.isArray(saved.completedActions)) setCompletedActions(new Set(saved.completedActions));
+              if (typeof saved.acceptedPoints === "number") setAcceptedPoints(saved.acceptedPoints);
+              if (typeof saved.rejectedCount === "number") setRejectedCount(saved.rejectedCount);
+            }
+          } catch (err) {
+            console.warn("[restore] accepted-state failed:", err);
+          }
+        }
+      } catch (err) {
+        console.warn("[restore] working-copy load failed:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeExtraction, chatId]);
+
+  // Persist the accepted-fix state to localStorage on every change so a
+  // refresh restores the score bumps and action-plan badges. Keyed on
+  // chatId so multiple chats don't collide. Skips when no chatId yet.
+  useEffect(() => {
+    if (!chatId) return;
+    try {
+      const payload = {
+        acceptedIndices: Array.from(acceptedIndices),
+        acceptedSections: Array.from(acceptedSections),
+        completedActions: Array.from(completedActions),
+        acceptedPoints,
+        rejectedCount,
+      };
+      // Only write when there's something to remember — avoids clobbering
+      // a fresh chat's state with an empty payload during the initial
+      // restore handshake.
+      const hasState =
+        payload.acceptedIndices.length > 0 ||
+        payload.acceptedSections.length > 0 ||
+        payload.completedActions.length > 0;
+      if (hasState) {
+        localStorage.setItem(`stackle_accepted_${chatId}`, JSON.stringify(payload));
+      }
+    } catch (err) {
+      console.warn("[persist] accepted-state failed:", err);
     }
-  }, [resumeExtraction]);
+  }, [chatId, acceptedIndices, acceptedSections, completedActions, acceptedPoints, rejectedCount]);
 
   // Reset edit state on new conversation — must clear EVERYTHING derived
   // from the previous resume or we leak scores, completion badges, and a
