@@ -22,6 +22,7 @@ export function buildResumeBuilderWelcome(
   ext: ResumeExtraction,
   lastFinalized?: { displayName: string } | null,
   analysis?: ResumeAnalysis | null,
+  chosenTargetRole?: string | null,
 ): string {
   const firstName = (ext.name ?? "").trim().split(/\s+/)[0] || "there";
 
@@ -44,7 +45,15 @@ export function buildResumeBuilderWelcome(
   // narrates the aha moment the user is simultaneously seeing in the
   // Report tab on the right. No more dedicated full-screen reveal — this
   // line IS the score reveal in conversation form.
-  const para1 = `Hey ${firstName}. You scored ${score}/100 — ${tier}.`;
+  // If the analysis benchmarked against a more junior version of the
+  // user's chosen role (e.g. user picked "Data Engineer", analyzer
+  // chose seniority="Entry-level to Junior"), surface that explicitly
+  // — silent re-targeting feels like gaslighting when the user later
+  // sees "Junior Data Engineer" in the report.
+  const seniorityNote = buildSeniorityNote(analysis, chosenTargetRole);
+  const para1 = seniorityNote
+    ? `Hey ${firstName}. You scored ${score}/100 — ${tier}. ${seniorityNote}`
+    : `Hey ${firstName}. You scored ${score}/100 — ${tier}.`;
 
   const quickReadParts = [`Quick read: you scored ${score}/100.`];
   if (strongestSignal) quickReadParts.push(strongestSignal);
@@ -86,6 +95,46 @@ function articleFor(phrase: string): string {
   if (consonantSoundAcronyms.some((a) => upper.startsWith(a))) return "a";
   if (vowelSoundAcronyms.some((a) => upper.startsWith(a))) return "an";
   return /^[aeiou]/i.test(word) ? "an" : "a";
+}
+
+// ── Seniority transparency
+// When the analyzer downshifts the user's chosen target role to a more
+// junior level (because of years of experience or missing skills), say so
+// in the welcome. Returns a one-sentence note or "" if there's no
+// material mismatch.
+function buildSeniorityNote(a: ResumeAnalysis | null | undefined, chosenTargetRole: string | null | undefined): string {
+  if (!a || !chosenTargetRole) return "";
+  const benchmark = (a.likelyTargetRole ?? "").trim();
+  const seniority = (a.seniorityEstimate ?? "").trim();
+  if (!benchmark && !seniority) return "";
+
+  // Detect a junior downshift: chosen target doesn't say junior/entry/intern,
+  // but the seniority estimate does.
+  const chosenLower = chosenTargetRole.toLowerCase();
+  const benchLower = benchmark.toLowerCase();
+  const senLower = seniority.toLowerCase();
+  const chosenIsJunior = /\b(junior|jr\.?|entry|intern|associate)\b/.test(chosenLower);
+  const benchmarkIsJunior =
+    /\b(junior|jr\.?|entry|intern|associate)\b/.test(benchLower) ||
+    /\b(junior|jr\.?|entry|intern|associate)\b/.test(senLower);
+
+  if (!chosenIsJunior && benchmarkIsJunior) {
+    // Surface the downshift honestly.
+    const targetLabel = benchmark || `${seniority} ${chosenTargetRole}`.trim();
+    return `Note: you picked ${chosenTargetRole}, but I benchmarked against ${targetLabel} based on your years of experience and stack — that's the realistic target right now.`;
+  }
+
+  // Reverse direction (chose junior, analyzer picked senior) is uncommon
+  // but worth noting — usually means strong signal.
+  const chosenIsSenior = /\b(senior|sr\.?|staff|principal|lead|manager)\b/.test(chosenLower);
+  const benchmarkIsSenior =
+    /\b(senior|sr\.?|staff|principal|lead|manager)\b/.test(benchLower) ||
+    /\b(senior|sr\.?|staff|principal|lead|manager)\b/.test(senLower);
+  if (!chosenIsSenior && benchmarkIsSenior) {
+    return `Note: you picked ${chosenTargetRole}, but the analysis benchmarked against ${benchmark || seniority} — your experience supports a more senior target.`;
+  }
+
+  return "";
 }
 
 // ── Score (mirrors components/ScoreReveal.tsx + ResumeBuilder.tsx deriveScore)

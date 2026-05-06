@@ -87,6 +87,11 @@ export default function Page() {
   // Hoisted to component scope so synthesis prompt + Career Profile
   // landing screen can both read it.
   const [careerGoal, setCareerGoal] = useState<string | null>(null);
+  // The role the user explicitly picked at upload (Data Engineer, ML, etc).
+  // Separate from careerGoal (filled later) and from analysis.likelyTargetRole
+  // (auto-detected). Chat welcome flags mismatches between this and the
+  // seniority the analyzer chose to benchmark against.
+  const [chosenTargetRole, setChosenTargetRole] = useState<string | null>(null);
 
   // ── Chat sessions ─────────────────────────────────────
   const [chatList, setChatList] = useState<SupabaseChat[]>([]);
@@ -477,7 +482,7 @@ export default function Page() {
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     )[0];
     const lastFinalized = latestFinal ? { displayName: latestFinal.display_name } : null;
-    const welcomeText = buildResumeBuilderWelcome(resumeExtraction, lastFinalized, resumeAnalysis);
+    const welcomeText = buildResumeBuilderWelcome(resumeExtraction, lastFinalized, resumeAnalysis, chosenTargetRole);
     // Chat-first refactor: after the welcome text (which now leads with the
     // score + tier), surface 3 quick-reply chips so the user can act in one
     // tap. Chips are derived from the analysis: top priority section gets
@@ -1853,7 +1858,8 @@ export default function Page() {
     return (
       <>
         <OnboardingFlow
-          onComplete={({ resumeText: rt, resumeFilename: rf, resumeExtraction: re, resumeAnalysis: ra, contact, careerGoal: goal }) => {
+          onComplete={({ resumeText: rt, resumeFilename: rf, resumeExtraction: re, resumeAnalysis: ra, contact, careerGoal: goal, chosenTargetRole: ctr }) => {
+            if (ctr) setChosenTargetRole(ctr);
             if (rt) { setResumeText(rt); setResumeFilename(rf ?? undefined); }
             // Merge contact fields back into the extraction so downstream consumers
             // (synthesis prompt, Drive, chat) see the user-confirmed values.

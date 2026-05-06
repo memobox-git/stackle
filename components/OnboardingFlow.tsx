@@ -67,6 +67,11 @@ type Props = {
     // typically one of the preset chips. Drives the Career Profile
     // CTA emphasis + gets injected into the synthesis system prompt.
     careerGoal?: string | null;
+    // The role the user EXPLICITLY picked at upload (e.g. "Data Engineer").
+    // Compared against analysis.seniorityEstimate so the chat welcome
+    // can flag mismatches honestly ("you picked Data Engineer but I
+    // benchmarked against Junior because of years of experience").
+    chosenTargetRole?: string | null;
   }) => void;
   // Returning user clicked "Sign in" — parent opens the AuthModal so they
   // can sign in with magic link / Google instead of redoing onboarding.
@@ -460,6 +465,9 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   function persistProfile(overrides: Partial<ContactInfo> = {}) {
     const finalContact = { ...contact, ...overrides };
     const analysisSoFar = resumeAnalysisRef.current;
+    const resolvedTarget = targetRole === "Other" && targetRoleCustom.trim()
+      ? targetRoleCustom.trim()
+      : targetRole;
     const profile = {
       avatarUrl: avatarUrl ?? undefined,
       resumeText: resumeText || undefined,
@@ -468,6 +476,13 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
       resumeExtraction: resumeExtraction ?? null,
       resumeAnalysis: analysisSoFar ?? null,
       careerGoal: careerGoal ?? null,
+      // The role the user EXPLICITLY picked at upload — separate from
+      // careerGoal (which they fill on a later step) and from the
+      // analysis's auto-detected likelyTargetRole. Surfaced in the chat
+      // welcome so we can flag when the analysis benchmark differs from
+      // what the user picked (e.g. user picked "Data Engineer" but the
+      // analysis benchmarked against "Junior Data Engineer").
+      chosenTargetRole: resolvedTarget || null,
     };
     localStorage.setItem(
       "stackle_onboarding",
