@@ -34,6 +34,14 @@ type Props = {
 };
 
 function computeScore(a: ResumeAnalysis): number {
+  // Prefer the agent-computed total — it's what the Report tab shows.
+  // Two-formulas-two-numbers across the same session is confusing
+  // ("score reveal said 55 but the report says 80, what changed?").
+  // Falls back to the legacy heuristic only for analyses that predate
+  // the structured scores schema.
+  if (a.scores && typeof a.scores.total === "number" && a.scores.total > 0) {
+    return Math.max(0, Math.min(100, Math.round(a.scores.total)));
+  }
   let score = 55;
   score += Math.min(a.strengths.length * 4, 20);
   score -= Math.min(a.weaknesses.length * 3, 15);

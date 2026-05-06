@@ -625,17 +625,17 @@ export default function Page() {
     setChatMessages(msgs);
     setActiveView(chat.mode === "resume_builder" ? "resume-builder" : "chat");
     setCareerGoal(chat.career_goal ?? null);
-    // CRITICAL: mark welcome as fired for this chat ALWAYS once we restore.
-    // If the chat row exists, this is an existing conversation — even if
-    // its messages array is currently empty, we should NOT push a fresh
-    // welcome on top because the user might be mid-flight (an in-flight
-    // persist could still be writing the first message). Marking the chat
-    // 'fired' here prevents the welcome useEffect from racing in and
-    // wiping any messages that arrive after restore.
-    welcomeFiredRef.current.add(chat.id);
-    // Also block the unauth fallback id so a transient activeChatId=null
-    // window doesn't cause the resume-builder welcome useEffect to push
-    // a welcome under "local-chat" before the real id propagates.
+    // Only block the welcome useEffect if this chat ALREADY has messages.
+    // (Earlier I always-marked here, which broke fresh chat rows: a row
+    // could exist with [] messages — common right after createChat — and
+    // the welcome useEffect would never fire. Result: blank chat panel.)
+    if (msgs.length > 0) {
+      welcomeFiredRef.current.add(chat.id);
+    }
+    // Always block the "local-chat" fallback id so a transient
+    // activeChatId=null window doesn't cause the resume-builder welcome
+    // useEffect to push a duplicate welcome under that key before the
+    // real id propagates. The real chatId path stays open above.
     welcomeFiredRef.current.add("local-chat");
 
     if (chat.mode === "resume_builder") {

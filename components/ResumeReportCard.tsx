@@ -206,7 +206,11 @@ export default function ResumeReportCard({
   const circ = 2 * Math.PI * r;
   const filled = circ * (total / 100);
 
-  const missingSignals = analysis.missingSignals ?? [];
+  // Filter empty / whitespace-only strings the model occasionally emits
+  // so the count matches what we actually render. Was: header said
+  // '8 missing signals' but only 7 pills appeared because one slot was
+  // an empty string.
+  const missingSignals = (analysis.missingSignals ?? []).filter((s) => typeof s === "string" && s.trim().length > 0);
   const positioningTone =
     missingSignals.length === 0 ? { label: "Strong match", color: "#15803d" }
     : missingSignals.length <= 2 ? { label: "Close match", color: "#b45309" }
@@ -270,12 +274,13 @@ export default function ResumeReportCard({
             aria-label="Dismiss"
             title="Dismiss"
             style={{
-              position: "absolute", top: "14px", right: "14px",
-              width: "28px", height: "28px",
-              borderRadius: "6px",
-              background: "transparent", border: "none",
-              color: "#71717a", cursor: "pointer",
+              position: "absolute", top: "12px", right: "12px",
+              width: "32px", height: "32px",
+              borderRadius: "8px",
+              background: "#ffffff", border: "1px solid #e9d5ff",
+              color: "#52525b", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
             }}
           >
             <X size={16} strokeWidth={2} />
@@ -354,6 +359,7 @@ export default function ResumeReportCard({
             </button>
             <button
               onClick={() => onFixAll?.()}
+              title="Guided step-by-step fix — the writer chains through every priority and you accept or reject each one."
               style={{
                 fontSize: "14px", fontWeight: 500,
                 padding: "9px 16px",
@@ -365,9 +371,12 @@ export default function ResumeReportCard({
                 display: "inline-flex", alignItems: "center", gap: "6px",
               }}
             >
-              Walk me through it <ArrowRight size={14} strokeWidth={2} />
+              Guide me through fixes <ArrowRight size={14} strokeWidth={2} />
             </button>
           </div>
+          <p style={{ fontSize: "12px", color: "#71717a", marginTop: "8px", marginBottom: "0" }}>
+            Step-by-step — review and accept each rewrite individually.
+          </p>
         </Card>
       )}
 
@@ -438,14 +447,24 @@ export default function ResumeReportCard({
           {subs.map((s, i) => {
             const pct = s.score / s.max;
             const c = scoreColor(pct);
+            // Tint the cell background so weak categories pop without
+            // adding extra chrome. Stronger weight on the number too.
+            const tint = pct < 0.5
+              ? { bg: "rgba(239, 68, 68, 0.06)", weight: 600 }
+              : pct < 0.75
+                ? { bg: "rgba(217, 119, 6, 0.06)", weight: 600 }
+                : { bg: "rgba(22, 163, 74, 0.04)", weight: 500 };
             return (
               <div key={s.key} style={{
                 textAlign: "center",
-                paddingLeft: i === 0 ? 0 : "12px",
-                paddingRight: i === subs.length - 1 ? 0 : "12px",
+                paddingTop: "12px",
+                paddingBottom: "12px",
+                paddingLeft: i === 0 ? "12px" : "12px",
+                paddingRight: i === subs.length - 1 ? "12px" : "12px",
+                background: tint.bg,
                 borderRight: i === subs.length - 1 ? "none" : "1px solid #f4f4f5",
               }}>
-                <div style={{ fontSize: "22px", fontWeight: 500, color: c, lineHeight: 1.1 }}>
+                <div style={{ fontSize: "22px", fontWeight: tint.weight, color: c, lineHeight: 1.1 }}>
                   {s.score}
                   <span style={{ fontSize: "13px", color: "#a1a1aa", fontWeight: 400 }}>/{s.max}</span>
                 </div>
