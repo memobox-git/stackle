@@ -159,7 +159,7 @@ Return exactly this structure:
       "score": number,
       "max": 20,
       "status": "STRONG" | "GOOD" | "REVIEW" | "WEAK",
-      "deductions": string[] (each deduction applied, e.g. "Table-formatted Skills section: -3")
+      "deductions": string[] (TIGHT one-liners, max 14 words each. Format: "Issue: -N". The UI extracts the cost. Example GOOD: "Aliased LinkedIn URL: -1". Example BAD: "Aliased LinkedIn and GitHub URLs obscure raw links and hurt ATS parsing accuracy: -1" — too long. Name the issue in 6-12 words, end with ": -N". No reasoning paragraph; the cost speaks for itself.)
     },
     "contentImpact": {
       "score": number,

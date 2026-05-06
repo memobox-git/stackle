@@ -170,6 +170,109 @@ function buildImpacts(priorities: string[], current: number, projected?: string)
   });
 }
 
+// ── Score Deductions card ─────────────────────────────────────────────────
+// Tabbed view of what's costing points per category. Replaced the prior
+// stacked-list layout that pushed the page long. Tabs stay inside one
+// card; only the active category renders below — short, scannable.
+//
+// Each deduction is a single line with a leading "– N pt" pill on the
+// left so the user can scan the cost at a glance. The full reason text
+// from the analyzer is preserved (we don't truncate the model's words),
+// but the visual chrome is minimal — no boxes, no left-border accents.
+function ScoreDeductionsCard({ scores }: { scores: ResumeAnalysis["scores"] }) {
+  const cats: { key: string; label: string; deductions: string[]; score: number; max: number }[] = [
+    { key: "ats",     label: "ATS",       deductions: scores?.atsCompatibility?.deductions ?? [],     score: scores?.atsCompatibility?.score ?? 0,    max: scores?.atsCompatibility?.max ?? 20 },
+    { key: "content", label: "Content",   deductions: scores?.contentImpact?.deductions ?? [],        score: scores?.contentImpact?.score ?? 0,        max: scores?.contentImpact?.max ?? 25 },
+    { key: "format",  label: "Format",    deductions: scores?.structureFormatting?.deductions ?? [],  score: scores?.structureFormatting?.score ?? 0,  max: scores?.structureFormatting?.max ?? 20 },
+    { key: "keyword", label: "Keywords",  deductions: scores?.keywordCoverage?.deductions ?? [],      score: scores?.keywordCoverage?.score ?? 0,      max: scores?.keywordCoverage?.max ?? 20 },
+    { key: "senior",  label: "Seniority", deductions: scores?.senioritySignal?.deductions ?? [],      score: scores?.senioritySignal?.score ?? 0,      max: scores?.senioritySignal?.max ?? 15 },
+  ].filter((c) => c.deductions.length > 0);
+
+  // Default-active tab = the category with the largest gap (max − score),
+  // so the user lands on the biggest opportunity first.
+  const [active, setActive] = useState<string>(() => {
+    if (cats.length === 0) return "";
+    const sorted = [...cats].sort((a, b) => (b.max - b.score) - (a.max - a.score));
+    return sorted[0].key;
+  });
+
+  if (cats.length === 0) return null;
+  const activeCat = cats.find((c) => c.key === active) ?? cats[0];
+
+  // Try to extract a leading "-N" point cost from the deduction string
+  // (analyzer already produces "Bullet X is task-based: -1"). We pull it
+  // out so we can render it as a pill — keeps the body clean.
+  function splitCost(d: string): { body: string; cost: string | null } {
+    const m = d.match(/^(.*?)[:\s]+-\s*(\d+(?:\.\d+)?)\s*$/);
+    if (m) return { body: m[1].trim().replace(/[:\s,–-]+$/, ""), cost: `−${m[2]}` };
+    return { body: d, cost: null };
+  }
+
+  return (
+    <Card>
+      <SectionLabel>Score Deductions</SectionLabel>
+
+      {/* Tab strip — single row, underline-active, no boxes */}
+      <div style={{ display: "flex", gap: "16px", borderBottom: "1px solid #e4e4e7", marginBottom: "14px" }}>
+        {cats.map((c) => {
+          const isActive = c.key === active;
+          const gap = c.max - c.score;
+          return (
+            <button
+              key={c.key}
+              onClick={() => setActive(c.key)}
+              style={{
+                background: "transparent",
+                border: "none",
+                padding: "0 0 8px",
+                cursor: "pointer",
+                fontSize: "13px",
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? "#18181b" : "#71717a",
+                borderBottom: isActive ? "2px solid #18181b" : "2px solid transparent",
+                marginBottom: "-1px",
+                display: "inline-flex",
+                alignItems: "baseline",
+                gap: "6px",
+              }}
+            >
+              {c.label}
+              <span style={{ fontSize: "11px", color: "#a1a1aa", fontFamily: "monospace" }}>
+                −{gap}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Active deductions — plain rows, leading −N pill, body text */}
+      <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
+        {activeCat.deductions.map((d, i) => {
+          const { body, cost } = splitCost(d);
+          return (
+            <li key={i} style={{ display: "flex", gap: "10px", alignItems: "baseline", fontSize: "13px", color: "#3f3f46", lineHeight: 1.5 }}>
+              {cost && (
+                <span style={{
+                  flexShrink: 0,
+                  fontSize: "11px",
+                  fontFamily: "monospace",
+                  fontWeight: 600,
+                  color: "#dc2626",
+                  minWidth: "32px",
+                  textAlign: "right",
+                }}>
+                  {cost}
+                </span>
+              )}
+              <span style={{ flex: 1 }}>{body}</span>
+            </li>
+          );
+        })}
+      </ul>
+    </Card>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ResumeReportCard({
@@ -795,50 +898,8 @@ export default function ResumeReportCard({
               Renders only if at least one deduction is present across
               all 5 categories. Hides empty categories so we don't show
               "ATS Compatibility (none)" — wasted space. */}
-      {(() => {
-        const cats: { label: string; deductions: string[]; score: number; max: number }[] = [
-          { label: "ATS Compatibility",      deductions: scores.atsCompatibility?.deductions ?? [],     score: scores.atsCompatibility?.score ?? 0,    max: scores.atsCompatibility?.max ?? 20 },
-          { label: "Content & Impact",       deductions: scores.contentImpact?.deductions ?? [],        score: scores.contentImpact?.score ?? 0,        max: scores.contentImpact?.max ?? 25 },
-          { label: "Structure & Formatting", deductions: scores.structureFormatting?.deductions ?? [],  score: scores.structureFormatting?.score ?? 0,  max: scores.structureFormatting?.max ?? 20 },
-          { label: "Keyword Coverage",       deductions: scores.keywordCoverage?.deductions ?? [],      score: scores.keywordCoverage?.score ?? 0,      max: scores.keywordCoverage?.max ?? 20 },
-          { label: "Seniority Signal",       deductions: scores.senioritySignal?.deductions ?? [],      score: scores.senioritySignal?.score ?? 0,      max: scores.senioritySignal?.max ?? 15 },
-        ].filter((c) => c.deductions.length > 0);
-        if (cats.length === 0) return null;
-        return (
-          <Card>
-            <SectionLabel>Score Deductions</SectionLabel>
-            <p style={{ fontSize: "13px", color: "#52525b", margin: "0 0 14px", lineHeight: 1.55 }}>
-              Why each category isn't at max. Each deduction names the specific bullet, line, or gap costing you points.
-            </p>
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              {cats.map((c) => (
-                <div key={c.label}>
-                  <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "8px" }}>
-                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#18181b" }}>{c.label}</span>
-                    <span style={{ fontSize: "12px", color: "#a1a1aa", fontFamily: "monospace" }}>{c.score}/{c.max}</span>
-                  </div>
-                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "6px" }}>
-                    {c.deductions.map((d, i) => (
-                      <li key={i} style={{
-                        fontSize: "13px",
-                        color: "#3f3f46",
-                        lineHeight: 1.55,
-                        padding: "8px 12px",
-                        background: "#fafafa",
-                        border: "1px solid #f4f4f5",
-                        borderLeft: "3px solid #ef4444",
-                        borderRadius: "6px",
-                      }}>
-                        {d}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </Card>
-        );
-      })()}
+      <ScoreDeductionsCard scores={scores} />
+
 
       {/* ── 7. SCORE PROJECTION ── mirrors the docx report's "Score
               Projection" table. Per-category headroom forecast, three
