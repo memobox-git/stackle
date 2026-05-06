@@ -380,7 +380,7 @@ export default function ResumeReportCard({
             </div>
             <div style={{ background: "#fff", border: "1px solid #ede9fe", borderRadius: "10px", padding: "12px 14px" }}>
               <div style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: "4px" }}>If you fix everything</div>
-              <div style={{ fontSize: "14px", fontWeight: 500, color: "#18181b" }}>{projectedHigh}/100</div>
+              <div style={{ fontSize: "14px", fontWeight: 500, color: "#18181b" }}>{Math.min(100, total + 8)}–{projectedHigh}/100</div>
               <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>+{projectedHigh - total} pts from {total}</div>
             </div>
           </div>
@@ -783,6 +783,62 @@ export default function ResumeReportCard({
           )}
         </Card>
       )}
+
+      {/* ── 6.5 SCORE DEDUCTIONS ── per-category breakdown of WHY each
+              sub-score isn't its max. The agent already populates
+              `scores.{category}.deductions: string[]` during analysis;
+              the docx report renders them under "Score Deductions" but
+              the in-app Report didn't until now. This is the single most
+              actionable addition — tells the user EXACTLY which bullet
+              cost them points.
+
+              Renders only if at least one deduction is present across
+              all 5 categories. Hides empty categories so we don't show
+              "ATS Compatibility (none)" — wasted space. */}
+      {(() => {
+        const cats: { label: string; deductions: string[]; score: number; max: number }[] = [
+          { label: "ATS Compatibility",      deductions: scores.atsCompatibility?.deductions ?? [],     score: scores.atsCompatibility?.score ?? 0,    max: scores.atsCompatibility?.max ?? 20 },
+          { label: "Content & Impact",       deductions: scores.contentImpact?.deductions ?? [],        score: scores.contentImpact?.score ?? 0,        max: scores.contentImpact?.max ?? 25 },
+          { label: "Structure & Formatting", deductions: scores.structureFormatting?.deductions ?? [],  score: scores.structureFormatting?.score ?? 0,  max: scores.structureFormatting?.max ?? 20 },
+          { label: "Keyword Coverage",       deductions: scores.keywordCoverage?.deductions ?? [],      score: scores.keywordCoverage?.score ?? 0,      max: scores.keywordCoverage?.max ?? 20 },
+          { label: "Seniority Signal",       deductions: scores.senioritySignal?.deductions ?? [],      score: scores.senioritySignal?.score ?? 0,      max: scores.senioritySignal?.max ?? 15 },
+        ].filter((c) => c.deductions.length > 0);
+        if (cats.length === 0) return null;
+        return (
+          <Card>
+            <SectionLabel>Score Deductions</SectionLabel>
+            <p style={{ fontSize: "13px", color: "#52525b", margin: "0 0 14px", lineHeight: 1.55 }}>
+              Why each category isn't at max. Each deduction names the specific bullet, line, or gap costing you points.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {cats.map((c) => (
+                <div key={c.label}>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: "10px", marginBottom: "8px" }}>
+                    <span style={{ fontSize: "14px", fontWeight: 600, color: "#18181b" }}>{c.label}</span>
+                    <span style={{ fontSize: "12px", color: "#a1a1aa", fontFamily: "monospace" }}>{c.score}/{c.max}</span>
+                  </div>
+                  <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: "6px" }}>
+                    {c.deductions.map((d, i) => (
+                      <li key={i} style={{
+                        fontSize: "13px",
+                        color: "#3f3f46",
+                        lineHeight: 1.55,
+                        padding: "8px 12px",
+                        background: "#fafafa",
+                        border: "1px solid #f4f4f5",
+                        borderLeft: "3px solid #ef4444",
+                        borderRadius: "6px",
+                      }}>
+                        {d}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </Card>
+        );
+      })()}
 
       {/* ── 7. SCORE PROJECTION ── mirrors the docx report's "Score
               Projection" table. Per-category headroom forecast, three
