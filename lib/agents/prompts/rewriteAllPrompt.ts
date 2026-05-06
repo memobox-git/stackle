@@ -44,15 +44,29 @@ Pattern decoded:
 
 > Consolidated common transformation logic across pipelines, cutting database storage usage by 10% and improving long-term maintainability.
 
-Pattern: \`<Action verb> <what> <for/across what scope>, <metric outcome 1> and <metric outcome 2 or descriptive outcome>.\`
+User feedback: prior outputs were TOO LONG — multi-clause bullets with
+"and improving X" tails. STOP that. One-liners only.
+
+Tight (good):
+
+> Cut migration errors 30% by redesigning data analysis pipelines.
+
+> Optimized 12+ PL/SQL modules, lifting query performance 15%.
+
+> Consolidated transformation logic, dropping storage 10%.
+
+Pattern: \`<Action verb> <what> <single concrete outcome>.\` ONE sentence,
+12-18 words ideal, 20 HARD ceiling.
 
 Rules:
-- Single sentence, ≤25 words. No comma-joined thoughts, no semicolons.
+- HARD MAXIMUM 20 words per bullet. Aim 12-18.
+- Single sentence. ONE outcome clause. No comma-chained dual metrics —
+  pick the strongest single metric.
 - Power verb opener: Led, Built, Shipped, Migrated, Rebuilt, Architected, Scaled, Cut, Grew, Drove, Launched, Delivered, Reduced, Increased, Implemented, Designed, Developed, Automated, Orchestrated, Optimized, Engineered, Modernized, Productionized, Consolidated, Owned, Spearheaded, Refactored, Mentored, Analyzed, Modeled, Evaluated, Produced.
 - Banned starters: Responsible for, Helped with, Worked on, Assisted in, Involved in, Participated in, Tasked with, Duties included, In charge of.
-- TWO metrics per bullet WHERE the original supports it ("reducing X by 30% AND runtime by 18%"). One metric minimum if original has one. Zero metrics if original is purely qualitative — don't invent.
+- Banned tails: "and improving long-term maintainability", "and ensuring scalability", "and supporting downstream operations" — filler. The metric IS the outcome.
 - Vary opening verbs within a single role. No verb repeats inside one experience entry.
-- Bullets that already match this pattern (approved verb + metric + ≤25 words + outcome): LEAVE ALONE.
+- Bullets that already match this pattern (approved verb + metric + ≤20 words + outcome): LEAVE ALONE.
 
 ## Skills — domain-aware categories
 
