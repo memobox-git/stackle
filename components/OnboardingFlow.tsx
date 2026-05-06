@@ -114,6 +114,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   ] as const;
   const [targetRole, setTargetRole] = useState<string>("Data Engineer");
   const [targetRoleCustom, setTargetRoleCustom] = useState<string>("");
+  const [roleAutoDetected, setRoleAutoDetected] = useState<boolean>(false);
   const [jobDescription, setJobDescription] = useState<string>("");
   const [showJdField, setShowJdField] = useState<boolean>(false);
 
@@ -270,13 +271,70 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
       formData.append("file", file);
       const res = await fetch("/api/parse-file", { method: "POST", body: formData });
       const data = await res.json();
-      setResumeText(data.text ?? "");
+      const text = data.text ?? "";
+      setResumeText(text);
       setResumeFilename(file.name);
+      // Quick keyword sniff to pre-fill the target role dropdown so the user
+      // doesn't have to think. If the resume strongly matches one of our
+      // ROLE_OPTIONS, default to that. Confidence is fuzzy — if no clear
+      // signal, leave the existing "Data Engineer" default.
+      const detected = inferRoleFromText(text);
+      if (detected) {
+        setTargetRole(detected);
+        setRoleAutoDetected(true);
+      }
     } catch {
       setResumeFilename(file.name);
     } finally {
       setUploading(false);
     }
+  }
+
+  // Pretty-print the uploaded filename so the success row reads cleanly:
+  //   OWAISJAFERAPPLERESUME#1 (1).pdf  →  Owaisjafer Apple Resume.pdf
+  // Strips hash signs, parenthetical version markers, double-spaces; runs
+  // a basic title-case pass on each whitespace-separated word.
+  function prettifyFilename(raw: string): string {
+    if (!raw) return raw;
+    const dot = raw.lastIndexOf(".");
+    const base = dot > 0 ? raw.slice(0, dot) : raw;
+    const ext = dot > 0 ? raw.slice(dot) : "";
+    const cleaned = base
+      .replace(/#\d+/g, " ")        // strip "#1" / "#23"
+      .replace(/\([^)]*\)/g, " ")    // strip "(1)" / "(final)"
+      .replace(/[_\-]+/g, " ")       // underscores / hyphens → spaces
+      .replace(/\s+/g, " ")
+      .trim();
+    // Title-case if ALL CAPS or all lower; preserve mixed-case the user
+    // intentionally wrote.
+    const looksFlat = cleaned === cleaned.toUpperCase() || cleaned === cleaned.toLowerCase();
+    const titled = looksFlat
+      ? cleaned.toLowerCase().replace(/\b[a-z]/g, (c) => c.toUpperCase())
+      : cleaned;
+    return titled + ext;
+  }
+
+  // Heuristic role inference. Returns one of ROLE_OPTIONS or null. Order
+  // matters — we check the most-specific patterns first so "Senior Data
+  // Engineer" wins over plain "Data Engineer".
+  function inferRoleFromText(text: string): string | null {
+    if (!text) return null;
+    const t = text.toLowerCase();
+    // Look only at the first ~3000 chars (header + summary + most recent
+    // job title) — most resumes lead with the candidate's positioning.
+    const head = t.slice(0, 3000);
+    const has = (...phrases: string[]) => phrases.some((p) => head.includes(p));
+
+    if (has("lead data engineer", "staff data engineer", "principal data engineer")) return "Lead / Staff Data Engineer";
+    if (has("senior data engineer", "sr. data engineer", "sr data engineer")) return "Senior Data Engineer";
+    if (has("analytics engineer")) return "Analytics Engineer";
+    if (has("ml engineer", "machine learning engineer")) return "ML Engineer";
+    if (has("data scientist")) return "Data Scientist";
+    if (has("data analyst")) return "Data Analyst";
+    if (has("bi developer", "business intelligence developer", "bi engineer")) return "BI Developer";
+    if (has("data engineer")) return "Data Engineer";
+    if (has("software engineer", "swe", "backend engineer", "full stack engineer", "frontend engineer")) return "Software Engineer";
+    return null;
   }
 
   async function handleResumeConfirm() {
@@ -663,17 +721,34 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
 
             {resumeFilename ? (
               <div className="flex flex-col gap-3 w-full">
+                {/* Stepper — Upload ✓ / Configure (active) / Analyze / Report */}
+                <div className="flex items-center gap-2 mb-1 text-[10px] font-medium tracking-[0.05em] uppercase">
+                  <Step label="Upload" state="done" />
+                  <StepDivider />
+                  <Step label="Configure" state="active" />
+                  <StepDivider />
+                  <Step label="Analyze" state="idle" />
+                  <StepDivider />
+                  <Step label="Report" state="idle" />
+                </div>
+
+                {/* Clean filename — strip junk, title-case, show check */}
                 <div className="px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm text-emerald-700 flex items-center gap-2.5 shadow-[0_2px_8px_-4px_rgba(16,185,129,0.25)]">
                   <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">✓</span>
-                  <span className="truncate"><strong className="font-semibold">{resumeFilename}</strong> — ready</span>
+                  <span className="truncate"><strong className="font-semibold">{prettifyFilename(resumeFilename)}</strong> — ready to analyze</span>
                 </div>
 
                 {/* Target role */}
                 <div className="flex flex-col gap-1.5 mt-2">
-                  <label className="text-xs font-medium text-gray-600">Target role</label>
+                  <label className="text-xs font-medium text-gray-600 flex items-center justify-between">
+                    <span>Target role</span>
+                    {roleAutoDetected && targetRole !== "Other" && (
+                      <span className="text-[10px] font-normal text-emerald-600">detected from your resume</span>
+                    )}
+                  </label>
                   <select
                     value={targetRole}
-                    onChange={(e) => setTargetRole(e.target.value)}
+                    onChange={(e) => { setTargetRole(e.target.value); setRoleAutoDetected(false); }}
                     disabled={extracting}
                     className="w-full px-3 py-2.5 rounded-xl border border-gray-200 bg-white text-sm text-gray-900 outline-none focus:border-gray-400 transition-colors"
                   >
@@ -693,18 +768,27 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                   )}
                 </div>
 
-                {/* Optional JD */}
+                {/* Optional JD — proper expandable button */}
                 {!showJdField ? (
                   <button
                     type="button"
                     onClick={() => setShowJdField(true)}
-                    className="text-xs text-gray-500 hover:text-gray-800 transition-colors text-left mt-1"
+                    className="w-full px-3 py-2.5 rounded-xl border border-dashed border-gray-300 bg-white text-sm text-gray-600 hover:text-gray-900 hover:border-gray-400 transition-colors text-left flex items-center gap-2"
                   >
-                    + Paste a job description (optional)
+                    <span className="text-base">+</span> Add job description (optional)
                   </button>
                 ) : (
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-gray-600">Job description (optional)</label>
+                    <label className="text-xs font-medium text-gray-600 flex items-center justify-between">
+                      <span>Job description (optional)</span>
+                      <button
+                        type="button"
+                        onClick={() => { setShowJdField(false); setJobDescription(""); }}
+                        className="text-[10px] text-gray-400 hover:text-gray-700"
+                      >
+                        Remove
+                      </button>
+                    </label>
                     <textarea
                       value={jobDescription}
                       onChange={(e) => setJobDescription(e.target.value)}
@@ -717,25 +801,30 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                 )}
 
                 {step === 2 && (
-                  <button onClick={handleResumeConfirm} disabled={uploading || extracting || (targetRole === "Other" && !targetRoleCustom.trim())}
-                    className={`w-full py-3 rounded-xl text-white text-sm font-semibold transition-all disabled:cursor-not-allowed shadow-md hover:shadow-lg relative overflow-hidden ${
-                      extracting
-                        ? "bg-gray-900"
-                        : "bg-gray-900 hover:bg-black active:scale-[0.99]"
-                    }`}
-                  >
-                    {extracting && (
-                      <span
-                        aria-hidden
-                        className="absolute inset-0 -translate-x-full"
-                        style={{
-                          background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
-                          animation: "shimmer 1.4s ease-in-out infinite",
-                        }}
-                      />
-                    )}
-                    <span className="relative">{extracting ? "Analyzing your resume…" : "Analyze My Resume"}</span>
-                  </button>
+                  <>
+                    <button onClick={handleResumeConfirm} disabled={uploading || extracting || (targetRole === "Other" && !targetRoleCustom.trim())}
+                      className={`w-full py-3 rounded-xl text-white text-sm font-semibold transition-all disabled:cursor-not-allowed shadow-md hover:shadow-lg relative overflow-hidden ${
+                        extracting
+                          ? "bg-gray-900"
+                          : "bg-gray-900 hover:bg-black active:scale-[0.99]"
+                      }`}
+                    >
+                      {extracting && (
+                        <span
+                          aria-hidden
+                          className="absolute inset-0 -translate-x-full"
+                          style={{
+                            background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
+                            animation: "shimmer 1.4s ease-in-out infinite",
+                          }}
+                        />
+                      )}
+                      <span className="relative">{extracting ? "Analyzing your resume…" : "Analyze My Resume"}</span>
+                    </button>
+                    <p className="text-[12px] text-gray-500 text-center leading-relaxed mt-1">
+                      Takes about 30 seconds. We&apos;ll score your resume across 5 dimensions and give you a complete action plan.
+                    </p>
+                  </>
                 )}
               </div>
             ) : (
@@ -943,4 +1032,27 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
       `}</style>
     </div>
   );
+}
+
+// ── Stepper helpers ────────────────────────────────────────────────────────
+// Tiny inline components used on the upload-ready row.
+function Step({ label, state }: { label: string; state: "done" | "active" | "idle" }) {
+  const palette = state === "done"
+    ? { dot: "#10b981", text: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" }
+    : state === "active"
+      ? { dot: "#18181b", text: "text-gray-900", bg: "bg-gray-100 border-gray-300" }
+      : { dot: "#d4d4d8", text: "text-gray-400", bg: "bg-transparent border-transparent" };
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border ${palette.bg} ${palette.text}`}>
+      {state === "done" ? (
+        <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold flex items-center justify-center">✓</span>
+      ) : (
+        <span className="w-3.5 h-3.5 rounded-full" style={{ background: palette.dot }} />
+      )}
+      {label}
+    </span>
+  );
+}
+function StepDivider() {
+  return <span className="flex-1 h-px bg-gray-200" />;
 }
