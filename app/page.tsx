@@ -478,9 +478,29 @@ export default function Page() {
     )[0];
     const lastFinalized = latestFinal ? { displayName: latestFinal.display_name } : null;
     const welcomeText = buildResumeBuilderWelcome(resumeExtraction, lastFinalized, resumeAnalysis);
+    // Chat-first refactor: after the welcome text (which now leads with the
+    // score + tier), surface 3 quick-reply chips so the user can act in one
+    // tap. Chips are derived from the analysis: top priority section gets
+    // the "Fix the X" chip, score becomes the "Why is my score X?" chip.
+    // Falls back to a generic chip set when analysis is missing.
+    const chipLine = (() => {
+      const analysis = resumeAnalysis;
+      if (!analysis) return "__INLINE_CHIPS__:Walk me through the report|What's my biggest weakness?";
+      const score = analysis.scores && typeof analysis.scores.total === "number" && analysis.scores.total > 0
+        ? Math.round(Math.max(0, Math.min(100, analysis.scores.total)))
+        : null;
+      const top = analysis.rewritePriorities?.[0] ?? "";
+      const sectionLabel = /summary|profile|objective|headline|intro/i.test(top) ? "summary"
+        : /skills?|keyword|stack|tools|tech list/i.test(top) ? "skills"
+        : /bullet|impact|metric|quantif/i.test(top) ? "bullets"
+        : null;
+      const fixChip = sectionLabel ? `Fix the ${sectionLabel}` : "Apply all fixes";
+      const whyChip = score !== null ? `Why is my score ${score}?` : "Why this score?";
+      return `__INLINE_CHIPS__:${fixChip}|Show me the report|${whyChip}`;
+    })();
     const welcomeMsgs: ChatMessage[] = [
       { role: "assistant", content: welcomeText, timestamp: now() },
-      { role: "assistant", content: "__RESUME_WELCOME_CARD__" },
+      { role: "assistant", content: chipLine },
     ];
     setChatMessages(welcomeMsgs);
 

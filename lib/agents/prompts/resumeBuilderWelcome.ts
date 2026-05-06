@@ -35,10 +35,15 @@ export function buildResumeBuilderWelcome(
   }
 
   const score = computeScore(analysis);
+  const tier = tierLabel(score);
   const strongestSignal = pickStrongestSignal(ext);
   const biggestWinPointer = pickBiggestWinPointer(analysis, ext);
 
-  const para1 = `Hey ${firstName} — your report's ready on the right.`;
+  // Chat-first refactor: para 1 leads with the score + tier so the chat
+  // narrates the aha moment the user is simultaneously seeing in the
+  // Report tab on the right. No more dedicated full-screen reveal — this
+  // line IS the score reveal in conversation form.
+  const para1 = `Hey ${firstName}. You scored ${score}/100 — ${tier}.`;
 
   const quickReadParts = [`Quick read: you scored ${score}/100.`];
   if (strongestSignal) quickReadParts.push(strongestSignal);
@@ -80,6 +85,17 @@ function articleFor(phrase: string): string {
   if (consonantSoundAcronyms.some((a) => upper.startsWith(a))) return "a";
   if (vowelSoundAcronyms.some((a) => upper.startsWith(a))) return "an";
   return /^[aeiou]/i.test(word) ? "an" : "a";
+}
+
+// Buckets the numeric score into a human-readable tier. Matches the labels
+// ScoreReveal.tsx used in its scoreLabel() helper. Used by para 1 of the
+// welcome ("You scored 58/100 — Mixed.") so the chat narrates the same
+// framing the user sees in the Report panel hero.
+function tierLabel(score: number): string {
+  if (score >= 85) return "Strong";
+  if (score >= 70) return "Solid";
+  if (score >= 50) return "Mixed";
+  return "Needs work";
 }
 
 // ── Score (mirrors components/ScoreReveal.tsx + ResumeBuilder.tsx deriveScore)

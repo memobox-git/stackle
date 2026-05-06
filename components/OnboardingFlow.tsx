@@ -155,6 +155,23 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [step, fieldsReady]);
 
+  // Chat-first auto-advance: the moment analysis lands while the user is on
+  // the analyzing screen (step === 3), persist their profile and call
+  // onComplete to drop them into Resume Builder. The score-reveal "aha"
+  // now happens via the Report tab + chat welcome — not as a dedicated
+  // takeover screen. Without this effect the user would sit on the
+  // analyzing progress bar forever after analysis returns.
+  const autoAdvancedRef = useRef(false);
+  useEffect(() => {
+    if (step !== 3) return;
+    if (autoAdvancedRef.current) return;
+    if (!resumeAnalysisState) return;
+    autoAdvancedRef.current = true;
+    const profile = persistProfile();
+    onComplete(profile);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, resumeAnalysisState]);
+
   function handleAvatarChange(file: File) {
     // New file picked — revoke the old raw URL if any, reset framing
     if (rawAvatarUrl) URL.revokeObjectURL(rawAvatarUrl);
@@ -472,33 +489,33 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   // Step indicator — labelled dots at the top.
   const STEP_LABELS = ["Photo", "Resume", "Goal", "Confirm"] as const;
 
-  // Score reveal — full-screen takeover the moment extraction is done.
-  // Skips Career Goal + Contact review entirely; CTA drops user straight
-  // into Resume Builder Report tab. This is the wow moment.
+  // Step 3: chat-first refactor.
+  // Render the analyzing screen (rotating progress messages) while analysis
+  // is in flight, then auto-advance to Resume Builder the instant analysis
+  // lands. The "aha moment" — score circle, sub-scores, strengths/weaknesses,
+  // role match — now lives in the Report tab card on the right panel, while
+  // the chat narrates the moment via the personalised welcome + chips.
+  // No more dedicated full-screen reveal takeover.
   if (step === 3) {
     const firstName = (resumeExtraction?.name ?? "").trim().split(/\s+/)[0] || null;
-    // Most-recent real-employer role label, used to personalise the loading
-    // sequence ("You're a Senior Data Engineer with 8 years…"). Falls back
-    // to the very first experience entry if no real-employer detection
-    // applies (skip-list elsewhere is in resumeBuilderWelcome.ts; we use
-    // the simpler experience[0] here since we just want SOMETHING).
     const extractedRole = (resumeExtraction?.experience?.[0]?.title ?? "").trim() || null;
     const years = resumeExtraction?.totalYearsExperience ?? null;
-    // The user's chosen target from the upload step (resolves "Other" too).
     const resolvedTargetRole = targetRole === "Other" && targetRoleCustom.trim()
       ? targetRoleCustom.trim()
       : targetRole;
+    // ScoreReveal still renders here, but it never shows the reveal state.
+    // Its `onContinue` is wired to a no-op — the auto-advance useEffect
+    // below fires the moment analysis lands, before the user can click
+    // anything. We keep the component mounted purely for its loading-state
+    // UI (animated progress bar + rotating "Reading your resume..." copy).
     return (
       <ScoreReveal
-        analysis={resumeAnalysisState ?? resumeAnalysisRef.current}
+        analysis={null}
         candidateFirstName={firstName}
         extractedRole={extractedRole}
         years={years}
         targetRole={resolvedTargetRole}
-        onContinue={() => {
-          const profile = persistProfile();
-          onComplete(profile);
-        }}
+        onContinue={() => { /* no-op — auto-advance handles it */ }}
       />
     );
   }

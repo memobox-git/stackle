@@ -17,7 +17,7 @@
  * heavy divider lines. Spacing and value-contrast define sections instead.
  */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, ArrowRight } from "lucide-react";
 import { ResumeAnalysis, ScoreCategory } from "@/lib/agents/schemas/resumeIntelligence";
 
@@ -204,7 +204,32 @@ export default function ResumeReportCard({
   // Score circle geometry
   const r = 48;
   const circ = 2 * Math.PI * r;
-  const filled = circ * (total / 100);
+
+  // Chat-first refactor: the score circle now animates 0 → total over 1.6s
+  // on first mount per analysis. This is the visual aha moment that used
+  // to live in the dedicated ScoreReveal full-screen takeover. Same
+  // requestAnimationFrame ease-out pattern. Gated by hasAnimatedRef +
+  // analysis identity so it doesn't re-fire on every re-render but DOES
+  // re-fire if the analysis swaps (re-analyze flow).
+  const [displayedScore, setDisplayedScore] = useState(0);
+  const hasAnimatedRef = useRef<unknown>(null);
+  useEffect(() => {
+    // Re-animate when the analysis object reference changes.
+    if (hasAnimatedRef.current === analysis) return;
+    hasAnimatedRef.current = analysis;
+    const start = performance.now();
+    const duration = 1600;
+    let raf = 0;
+    const tick = (nowMs: number) => {
+      const t = Math.min(1, (nowMs - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplayedScore(Math.round(eased * total));
+      if (t < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [analysis, total]);
+  const filled = circ * (displayedScore / 100);
 
   // Filter empty / whitespace-only strings the model occasionally emits
   // so the count matches what we actually render. Was: header said
@@ -421,7 +446,7 @@ export default function ResumeReportCard({
               display: "flex", flexDirection: "column",
               alignItems: "center", justifyContent: "center",
             }}>
-              <span style={{ fontSize: "32px", fontWeight: 500, color: tier.color, lineHeight: 1 }}>{total}</span>
+              <span style={{ fontSize: "32px", fontWeight: 500, color: tier.color, lineHeight: 1 }}>{displayedScore}</span>
               <span style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>/100</span>
             </div>
           </div>
