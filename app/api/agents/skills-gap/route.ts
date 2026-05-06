@@ -15,11 +15,30 @@ Given a candidate's FULL resume text, their currently-listed skills, and their t
 STEP 1 — SKILL SWEEP:
 Read the entire resume text — bullets, project descriptions, titles, summary. List every technical skill, tool, framework, language, platform, database, cloud service, library, or technique that is EXPLICITLY mentioned. Technical only — NO soft skills, NO methodologies like "Agile" unless it's clearly a tooling claim ("Agile/Scrum" doesn't count; "Jira" does). Include the skills already in the candidate's skill groups. Deduplicate case-insensitively (e.g. "python" and "Python" are one).
 
-STEP 2 — CATEGORISE:
-Group the sweep results into tight recruiter-legible categories, 3-8 skills per group. Prefer canonical labels: Languages, Frameworks & Libraries, Data & Databases, Cloud & Infra, ML / AI, Frontend, Testing & Quality, Observability, Tools. Merge groups smaller than 3 items into a neighbouring category. NEVER output a "Misc" / "Other" bucket. If a skill genuinely doesn't fit, drop it rather than dumping it.
+STEP 2 — CATEGORISE (STRICT 8-CATEGORY TAXONOMY):
+Group the sweep results into EXACTLY these 8 canonical categories. NEVER invent new ones. NEVER use generic labels like "Tools", "Misc", "Other".
+
+The 8 categories and what belongs in each:
+
+1. Languages — programming languages ONLY (Python, SQL, PL/SQL, Java, Scala, Go, TypeScript, R, Bash). Data formats like JSON/XML/YAML do NOT belong here — drop them.
+2. Data Processing & ETL — Spark, PySpark, Spark SQL, Hadoop, Kafka, Airflow, Prefect, Dagster, dbt (when used as transformation), Pandas, NumPy (as data lib), Beam, Flink, ETL/ELT pipelines, Batch & Streaming Processing, SQL*Loader, Informatica, Talend.
+3. Cloud — AWS, Azure, GCP, S3, EC2, Lambda, Glue, EMR, Azure Data Factory, BigQuery (the platform service), GCS, Cloud Run, Cloud Functions.
+4. Data Warehousing — actual warehouse/lakehouse PRODUCTS only: Snowflake, BigQuery (when listed as warehouse), Redshift, Databricks, Synapse, Teradata, Vertica, ClickHouse, Iceberg, Delta Lake. NEVER concepts like "Distributed Systems" or "Big Data Architecture" — drop those entirely.
+5. Visualization & BI — Tableau, Power BI, Looker, Mode, Metabase, Superset, Matplotlib, Seaborn, Plotly, D3.js.
+6. CI/CD & DevOps — Jenkins, GitHub Actions, GitLab CI, Docker, Kubernetes, Terraform, Helm, Git, GitHub, Linux, Bash scripting, REST APIs (as integration tooling), Postman, VS Code.
+7. Data Quality & Observability — ONLY data-quality / monitoring tools: Great Expectations, Soda, Monte Carlo, dbt tests, Datafold, Pipeline monitoring, Prometheus (when used for data), Grafana, DataDog (data context). If the candidate has none of these, return an empty skills array for this category and the UI will hide it.
+8. ML & Analytics — scikit-learn, TensorFlow, PyTorch, XGBoost, LightGBM, MLflow, NumPy (when ML), HuggingFace, LangChain, statsmodels, SciPy.
+
+Hard rules:
+- A skill must appear in EXACTLY ONE category. If you're tempted to put it in two, pick the more specific one.
+- Pandas/NumPy → Data Processing & ETL (NOT Data Quality).
+- REST APIs → CI/CD & DevOps.
+- JSON/XML/YAML → drop entirely (data formats, not skills).
+- Distributed Systems / Big Data Architecture → drop (concepts, not products).
+- Output ALL 8 categories in the recategorizedGroups array, in the order above. Empty categories return { category: "...", skills: [] } so the UI can hide them. NEVER skip a category from the array.
 
 STEP 3 — MISSING:
-For the target role, add 3-6 high-priority skills the candidate is missing. Only suggest skills appropriate to their seniority. Never suggest soft skills. Never suggest anything already in the sweep (step 1 output), even under a different name. One tight reason line per suggestion.
+For the target role, add 8-12 high-priority skills the candidate is missing. Cover the gap across multiple categories — don't just suggest 12 ML tools if they're missing cloud + warehouse too. Only suggest skills appropriate to their seniority. Never suggest soft skills. Never suggest anything already in the sweep (step 1 output), even under a different name (case-insensitive match: "Apache Airflow" and "Airflow" are duplicates — drop the suggestion). One tight reason line per suggestion.
 
 OUTPUT FORMAT — valid JSON only, no markdown fences:
 {
@@ -83,7 +102,7 @@ Return the JSON described. Do the sweep, categorise, and list missing.`;
 
     const msg = await client.messages.create({
       model: "claude-sonnet-4-5",
-      max_tokens: 2000,
+      max_tokens: 3000,
       system: SYSTEM_PROMPT,
       messages: [{ role: "user", content: userMessage }],
     });

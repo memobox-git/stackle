@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { deriveScoreFromAnalysis } from "@/lib/score";
 import { X, ChevronLeft, ChevronDown, FileText, ClipboardList, Pencil, Download, Link2, Share2, Check, Mail, Target, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import ChatWindow from "@/components/ChatWindow";
@@ -1097,9 +1098,37 @@ export default function ResumeBuilder({
     setDismissedSuggestions((prev) => new Set([...prev, skill.toLowerCase()]));
   }, []);
 
-  const visibleSuggestions = (skillsGap?.missing ?? []).filter(
-    (s) => !dismissedSuggestions.has(s.skill.toLowerCase())
-  );
+  // Build a case-insensitive set of skills already on the resume, including
+  // common variants ("Apache Airflow" ↔ "Airflow", "AWS S3" ↔ "S3"). The
+  // skills-gap model occasionally suggests a skill that's already present
+  // under a slightly different name; we filter those out client-side as a
+  // safety net on top of the prompt-side rule.
+  const existingSkillsLC = useMemo(() => {
+    const set = new Set<string>();
+    const ext = editedExtraction ?? resumeExtraction;
+    for (const g of ext?.skillGroups ?? []) {
+      for (const s of g.skills ?? []) {
+        const lc = s.toLowerCase().trim();
+        if (!lc) continue;
+        set.add(lc);
+        // Strip common prefixes for variant matching
+        set.add(lc.replace(/^apache\s+/, ""));
+        set.add(lc.replace(/^aws\s+/, ""));
+        set.add(lc.replace(/^google\s+cloud\s+/, ""));
+        set.add(lc.replace(/^microsoft\s+/, ""));
+      }
+    }
+    return set;
+  }, [editedExtraction, resumeExtraction]);
+
+  const visibleSuggestions = (skillsGap?.missing ?? []).filter((s) => {
+    const lc = s.skill.toLowerCase().trim();
+    if (dismissedSuggestions.has(lc)) return false;
+    if (existingSkillsLC.has(lc)) return false;
+    if (existingSkillsLC.has(lc.replace(/^apache\s+/, ""))) return false;
+    if (existingSkillsLC.has(lc.replace(/^aws\s+/, ""))) return false;
+    return true;
+  });
 
   // Fix All kicks off the first pending fix. Auto-advance chains through the
   // rest — each one shows its own typewriter + ✓/✗ so the user approves each
@@ -1342,26 +1371,9 @@ export default function ResumeBuilder({
   const [jdMatchOpen, setJdMatchOpen] = useState(false);
   const reportRef = useRef<HTMLDivElement>(null);
 
-  function deriveScore(a: typeof resumeAnalysis): number {
-    if (!a) return 0;
-    // Prefer the agent-computed total (same source the Report tab uses)
-    // so Score Reveal / Report / Edit-tab banner all show the same number.
-    // Fall back to the legacy heuristic only for analyses that predate
-    // the structured scores schema.
-    if (a.scores && typeof a.scores.total === "number" && a.scores.total > 0) {
-      return Math.max(0, Math.min(100, Math.round(a.scores.total)));
-    }
-    let score = 55;
-    score += Math.min(a.strengths.length * 4, 20);
-    score -= Math.min(a.weaknesses.length * 3, 15);
-    score -= Math.min(a.keywordGaps.length * 1.5, 10);
-    if (a.atsHeuristics.formattingRisk === "low") score += 5;
-    if (a.atsHeuristics.formattingRisk === "high") score -= 5;
-    if (a.atsHeuristics.scanabilityRisk === "low") score += 5;
-    if (a.atsHeuristics.scanabilityRisk === "high") score -= 5;
-    score -= Math.min(a.weakBullets.length, 5);
-    return Math.max(20, Math.min(100, Math.round(score)));
-  }
+  // Single source of truth — see lib/score.ts. Removes the per-component
+  // heuristic that diverged between Edit / Rewrite / Welcome / Report.
+  const deriveScore = deriveScoreFromAnalysis;
 
   async function handleDownloadDocx() {
     if (!resumeAnalysis || isDownloadingDocx) return;
@@ -1585,8 +1597,11 @@ export default function ResumeBuilder({
     setClosedTabs(new Set());
   }
 
-  // Score for Edit tab banner — uses existing deriveScore function above
-  const baseScore = deriveScore(resumeAnalysis);
+  // Score for Edit tab banner — derives from effectiveAnalysis (post-accepted
+  // priorities) so Edit / Report / Rewrite all show the same current number
+  // for the same analysis run. Welcome chat message is frozen at first-fire
+  // (historical, expected) — every other live surface tracks effectiveAnalysis.
+  const baseScore = deriveScore(effectiveAnalysis);
   const currentEditScore = Math.min(100, baseScore + Math.min(editHistory.length * 3, 15));
 
   const hasPanelContent = !!resumeExtraction;
@@ -1596,7 +1611,10 @@ export default function ResumeBuilder({
     <div
       className={`flex flex-col min-h-0 rb-chat-panel ${isPanelOpen ? "rb-chat-panel-open" : ""} ${mobileView === "panel" ? "hidden md:flex" : "flex"}`}
       style={{
-        width: isPanelOpen ? "35%" : "100%",
+        // Chat-first: chat is the primary interface. 50/50 split with the
+        // workspace when a panel is open, full-width when nothing on the
+        // right. Was 35/65 — felt like a sidebar.
+        width: isPanelOpen ? "50%" : "100%",
         transition: "width 300ms ease",
         minWidth: 0,
       }}
@@ -1912,7 +1930,8 @@ export default function ResumeBuilder({
       className={`flex-col min-h-0 bg-white overflow-hidden rb-workspace-panel ${isPanelOpen ? "rb-workspace-panel-open" : ""}
         ${mobileView === "panel" ? "flex flex-1" : "hidden md:flex"}`}
       style={{
-        width: isPanelOpen ? "65%" : "0",
+        // Chat-first: 50/50 split when open. Was 65 — felt panel-first.
+        width: isPanelOpen ? "50%" : "0",
         minWidth: isPanelOpen ? "0" : "0",
         transition: "width 300ms ease",
         flexShrink: 0,
@@ -2344,7 +2363,7 @@ export default function ResumeBuilder({
             {activeTab === "rewrite" && resumeAnalysis && resumeExtraction && (
               <RewriteTab
                 extraction={editedExtraction ?? resumeExtraction}
-                analysis={resumeAnalysis}
+                analysis={effectiveAnalysis}
                 targetRole={resumeAnalysis.likelyTargetRole ?? "your target role"}
                 jobDescription={null}
                 acceptedFixCount={acceptedIndices.size}
@@ -2398,10 +2417,10 @@ export default function ResumeBuilder({
           .rb-chat-panel { width: 100% !important; }
           .rb-workspace-panel { width: 100% !important; }
         }
-        /* Tablet (iPad): slightly wider chat column */
+        /* Tablet (iPad): chat-first 50/50 split */
         @media (min-width: 768px) and (max-width: 1199px) {
-          .rb-chat-panel-open { width: 35% !important; }
-          .rb-workspace-panel-open { width: 65% !important; }
+          .rb-chat-panel-open { width: 50% !important; }
+          .rb-workspace-panel-open { width: 50% !important; }
         }
       `}</style>
 

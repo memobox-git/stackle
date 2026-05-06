@@ -1,6 +1,6 @@
 import { ResumeExtraction } from "../schemas/resumeExtraction";
 import { ResumeAnalysis } from "../schemas/resumeIntelligence";
-import { tierLabel } from "@/lib/score";
+import { tierLabel, deriveScoreFromAnalysis } from "@/lib/score";
 
 /**
  * Build the opening assistant message for the Resume Builder chat panel.
@@ -137,23 +137,10 @@ function buildSeniorityNote(a: ResumeAnalysis | null | undefined, chosenTargetRo
   return "";
 }
 
-// ── Score (mirrors components/ScoreReveal.tsx + ResumeBuilder.tsx deriveScore)
+// ── Score (delegates to lib/score.ts so welcome / Report / Edit / Rewrite
+//    never disagree on the same analysis)
 function computeScore(a: ResumeAnalysis): number {
-  // Same fix as ScoreReveal — prefer the agent-computed total when present
-  // so the welcome's score matches what the user just saw on the reveal.
-  if (a.scores && typeof a.scores.total === "number" && a.scores.total > 0) {
-    return Math.max(0, Math.min(100, Math.round(a.scores.total)));
-  }
-  let score = 55;
-  score += Math.min(a.strengths.length * 4, 20);
-  score -= Math.min(a.weaknesses.length * 3, 15);
-  score -= Math.min(a.keywordGaps.length * 1.5, 10);
-  if (a.atsHeuristics?.formattingRisk === "low") score += 5;
-  if (a.atsHeuristics?.formattingRisk === "high") score -= 5;
-  if (a.atsHeuristics?.scanabilityRisk === "low") score += 5;
-  if (a.atsHeuristics?.scanabilityRisk === "high") score -= 5;
-  score -= Math.min((a.weakBullets ?? []).length, 5);
-  return Math.max(20, Math.min(100, Math.round(score)));
+  return deriveScoreFromAnalysis(a);
 }
 
 // ── Strongest-signal sentence

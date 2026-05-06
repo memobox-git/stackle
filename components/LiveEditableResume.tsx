@@ -771,7 +771,7 @@ export default function LiveEditableResume({
         <Section title="Skills">
           <EditableSection sectionKey="skillGroups" {...sharedProps}>
             <div>
-              {(extraction.skillGroups ?? []).map((group, i) => (
+              {(extraction.skillGroups ?? []).filter((group) => (group.skills ?? []).length > 0).map((group, i) => (
                 <div key={i} style={{ marginBottom: "8px", fontSize: "12.5px" }}>
                   <span style={{ fontWeight: "700", color: "#000", marginRight: "6px" }}>
                     {group.category}:

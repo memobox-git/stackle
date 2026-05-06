@@ -42,24 +42,11 @@ const PROGRESS_STEPS = [
   "Final polish…",
 ];
 
+// Score derivation imported from lib/score.ts so Welcome / Report / Edit
+// / Rewrite never disagree on the same analysis.
+import { deriveScoreFromAnalysis } from "@/lib/score";
 function deriveScore(a: ResumeAnalysis | null): number {
-  if (!a) return 60;
-  // Prefer the agent-computed total — same source ScoreReveal /
-  // Report / Edit-tab use, so all four screens read the same number
-  // for the same analysis run.
-  if (a.scores && typeof a.scores.total === "number" && a.scores.total > 0) {
-    return Math.max(0, Math.min(100, Math.round(a.scores.total)));
-  }
-  let score = 55;
-  score += Math.min(a.strengths.length * 4, 20);
-  score -= Math.min(a.weaknesses.length * 3, 15);
-  score -= Math.min(a.keywordGaps.length * 1.5, 10);
-  if (a.atsHeuristics?.formattingRisk === "low") score += 5;
-  if (a.atsHeuristics?.formattingRisk === "high") score -= 5;
-  if (a.atsHeuristics?.scanabilityRisk === "low") score += 5;
-  if (a.atsHeuristics?.scanabilityRisk === "high") score -= 5;
-  score -= Math.min((a.weakBullets ?? []).length, 5);
-  return Math.max(20, Math.min(100, Math.round(score)));
+  return deriveScoreFromAnalysis(a) || 60;
 }
 
 // Group the priority list into a human-readable change preview so the
