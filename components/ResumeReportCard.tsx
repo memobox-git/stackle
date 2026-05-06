@@ -241,15 +241,34 @@ export default function ResumeReportCard({
     : null;
   const top3 = allPriorities.slice(0, 3);
   const top3ImpactSum = impacts.slice(0, 3).reduce((s, n) => s + n, 0);
-  const biggestImpactIdx = impacts.length > 0 ? impacts.reduce((maxI, v, i, arr) => v > arr[maxI] ? i : maxI, 0) : -1;
+  // Biggest Impact MUST be a different section than Fastest Win — otherwise
+  // the AI Coach card shows "Summary" twice, which reads as a bug. We map
+  // each priority to a section bucket, then pick the highest-impact priority
+  // whose bucket differs from Fastest Win's bucket.
+  const sectionBucket = (a: string): string =>
+    /summary|profile|objective|headline|intro/i.test(a) ? "summary"
+    : /skills?|keyword|stack|tools|tech list/i.test(a) ? "skills"
+    : /bullet|impact|metric|quantif|achievement|wins/i.test(a) ? "experience bullets"
+    : /education|certif|degree/i.test(a) ? "education"
+    : /experience|role|job/i.test(a) ? "experience"
+    : "other";
+  const fastestWinBucket = topPriority ? sectionBucket(topPriority) : "";
+  // Sort indices by impact desc, then pick the first one whose bucket
+  // differs from Fastest Win. If everything is in the same bucket, fall
+  // back to the second-highest priority regardless.
+  const sortedByImpact = impacts
+    .map((v, i) => ({ i, v }))
+    .filter((x) => x.i < allPriorities.length)
+    .sort((a, b) => b.v - a.v);
+  const biggestImpactIdx = (() => {
+    for (const { i } of sortedByImpact) {
+      if (sectionBucket(allPriorities[i]) !== fastestWinBucket) return i;
+    }
+    // Everything maps to the same bucket — pick the second priority if any.
+    return allPriorities.length >= 2 ? 1 : -1;
+  })();
   const biggestImpactSection = biggestImpactIdx >= 0
-    ? (() => {
-        const a = allPriorities[biggestImpactIdx];
-        return /summary/i.test(a) ? "summary"
-          : /skills?/i.test(a) ? "skills"
-          : /bullet|impact|metric|quantif/i.test(a) ? "experience bullets"
-          : "this priority";
-      })()
+    ? sectionBucket(allPriorities[biggestImpactIdx])
     : "";
 
   return (
@@ -447,13 +466,9 @@ export default function ResumeReportCard({
           {subs.map((s, i) => {
             const pct = s.score / s.max;
             const c = scoreColor(pct);
-            // Tint the cell background so weak categories pop without
-            // adding extra chrome. Stronger weight on the number too.
-            const tint = pct < 0.5
-              ? { bg: "rgba(239, 68, 68, 0.06)", weight: 600 }
-              : pct < 0.75
-                ? { bg: "rgba(217, 119, 6, 0.06)", weight: 600 }
-                : { bg: "rgba(22, 163, 74, 0.04)", weight: 500 };
+            // No background tints — the score number colour already
+            // communicates strength (red/amber/green). Random tinted cells
+            // were noise without signal.
             return (
               <div key={s.key} style={{
                 textAlign: "center",
@@ -461,10 +476,10 @@ export default function ResumeReportCard({
                 paddingBottom: "12px",
                 paddingLeft: i === 0 ? "12px" : "12px",
                 paddingRight: i === subs.length - 1 ? "12px" : "12px",
-                background: tint.bg,
+                background: "transparent",
                 borderRight: i === subs.length - 1 ? "none" : "1px solid #f4f4f5",
               }}>
-                <div style={{ fontSize: "22px", fontWeight: tint.weight, color: c, lineHeight: 1.1 }}>
+                <div style={{ fontSize: "22px", fontWeight: 500, color: c, lineHeight: 1.1 }}>
                   {s.score}
                   <span style={{ fontSize: "13px", color: "#a1a1aa", fontWeight: 400 }}>/{s.max}</span>
                 </div>
