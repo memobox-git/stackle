@@ -20,6 +20,13 @@ interface Props {
   analysis: ResumeAnalysis | null;
   targetRole: string;
   jobDescription?: string | null;
+  /** Number of fixes the user has already accepted in the Edit tab.
+   *  Surfaced in the idle card so we acknowledge their work before
+   *  one-shot rewriting on top of it. */
+  acceptedFixCount?: number;
+  /** Original (pre-edit) score — shown alongside current when changes
+   *  exist so the user sees the full progression: Original → Current → After Rewrite. */
+  baseScore?: number;
   /** When the user accepts the rewrite, swap working copy + auto-save. */
   onAcceptAll: (rewritten: ResumeExtraction) => void;
   /** "Tweak in Edit" — push the rewritten extraction into edit mode. */
@@ -37,6 +44,12 @@ const PROGRESS_STEPS = [
 
 function deriveScore(a: ResumeAnalysis | null): number {
   if (!a) return 60;
+  // Prefer the agent-computed total — same source ScoreReveal /
+  // Report / Edit-tab use, so all four screens read the same number
+  // for the same analysis run.
+  if (a.scores && typeof a.scores.total === "number" && a.scores.total > 0) {
+    return Math.max(0, Math.min(100, Math.round(a.scores.total)));
+  }
   let score = 55;
   score += Math.min(a.strengths.length * 4, 20);
   score -= Math.min(a.weaknesses.length * 3, 15);
@@ -49,11 +62,51 @@ function deriveScore(a: ResumeAnalysis | null): number {
   return Math.max(20, Math.min(100, Math.round(score)));
 }
 
+// Group the priority list into a human-readable change preview so the
+// user knows what they're committing to before clicking Generate. We
+// classify each priority by the section it touches and roll up counts.
+function summariseFixes(priorities: string[]): { label: string; key: string }[] {
+  const buckets = {
+    summary: 0,
+    bullets: 0,
+    skills: 0,
+    keywords: 0,
+    structure: 0,
+    other: 0,
+  };
+  priorities.forEach((p) => {
+    const u = p.toLowerCase();
+    if (/summary|profile|objective|headline/.test(u)) buckets.summary++;
+    else if (/bullet|impact|metric|quantif|achievement/.test(u)) buckets.bullets++;
+    else if (/skills?\b|technologies|tech list|stack/.test(u)) buckets.skills++;
+    else if (/keyword|ats|terminology/.test(u)) buckets.keywords++;
+    else if (/order|reorder|move|format|structure|section/.test(u)) buckets.structure++;
+    else buckets.other++;
+  });
+  const items: { label: string; key: string }[] = [];
+  if (buckets.summary)  items.push({ key: "summary",  label: `Summary rewrite (third person, value prop)` });
+  if (buckets.bullets)  items.push({ key: "bullets",  label: `${buckets.bullets} bullet${buckets.bullets > 1 ? "s" : ""} quantified for impact` });
+  if (buckets.skills)   items.push({ key: "skills",   label: `Skills section restructured into categories` });
+  if (buckets.keywords) items.push({ key: "keywords", label: `Missing keywords added for the target role` });
+  if (buckets.structure) items.push({ key: "structure", label: `Structure + formatting cleanup` });
+  if (buckets.other && items.length === 0) items.push({ key: "other", label: `${buckets.other} writing improvement${buckets.other > 1 ? "s" : ""}` });
+  return items;
+}
+
+const STYLE_OPTIONS: { key: string; label: string; hint?: string }[] = [
+  { key: "default",     label: "Default",     hint: "" },
+  { key: "modern",      label: "Modern",      hint: "Punchy, recent-keyword-heavy, slightly more casual." },
+  { key: "conservative", label: "Conservative", hint: "Formal tone, no slang, traditional resume conventions." },
+  { key: "senior",      label: "Senior",      hint: "Lean on leadership signals, scope, and outcomes — not tasks." },
+];
+
 export default function RewriteTab({
   extraction,
   analysis,
   targetRole,
   jobDescription,
+  acceptedFixCount = 0,
+  baseScore,
   onAcceptAll,
   onTweakInEdit,
 }: Props) {
@@ -63,6 +116,7 @@ export default function RewriteTab({
   const [changedKeys, setChangedKeys] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("optimized");
+  const [styleKey, setStyleKey] = useState<string>("default");
 
   // Cycle progress messages every 6s while generating.
   useEffect(() => {
@@ -134,30 +188,87 @@ export default function RewriteTab({
     }
   }
 
-  // Idle / generating state — centered card with stats + CTA.
+  // Idle / generating state — wider card with fix breakdown + style picker.
   if (!rewritten) {
+    const fixSummary = analysis ? summariseFixes(analysis.rewritePriorities ?? []) : [];
+    const remainingFixes = Math.max(0, fixCount - acceptedFixCount);
+    const showProgression = typeof baseScore === "number" && baseScore !== currentScore;
+    const styleHintFor = (key: string) => {
+      const opt = STYLE_OPTIONS.find((o) => o.key === key);
+      return opt?.hint && opt.hint.length > 0 ? opt.hint : undefined;
+    };
     return (
-      <div className="flex-1 overflow-y-auto p-8 flex items-center justify-center">
-        <div className="max-w-md w-full">
-          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm text-center">
-            <div className="w-12 h-12 mx-auto rounded-xl bg-violet-600 flex items-center justify-center mb-4">
-              <Sparkles className="w-6 h-6 text-white" strokeWidth={2.25} />
+      <div className="flex-1 overflow-y-auto px-8 pt-12 pb-16 flex flex-col items-center">
+        <div className="max-w-xl w-full">
+          <div className="bg-white border border-gray-200 rounded-2xl p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-xl bg-violet-600 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-white" strokeWidth={2.25} />
+              </div>
+              <h2 className="text-xl font-medium text-gray-900">Build your optimized resume</h2>
             </div>
-            <h2 className="text-xl font-medium text-gray-900 mb-2">Build your optimized resume</h2>
-            <p className="text-sm text-gray-600 leading-relaxed mb-6">
-              Stackle will apply <span className="font-semibold text-gray-900">{fixCount} fix{fixCount === 1 ? "" : "es"}</span> and generate a polished version targeting <span className="font-semibold text-gray-900">{targetRole}</span>.
+            <p className="text-sm text-gray-600 leading-relaxed mb-5">
+              {acceptedFixCount > 0
+                ? <>You&apos;ve accepted <span className="font-semibold text-gray-900">{acceptedFixCount} fix{acceptedFixCount === 1 ? "" : "es"}</span> already. This will apply the remaining <span className="font-semibold text-gray-900">{remainingFixes}</span> and polish the entire resume targeting <span className="font-semibold text-gray-900">{targetRole}</span>.</>
+                : <>Stackle will apply <span className="font-semibold text-gray-900">{fixCount} fix{fixCount === 1 ? "" : "es"}</span> and generate a polished version targeting <span className="font-semibold text-gray-900">{targetRole}</span>.</>}
             </p>
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 text-left text-sm space-y-2">
+
+            {/* Fix breakdown — what changes */}
+            {fixSummary.length > 0 && (
+              <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <p className="text-[11px] font-semibold tracking-widest uppercase text-gray-500 mb-2.5">This will change</p>
+                <ul className="space-y-1.5">
+                  {fixSummary.map((f) => (
+                    <li key={f.key} className="flex items-start gap-2 text-sm text-gray-800">
+                      <span className="text-emerald-600 flex-shrink-0 mt-0.5">✓</span>
+                      <span>{f.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {/* Stats */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5 text-sm space-y-2">
               <Stat label="Target role" value={targetRole} />
               <Stat label="Estimated time" value="~30 seconds" />
-              <Stat label="Projected score" value={`${currentScore} → ${projHigh} (+${projHigh - currentScore})`} />
+              <Stat
+                label="Score"
+                value={
+                  showProgression
+                    ? `${baseScore} → ${currentScore} → ${projHigh} (+${projHigh - (baseScore as number)})`
+                    : `${currentScore} → ${projHigh} (+${projHigh - currentScore})`
+                }
+              />
             </div>
+
+            {/* Style selector */}
+            <div className="mb-5">
+              <p className="text-xs font-medium text-gray-700 mb-2">Style</p>
+              <div className="flex flex-wrap gap-1.5">
+                {STYLE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    onClick={() => setStyleKey(opt.key)}
+                    title={opt.hint || "Default writing style"}
+                    className={`text-xs font-medium px-3 py-1.5 rounded-lg border transition-colors ${
+                      styleKey === opt.key
+                        ? "bg-violet-600 border-violet-600 text-white"
+                        : "bg-white border-gray-300 text-gray-700 hover:border-gray-400"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <button
-              onClick={() => generate()}
+              onClick={() => generate(styleHintFor(styleKey))}
               disabled={generating || !analysis}
               className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {generating ? "Generating…" : "✨ Generate optimized resume"}
+              {generating ? "Generating…" : "✨ Generate my resume"}
             </button>
 
             {generating && (

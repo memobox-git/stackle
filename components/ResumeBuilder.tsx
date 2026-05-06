@@ -2228,6 +2228,8 @@ export default function ResumeBuilder({
                 analysis={resumeAnalysis}
                 targetRole={resumeAnalysis.likelyTargetRole ?? "your target role"}
                 jobDescription={null}
+                acceptedFixCount={acceptedIndices.size}
+                baseScore={baseScore}
                 onAcceptAll={(rewritten) => {
                   // Replace the working extraction with the AI rewrite,
                   // bump editHistory so the score banner reflects the
