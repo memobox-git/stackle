@@ -6,6 +6,8 @@ import { NextRequest } from "next/server";
 import { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
 import { RESUME_WRITER_SYSTEM_PROMPT } from "@/lib/agents/prompts/resumeWriterPrompt";
 import { rateLimit } from "@/lib/rateLimit";
+import { checkTraceability, describeIssues as describeTraceability } from "@/lib/agents/validation/traceabilityCheck";
+import { validateRewrite, passesValidation, describeValidationIssues } from "@/lib/agents/validation/rewriteValidator";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -134,38 +136,93 @@ ${body.instruction}${previousBlock}${styleBlock}${lockBlock}${lockedBulletsBlock
 
 Identify the correct sectionKey and rewrite only that section. Respond with JSON only.`;
 
-    const message = await client.messages.create({
-      // Sonnet for higher-quality rewrites — Haiku was fast but produced
-      // safe, generic bullets. This is the user-visible writer, quality > latency.
-      model: "claude-sonnet-4-5",
-      max_tokens: 1200,
-      system: RESUME_WRITER_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: userMessage }],
-    });
+    // Generate-with-validate loop. The writer can hallucinate metrics or
+    // technologies the candidate doesn't have, or violate structural rules
+    // (banned phrases, oversized bullets, multi-sentence). We run two
+    // checks on the response — traceabilityCheck (catches invented facts)
+    // and validateRewrite (catches stylistic violations). If either fails
+    // with errors, we feed the issues back to the writer and try ONCE
+    // more. After that we accept the cleaner of the two attempts.
 
-    const rawText = message.content[0].type === "text" ? message.content[0].text.trim() : "";
+    type WriterAttempt = {
+      parsed: { sectionKey: string; newContent: string };
+      validationIssues: ReturnType<typeof validateRewrite>;
+      traceabilityIssues: ReturnType<typeof checkTraceability>;
+      raw: string;
+    };
 
-    // Strip markdown fences if present
-    const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const runWriter = async (extraMessage: string): Promise<WriterAttempt | { error: string; raw: string }> => {
+      const message = await client.messages.create({
+        model: "claude-sonnet-4-5",
+        max_tokens: 1200,
+        system: RESUME_WRITER_SYSTEM_PROMPT,
+        messages: [{ role: "user", content: userMessage + extraMessage }],
+      });
+      const rawText = message.content[0].type === "text" ? message.content[0].text.trim() : "";
+      const jsonText = rawText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+      let parsed: { sectionKey: string; newContent: string };
+      try {
+        parsed = JSON.parse(jsonText);
+      } catch {
+        return { error: "AI returned invalid JSON", raw: rawText };
+      }
+      if (!parsed.sectionKey || parsed.newContent === undefined) {
+        return { error: "Missing sectionKey or newContent", raw: rawText };
+      }
+      // Skip both checks for the not-applicable signal — it's a meta
+      // response, not a rewrite.
+      if (parsed.sectionKey === "__not_applicable__") {
+        return { parsed, validationIssues: [], traceabilityIssues: [], raw: rawText };
+      }
+      const validationIssues = validateRewrite(parsed.sectionKey, parsed.newContent);
+      const traceabilityIssues = checkTraceability(parsed.newContent, body.extraction);
+      return { parsed, validationIssues, traceabilityIssues, raw: rawText };
+    };
 
-    let parsed: { sectionKey: string; newContent: string };
-    try {
-      parsed = JSON.parse(jsonText);
-    } catch {
-      return new Response(JSON.stringify({ error: "AI returned invalid JSON", raw: rawText }), {
+    // First pass.
+    const first = await runWriter("");
+    if ("error" in first) {
+      return new Response(JSON.stringify({ error: first.error, raw: first.raw }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    if (!parsed.sectionKey || parsed.newContent === undefined) {
-      return new Response(JSON.stringify({ error: "Missing sectionKey or newContent", raw: rawText }), {
-        status: 500,
+    const firstHasErrors = !passesValidation(first.validationIssues) || first.traceabilityIssues.length > 0;
+
+    // If the first pass is clean, accept it.
+    if (!firstHasErrors) {
+      return new Response(JSON.stringify(first.parsed), {
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify(parsed), {
+    // Otherwise feed the issues back for a single regenerate attempt. We
+    // only retry once — if the second pass still fails, we ship the cleaner
+    // of the two so the user gets SOMETHING rather than an error.
+    const feedback = [
+      describeValidationIssues(first.validationIssues),
+      describeTraceability(first.traceabilityIssues),
+    ].filter(Boolean).join("\n\n");
+    const second = await runWriter(`\n\n──── REGENERATE ────\n${feedback}`);
+
+    if ("error" in second) {
+      // Second pass failed to produce JSON — fall back to first.
+      return new Response(JSON.stringify(first.parsed), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    // Pick the cleaner of the two attempts. Prefer no traceability issues
+    // (factual integrity is more important than stylistic polish).
+    const secondHasErrors = !passesValidation(second.validationIssues) || second.traceabilityIssues.length > 0;
+    const better =
+      !secondHasErrors ? second :
+      second.traceabilityIssues.length < first.traceabilityIssues.length ? second :
+      second.validationIssues.length < first.validationIssues.length ? second :
+      first;
+
+    return new Response(JSON.stringify(better.parsed), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err: unknown) {
