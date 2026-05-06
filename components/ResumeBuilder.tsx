@@ -1225,6 +1225,13 @@ export default function ResumeBuilder({
 
   function deriveScore(a: typeof resumeAnalysis): number {
     if (!a) return 0;
+    // Prefer the agent-computed total (same source the Report tab uses)
+    // so Score Reveal / Report / Edit-tab banner all show the same number.
+    // Fall back to the legacy heuristic only for analyses that predate
+    // the structured scores schema.
+    if (a.scores && typeof a.scores.total === "number" && a.scores.total > 0) {
+      return Math.max(0, Math.min(100, Math.round(a.scores.total)));
+    }
     let score = 55;
     score += Math.min(a.strengths.length * 4, 20);
     score -= Math.min(a.weaknesses.length * 3, 15);
@@ -2052,45 +2059,64 @@ export default function ResumeBuilder({
 
             {activeTab === "edit" && (
               <div style={{ animation: "fadeIn 200ms ease" }}>
-                {/* Score banner + View Original button */}
+                {/* Unified version bar — Working Copy badge, score
+                    progression (hidden while no edits made), saved-state
+                    indicator, undo, and View Original — all in one row. */}
                 <div style={{
                   background: "#fafafa",
                   borderBottom: "1px solid #e5e7eb",
-                  padding: "8px 16px",
+                  padding: "10px 16px",
                   display: "flex",
                   alignItems: "center",
-                  gap: "8px",
+                  gap: "10px",
                   fontSize: "12px",
                   fontFamily: "system-ui, sans-serif",
                   flexShrink: 0,
                   position: "relative",
                 }}>
-                  <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase", color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "4px", padding: "1px 6px", marginRight: "8px" }}>Working Copy</span>
+                  <span style={{ fontSize: "9px", fontWeight: "700", letterSpacing: "0.1em", textTransform: "uppercase", color: "#15803d", background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "4px", padding: "2px 7px" }}>Working Copy</span>
+
+                  {/* Score progression. We always show the original score
+                      so the user has a reference; we ONLY surface the
+                      working-version score when it differs from baseline,
+                      so the bar reads quietly until there's actual progress. */}
                   <span style={{ color: "#52525b" }}>Original score:</span>
                   <span
                     key={`base-${baseScore}`}
-                    style={{ fontFamily: "monospace", fontWeight: 500, color: "#71717a", transition: "color 300ms" }}
+                    style={{ fontFamily: "monospace", fontWeight: 500, color: "#71717a" }}
                   >
                     {baseScore}
                   </span>
-                  <span style={{ color: "#a1a1aa", margin: "0 4px" }}>→</span>
-                  <span style={{ color: "#52525b" }}>Working version:</span>
-                  <span
-                    key={`edit-${currentEditScore}`}
-                    style={{
-                      fontFamily: "monospace",
-                      fontWeight: 600,
-                      color: editHistory.length > 0 ? "#15803d" : "#71717a",
-                      transition: "color 300ms",
-                    }}
-                  >
-                    {currentEditScore}
-                  </span>
-                  {editHistory.length > 0 && (
-                    <span style={{ fontSize: "11px", color: "#15803d", fontWeight: 500, marginLeft: "4px" }}>
-                      +{currentEditScore - baseScore} pts
+                  {currentEditScore !== baseScore && (
+                    <>
+                      <span style={{ color: "#a1a1aa", margin: "0 2px" }}>→</span>
+                      <span style={{ color: "#52525b" }}>Working:</span>
+                      <span
+                        key={`edit-${currentEditScore}`}
+                        style={{
+                          fontFamily: "monospace",
+                          fontWeight: 600,
+                          color: "#15803d",
+                          transition: "color 300ms",
+                        }}
+                      >
+                        {currentEditScore}
+                      </span>
+                      <span style={{ fontSize: "11px", color: "#15803d", fontWeight: 500 }}>
+                        +{currentEditScore - baseScore} pts
+                      </span>
+                    </>
+                  )}
+
+                  {/* Saved-just-now indicator. savedGhost flips true for
+                      ~1.2s after each persistWorkingCopy success. */}
+                  {savedGhost && (
+                    <span style={{ fontSize: "11px", color: "#15803d", display: "inline-flex", alignItems: "center", gap: "4px", animation: "fadeIn 200ms ease" }}>
+                      <Check size={11} strokeWidth={2.5} />
+                      Saved · just now
                     </span>
                   )}
+
                   {editHistory.length > 0 && (
                     <button
                       onClick={handleUndo}
