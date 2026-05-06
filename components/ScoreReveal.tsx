@@ -53,17 +53,54 @@ function scoreLabel(score: number): { label: string; color: string } {
   return { label: "Weak", color: "#ef4444" };
 }
 
+// Pick "a" or "an" based on the first word's leading sound. Vowel-letter
+// heuristic with light vowel-sound exceptions ("UI", "FE" → "a"; "MBA",
+// "HR" → "an"). Good enough for resume role labels.
+function articleFor(phrase: string): string {
+  const word = phrase.trim().split(/\s+/)[0] ?? "";
+  if (!word) return "a";
+  const upper = word.toUpperCase();
+  // Acronyms — pronounced letter-by-letter, so "MBA" reads as "em-bee-ay"
+  // and takes "an"; "UI" reads as "you-eye" so "a UI Designer" is correct.
+  const vowelSoundAcronyms = ["MBA", "MS", "MD", "FBI", "HR", "HTML", "HTTP", "L1", "L2"];
+  const consonantSoundAcronyms = ["UI", "UX", "URL", "USB", "U.S.", "EU"];
+  if (consonantSoundAcronyms.some((a) => upper.startsWith(a))) return "a";
+  if (vowelSoundAcronyms.some((a) => upper.startsWith(a))) return "an";
+  // Default vowel rule on first letter.
+  return /^[aeiou]/i.test(word) ? "an" : "a";
+}
+
+// Round fractional years into a clean phrase. Stackle reports come from
+// extraction in decimals (1.4, 4.8) which read awkwardly in copy.
+function describeYears(years: number | null | undefined): string {
+  if (typeof years !== "number" || !isFinite(years) || years <= 0) return "your experience";
+  if (years < 1) return "less than 1 year of experience";
+  // Round to nearest integer; tag "about" / "almost" so it doesn't feel false.
+  const floor = Math.floor(years);
+  const frac = years - floor;
+  if (frac < 0.25) {
+    return floor === 1 ? "1 year of experience" : `${floor} years of experience`;
+  }
+  if (frac >= 0.75) {
+    const rounded = floor + 1;
+    return rounded === 1 ? "almost 1 year of experience" : `almost ${rounded} years of experience`;
+  }
+  // Mid-range — say "about N" using the lower side.
+  return floor === 1 ? "about 1 year of experience" : `about ${floor} years of experience`;
+}
+
 // Build the 12 progress messages, personalised with whatever data the
 // extraction agent returned. Falls back gracefully if a field is missing.
 function buildProgressMessages(extractedRole: string | null, years: number | null, targetRole: string | null): string[] {
-  const yrsPhrase = typeof years === "number" && years > 0 ? `${years} years` : "your experience";
   const role = (extractedRole ?? "").trim();
   const target = (targetRole ?? "").trim();
+  const yearsPhrase = describeYears(years);
+  const article = role ? articleFor(role) : "a";
 
   return [
     "Reading your resume…",
     role
-      ? `You're a ${role} with ${yrsPhrase} of experience…`
+      ? `You're ${article} ${role} with ${yearsPhrase}…`
       : "Pulling out your roles, dates, and skills…",
     "Identifying your closest role match…",
     target
@@ -149,7 +186,20 @@ export default function ScoreReveal({
     : "Here's the read on your resume.";
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-gradient-to-b from-white via-white to-[#fafafa]">
+    <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-gradient-to-b from-white via-white to-[#fafafa] relative">
+      {/* Stackle logo — top-left, matches OnboardingFlow placement so the
+          screen feels continuous with the upload flow that preceded it. */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex items-center gap-2.5">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-black text-base font-bold shadow"
+          style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
+        >
+          S
+        </div>
+        <span className="text-xs uppercase tracking-[0.2em] text-gray-600 font-semibold">
+          Stackle
+        </span>
+      </div>
       <div className="w-full max-w-xl flex flex-col items-center text-center animate-fadein">
         <p className="text-sm text-gray-500 mb-2 tracking-wide">{greeting}</p>
 
