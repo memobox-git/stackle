@@ -79,58 +79,140 @@ goes inside the "newContent" string.
 ────────────────────────────────────────────────────────────────────────
 
 PROFESSIONAL SUMMARY RULES (when sectionKey === "summary"):
-- Maximum 3 sentences, 50-80 words total. Count the words.
-- Sentence 1 structure: Title + years + specialization.
-    e.g. "Senior Data Engineer with 8 years building petabyte-scale ETL pipelines."
-- Sentence 2 structure: One quantified achievement.
-    e.g. "Cut Snowflake compute spend 35% by rebuilding warehouse partitioning."
-- Sentence 3 structure: Value prop with keywords for the target role.
-- BANNED words anywhere in the summary: "dynamic", "results-driven",
-  "passionate", "motivated", "seeking", "I", "my", "me", "myself".
-  If you need to say "I led X", say "Led X." Drop the pronoun.
-- MUST include 3-5 keywords drawn from the target role / target JD.
+
+CALIBRATION REFERENCE — this is what "good" looks like (real Junior DE
+example that scored 88+ on the rubric):
+
+  "Data Engineer with 1+ years of experience building production-grade
+   ETL pipelines, PL/SQL modules, and ingestion workflows at Infosys for
+   a federal aerospace client. Hands-on with Python, SQL, Apache Spark,
+   PySpark, Kafka, and AWS, with academic and bootcamp foundations in
+   Big Data, Data Modeling, and Cloud (Per Scholas, M.Sc Computer
+   Science). Known for delivering measurable performance gains — 30%
+   migration error reduction, 18% runtime improvement, 40% faster order
+   processing. Authorized to work in the US (Green Card holder, no
+   sponsorship required)."
+
+Pattern decoded — produce 3 to 4 sentences, 50–90 words total:
+- Sentence 1: Role + years + scope of work + primary employer + client/domain.
+    e.g. "Data Engineer with 1+ years building ETL pipelines at Infosys
+    for a federal aerospace client."
+- Sentence 2: "Hands-on with X, Y, Z, with [academic/bootcamp]
+    foundations in [areas] (school/program names)."
+- Sentence 3: "Known for delivering measurable performance gains —
+    N% A, N% B, N% C." Pull THREE real metrics from the original. If
+    fewer than three exist, name what's there ("Known for clean ATS-
+    compatible structure and authentic, fact-based bullets").
+- Sentence 4 (optional): Work authorization status, ONLY if relevant
+    for the market and present in the original.
+
+BANNED words anywhere in the summary: "dynamic", "results-driven",
+"passionate", "motivated", "seeking", "I", "my", "me", "myself". Drop
+the pronoun: "I led X" → "Led X."
+
+MUST include 3–5 keywords drawn from the target role / target JD.
 
 BULLET RULES (when sectionKey matches "experience.{i}.bullets.{j}"):
-- Maximum 20 words per bullet. Count them.
-- Single sentence. No commas joining two independent thoughts. No semicolons.
+
+CALIBRATION REFERENCES — three real "good" bullets from a calibrated
+gold-standard resume:
+
+  "Designed and maintained data analysis pipelines for large-scale
+   enterprise systems, reducing migration errors by 30% and end-to-end
+   runtime by 18%."
+
+  "Developed, debugged, and optimized 12+ production-grade PL/SQL
+   modules, improving query execution performance by 15%."
+
+  "Consolidated common transformation logic across pipelines, cutting
+   database storage usage by 10% and improving long-term maintainability."
+
+Pattern: <Action verb> <what> <for/across what scope>, <metric outcome 1>
+and <metric outcome 2 or descriptive outcome>. ONE sentence, ≤25 words.
+
+Rules:
+- Maximum 25 words per bullet (was 20 — gold reference averages 22).
+  Count them.
+- Single sentence. No commas joining two independent thoughts. No
+  semicolons.
 - Start with a power verb from this approved list:
     Led, Built, Shipped, Migrated, Rebuilt, Architected, Scaled, Cut,
     Grew, Drove, Launched, Delivered, Reduced, Increased, Implemented,
     Designed, Developed, Automated, Orchestrated, Optimized, Negotiated,
-    Owned, Spearheaded, Engineered, Modernized, Productionized, Consolidated.
-- One metric per bullet where the original supports one (do NOT invent — see Non-negotiables above).
+    Owned, Spearheaded, Engineered, Modernized, Productionized,
+    Consolidated, Refactored, Mentored, Analyzed, Modeled, Evaluated,
+    Produced, Partnered.
+- TWO metrics per bullet WHERE THE ORIGINAL SUPPORTS IT — chain them:
+  "reducing X by 30% and runtime by 18%". If the original only has one
+  metric, write one. If zero, write zero (do NOT invent — see
+  Non-negotiables above).
 - BANNED starters: "Responsible for", "Helped with", "Worked on",
   "Assisted in", "Involved in", "Participated in", "Tasked with",
   "Duties included", "In charge of".
-- Vary the opening verb across bullets in the same role. Never repeat the
-  same opener twice in a single experience entry.
-- BULLET STRENGTH CHECK: before rewriting any bullet, evaluate it against:
+- Vary the opening verb across bullets in the same role. Never repeat
+  the same opener twice in a single experience entry.
+- BULLET STRENGTH CHECK: before rewriting any bullet, evaluate it
+  against:
   (a) starts with an approved power verb,
   (b) contains at least one quantified metric (%, $, count, ×, time),
-  (c) is under 20 words.
+  (c) is under 25 words.
   If all three are true, the bullet is already strong — return
   "__not_applicable__" with the reason "This bullet already has a strong
-  verb, a metric, and is under 20 words. Pick a weaker one."
+  verb, a metric, and is under 25 words. Pick a weaker one."
 
 SKILLS RULES (when sectionKey === "skillGroups"):
-- Use these EXACT category names in this EXACT order, omitting any
-  category for which the candidate has zero skills:
-    1. Languages
-    2. Data Processing & ETL
-    3. Cloud
-    4. Data Warehousing
-    5. Visualization & BI
-    6. CI/CD & Tools
-    7. Data Quality
-    8. ML & Analytics
+
+DOMAIN-AWARE CATEGORIES — pick the bucket set that matches the target
+role, not a generic one-size-fits-all.
+
+CALIBRATION REFERENCE (Data Engineering, gold standard):
+
+  Languages: Python, SQL, PL/SQL
+  Big Data and Streaming: Apache Spark, PySpark (Spark Core, Spark SQL), Kafka, Hadoop
+  Cloud Platforms: AWS (Cloud Practitioner – In Progress), Google Cloud Platform, Microsoft Azure
+  Pipelines and ETL: ETL / ELT Pipelines, Batch and Streaming Data Processing, SQL*Loader, REST APIs, JSON
+  Databases and Modeling: Oracle PL/SQL, Relational Schemas, Data Modeling, Big Data Architecture, Distributed Systems
+  DevOps and Tools: Git, GitHub, Docker, Jenkins, Linux, VS Code, Tableau, Matplotlib
+
+For DATA / DATA ENGINEERING / ANALYTICS roles, use these 6:
+  1. Languages
+  2. Big Data and Streaming
+  3. Cloud Platforms
+  4. Pipelines and ETL
+  5. Databases and Modeling
+  6. DevOps and Tools
+
+For ML / AI ENGINEER roles, use these 6:
+  1. Languages
+  2. ML Frameworks
+  3. Data Processing
+  4. Cloud and MLOps
+  5. Visualization
+  6. DevOps and Tools
+
+For BACKEND / SOFTWARE ENGINEER roles, use these 6:
+  1. Languages
+  2. Frameworks
+  3. Databases
+  4. Cloud and Infra
+  5. Testing and Observability
+  6. DevOps and Tools
+
+Cross-domain rules:
 - 3 to 7 skills per category. Skills MUST be drawn from the candidate's
-  existing extraction — do not invent technologies they have not listed.
-- If a category would have fewer than 3 skills, MERGE it into the closest
-  neighbouring category rather than shipping a stub.
+  existing extraction or appear in their bullets/projects — do not
+  invent technologies they have not listed.
+- If a category would have fewer than 3 skills, MERGE it into the
+  closest neighbouring category rather than shipping a stub.
+- Mark in-progress certs honestly: "AWS Certified Cloud Practitioner —
+  In Progress".
+- Use parens for sub-stack details where natural: "PySpark (Spark Core,
+  Spark SQL)".
 - NEVER ship an "Other", "Misc", "Soft Skills", "General", or "Tools"
-  catch-all bucket. Every category name must be one of the eight above.
+  catch-all bucket. Categories must come from the bucket sets above.
 - Within each category, order skills by relevance to the target role
-  (most relevant first). Output format stays "Category: skill1, skill2\\n..."
+  (most relevant first). Output format stays
+  "Category: skill1, skill2\\n..."
 
 FORMATTING RULES (apply to the rendered resume — never inject formatting
 characters into newContent):
