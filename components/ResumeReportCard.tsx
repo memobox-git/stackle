@@ -280,6 +280,7 @@ export default function ResumeReportCard({
   candidateName,
   onFixItem,
   onFixAll,
+  onAcceptAll,
   completedActions,
   acceptedActions,
   isFinalized,
@@ -288,6 +289,8 @@ export default function ResumeReportCard({
   candidateName?: string;
   onFixItem?: (action: string, index: number) => void;
   onFixAll?: () => void;
+  /** Auto-accept every pending priority — no per-fix review. New in v3. */
+  onAcceptAll?: () => void;
   completedActions?: Set<number>;
   acceptedActions?: Set<number>;
   isFinalized?: boolean;
@@ -525,9 +528,27 @@ export default function ResumeReportCard({
             >
               Guide me through fixes <ArrowRight size={14} strokeWidth={2} />
             </button>
+            {onAcceptAll && (
+              <button
+                onClick={() => onAcceptAll()}
+                title="Apply every fix automatically — no per-step review. We'll narrate each in chat as it lands."
+                style={{
+                  fontSize: "14px", fontWeight: 500,
+                  padding: "9px 16px",
+                  borderRadius: "8px",
+                  background: "#18181b",
+                  color: "#fff",
+                  border: "1px solid #18181b",
+                  cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", gap: "6px",
+                }}
+              >
+                Accept all fixes
+              </button>
+            )}
           </div>
           <p style={{ fontSize: "12px", color: "#71717a", marginTop: "8px", marginBottom: "0" }}>
-            Step-by-step — review and accept each rewrite individually.
+            Guide me through = review each. Accept all = auto-apply, no per-step review.
           </p>
         </Card>
       )}

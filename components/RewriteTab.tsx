@@ -31,6 +31,15 @@ interface Props {
   onAcceptAll: (rewritten: ResumeExtraction) => void;
   /** "Tweak in Edit" — push the rewritten extraction into edit mode. */
   onTweakInEdit: (rewritten: ResumeExtraction) => void;
+  /** Hydrate the rewrite from a saved snapshot when the user returns to
+   *  the tab after a refresh. Parent loads from localStorage on mount and
+   *  passes the previously-generated extraction here. */
+  initialRewritten?: ResumeExtraction | null;
+  initialChangedKeys?: string[];
+  /** Notify parent when a fresh rewrite is generated so the parent can
+   *  persist it (localStorage + future Drive file). Called once per
+   *  successful generate(). */
+  onRewriteGenerated?: (rewritten: ResumeExtraction, changedKeys: string[], styleHint: string | undefined) => void;
 }
 
 const PROGRESS_STEPS = [
@@ -96,11 +105,28 @@ export default function RewriteTab({
   baseScore,
   onAcceptAll,
   onTweakInEdit,
+  initialRewritten = null,
+  initialChangedKeys = [],
+  onRewriteGenerated,
 }: Props) {
   const [generating, setGenerating] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const downloadAnchorRef = useRef<HTMLDivElement>(null);
   const [progressIdx, setProgressIdx] = useState(0);
-  const [rewritten, setRewritten] = useState<ResumeExtraction | null>(null);
-  const [changedKeys, setChangedKeys] = useState<string[]>([]);
+  // Seed from initialRewritten so a refreshed page lands on the
+  // generated-state view directly, not the empty card.
+  const [rewritten, setRewritten] = useState<ResumeExtraction | null>(initialRewritten);
+  const [changedKeys, setChangedKeys] = useState<string[]>(initialChangedKeys);
+
+  // Re-sync if the parent's snapshot changes (e.g. user switches chats
+  // and a different cached rewrite is hydrated).
+  useEffect(() => {
+    if (initialRewritten) {
+      setRewritten(initialRewritten);
+      setChangedKeys(initialChangedKeys);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRewritten]);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<ViewMode>("optimized");
   const [styleKey, setStyleKey] = useState<string>("default");
@@ -166,6 +192,8 @@ export default function RewriteTab({
       setRewritten(data.extraction);
       setChangedKeys(data.changedKeys ?? []);
       setView("optimized");
+      // Persist via parent — survives refresh.
+      onRewriteGenerated?.(data.extraction, data.changedKeys ?? [], styleHint);
       // Jump progress to final to make the bar feel complete.
       setProgressIdx(PROGRESS_STEPS.length - 1);
     } catch (err) {
@@ -320,7 +348,7 @@ export default function RewriteTab({
         )}
         {view === "optimized" && (
           <div className="h-full overflow-y-auto p-6">
-            <div className="bg-white shadow-sm border border-emerald-200 rounded-lg overflow-hidden max-w-3xl mx-auto">
+            <div ref={downloadAnchorRef} className="bg-white shadow-sm border border-emerald-200 rounded-lg overflow-hidden max-w-3xl mx-auto">
               <ResumeDocument extraction={rewritten} />
             </div>
           </div>
@@ -363,6 +391,32 @@ export default function RewriteTab({
           className="text-sm font-medium px-4 py-2 rounded-lg bg-violet-600 hover:bg-violet-700 text-white transition-colors flex items-center gap-2"
         >
           ✓ Accept all changes
+        </button>
+        <button
+          onClick={async () => {
+            if (downloading || !rewritten || !downloadAnchorRef.current) return;
+            setDownloading(true);
+            try {
+              const html2pdf = (await import("html2pdf.js")).default;
+              const name = rewritten.name?.replace(/[^a-zA-Z0-9]/g, "_") ?? "Resume";
+              await html2pdf()
+                .set({
+                  margin: 0,
+                  filename: `${name}_Optimized_Stackle.pdf`,
+                  image: { type: "jpeg", quality: 0.98 },
+                  html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+                  jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+                })
+                .from(downloadAnchorRef.current)
+                .save();
+            } finally {
+              setDownloading(false);
+            }
+          }}
+          disabled={downloading}
+          className="text-sm font-medium px-4 py-2 rounded-lg bg-gray-900 hover:bg-black text-white transition-colors disabled:opacity-50 flex items-center gap-2"
+        >
+          {downloading ? "Preparing…" : "↓ Download"}
         </button>
         <button
           onClick={() => onTweakInEdit(rewritten)}

@@ -265,6 +265,12 @@ export default function ResumeBuilder({
   // Completion modal trigger state
   const [rejectedCount, setRejectedCount] = useState(0);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+
+  // Persisted Rewrite-tab snapshot. When the user generates a full-resume
+  // rewrite in the Rewrite tab, we cache it here (and in localStorage)
+  // so refreshing the page doesn't lose the result. RewriteTab seeds
+  // its own `rewritten` state from this on mount.
+  const [savedRewrite, setSavedRewrite] = useState<{ extraction: ResumeExtraction; changedKeys: string[]; styleHint?: string; generatedAt: string } | null>(null);
   const [showCompareModal, setShowCompareModal] = useState(false);
   // Most-recently finalized version's display name — drives the Edit tab label,
   // the PDF filename, and the "you finalized X last time" greeting on re-entry.
@@ -390,6 +396,24 @@ export default function ResumeBuilder({
           } catch (err) {
             console.warn("[restore] accepted-state failed:", err);
           }
+        }
+        // Restore any cached Rewrite-tab snapshot for this chat so the
+        // generated resume isn't lost on refresh.
+        try {
+          const rawRewrite = localStorage.getItem(`stackle_rewrite_${chatId}`);
+          if (rawRewrite) {
+            const saved = JSON.parse(rawRewrite) as { extraction: ResumeExtraction; changedKeys?: string[]; styleHint?: string; generatedAt?: string };
+            if (saved?.extraction) {
+              setSavedRewrite({
+                extraction: saved.extraction,
+                changedKeys: saved.changedKeys ?? [],
+                styleHint: saved.styleHint,
+                generatedAt: saved.generatedAt ?? new Date().toISOString(),
+              });
+            }
+          }
+        } catch (err) {
+          console.warn("[restore] rewrite-snapshot failed:", err);
         }
       } catch (err) {
         console.warn("[restore] working-copy load failed:", err);
@@ -1234,6 +1258,102 @@ export default function ResumeBuilder({
     setFixAllActive(true);
     await runFixForAction(allActions[firstPending], firstPending, editedExtraction, { fromFixAll: true });
   }, [editedExtraction, resumeAnalysis, isEditStreaming, completedActions, runFixForAction, hasCelebratedCompletion, completionBaseScore, onPushAssistantMessage, messages]);
+
+  // ── Accept All ─────────────────────────────────────────────────────
+  // Chains through every pending priority, calls the writer for each,
+  // applies the result to the working copy WITHOUT showing the per-fix
+  // accept/reject UI. The user gets one confirm modal at the start,
+  // then watches chat narrate progress while the panel updates live.
+  // Different from handleFixAll, which still requires accept/reject on
+  // every step.
+  const [acceptAllRunning, setAcceptAllRunning] = useState(false);
+  const acceptAllAbortedRef = useRef(false);
+  const handleAcceptAll = useCallback(async () => {
+    if (!editedExtraction || !resumeAnalysis || isEditStreaming || acceptAllRunning) return;
+    const allActions = resumeAnalysis.rewritePriorities ?? [];
+    if (allActions.length === 0) return;
+
+    // One-shot confirm. Window.confirm is intentional — keeps the change
+    // surface tiny while the feature stabilises. We can replace with a
+    // proper modal once the flow is validated.
+    const pending = allActions.filter((_, i) => !completedActions.has(i)).length;
+    const ok = window.confirm(`Apply all ${pending} fixes? Each will be saved to your working copy. About ${Math.max(30, pending * 5)} seconds.`);
+    if (!ok) return;
+
+    setAcceptAllRunning(true);
+    acceptAllAbortedRef.current = false;
+    if (onPushAssistantMessage) {
+      onPushAssistantMessage(`On it. Applying ${pending} fixes — I'll narrate each as it lands. Watch the right panel.`);
+      if (!messages.some((m) => m.content === "__FIX_PROGRESS_CARD__")) {
+        onPushAssistantMessage("__FIX_PROGRESS_CARD__");
+      }
+    }
+
+    let working = editedExtraction;
+    let applied = 0;
+    let skipped = 0;
+    const newAcceptedSections = new Set(acceptedSections);
+    const newAcceptedIndices = new Set(acceptedIndices);
+    const newCompletedActions = new Set(completedActions);
+
+    for (let i = 0; i < allActions.length; i++) {
+      if (acceptAllAbortedRef.current) break;
+      if (completedActions.has(i)) continue;
+      if (isProtected(allActions[i])) continue;
+
+      const action = allActions[i];
+      const lockedBullets = strongBulletKeys(working.experience);
+      const result = await callEditApi(action, working, { lockedBullets });
+      if (!result || result.sectionKey === "__not_applicable__" || isProtected(result.sectionKey)) {
+        skipped++;
+        newCompletedActions.add(i);
+        if (onPushAssistantMessage) {
+          onPushAssistantMessage(`Skipped fix ${i + 1} of ${allActions.length} — couldn't improve without more context.`);
+        }
+        continue;
+      }
+      if (newAcceptedSections.has(result.sectionKey)) {
+        // Don't double-edit a section already accepted earlier in the chain.
+        skipped++;
+        newCompletedActions.add(i);
+        continue;
+      }
+      // Apply the section change to the working copy.
+      const next = applyEdit(working, result.sectionKey, result.newContent);
+      working = next;
+      newAcceptedSections.add(result.sectionKey);
+      newAcceptedIndices.add(i);
+      newCompletedActions.add(i);
+      applied++;
+
+      // Persist to Drive immediately so a refresh mid-chain doesn't lose
+      // progress. The persistWorkingCopy helper handles the localStorage
+      // bookkeeping for us.
+      persistWorkingCopy(next);
+      setAcceptedSections(new Set(newAcceptedSections));
+      setAcceptedIndices(new Set(newAcceptedIndices));
+      setCompletedActions(new Set(newCompletedActions));
+
+      if (onPushAssistantMessage) {
+        const pts = action.toUpperCase().startsWith("HIGH") ? 4 : action.toUpperCase().startsWith("MEDIUM") ? 2 : 1;
+        const newScore = deriveScore({ ...resumeAnalysis });
+        onPushAssistantMessage(`Fix ${i + 1} of ${allActions.length}: applied. +${pts} pts. Score now ${newScore + applied}.`);
+      }
+    }
+
+    setIsEditStreaming(false);
+    setEditingSection(null);
+    setAcceptAllRunning(false);
+    setIsRewriting(false);
+
+    if (onPushAssistantMessage) {
+      const finalScore = deriveScore(resumeAnalysis) + applied * 2;
+      onPushAssistantMessage(
+        `Done. Applied ${applied}${skipped ? `, skipped ${skipped}` : ""}. Score is roughly ${Math.min(100, finalScore)} now. Open the Rewrite tab to download.`,
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editedExtraction, resumeAnalysis, isEditStreaming, acceptAllRunning, completedActions, acceptedSections, acceptedIndices, callEditApi, onPushAssistantMessage, messages]);
 
   // ── Chat-first orchestrator: tool dispatch ────────────────────────
   // The parent forwards tool_use blocks from the streaming orchestrator
@@ -2262,6 +2382,7 @@ export default function ResumeBuilder({
                   candidateName={resumeExtraction?.name}
                   onFixItem={handleFixItem}
                   onFixAll={handleFixAll}
+                  onAcceptAll={handleAcceptAll}
                   completedActions={completedActions}
                   acceptedActions={acceptedIndices}
                   isFinalized={!!lastFinalizedName}
@@ -2442,6 +2563,28 @@ export default function ResumeBuilder({
                 jobDescription={null}
                 acceptedFixCount={acceptedIndices.size}
                 baseScore={baseScore}
+                initialRewritten={savedRewrite?.extraction ?? null}
+                initialChangedKeys={savedRewrite?.changedKeys ?? []}
+                onRewriteGenerated={(rewritten, changedKeys, styleHint) => {
+                  // Persist the generated rewrite so refresh restores it.
+                  // localStorage keyed on chatId; future enhancement = also
+                  // store as a Drive 'version' file with display_name
+                  // 'AI Rewrite — {date}'.
+                  const snapshot = {
+                    extraction: rewritten,
+                    changedKeys,
+                    styleHint,
+                    generatedAt: new Date().toISOString(),
+                  };
+                  setSavedRewrite(snapshot);
+                  if (chatId) {
+                    try {
+                      localStorage.setItem(`stackle_rewrite_${chatId}`, JSON.stringify(snapshot));
+                    } catch (err) {
+                      console.warn("[persist] rewrite-snapshot failed:", err);
+                    }
+                  }
+                }}
                 onAcceptAll={(rewritten) => {
                   // Replace the working extraction with the AI rewrite,
                   // bump editHistory so the score banner reflects the
