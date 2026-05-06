@@ -379,9 +379,9 @@ export default function ResumeReportCard({
               <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>+{impacts[biggestImpactIdx] ?? 0} pts</div>
             </div>
             <div style={{ background: "#fff", border: "1px solid #ede9fe", borderRadius: "10px", padding: "12px 14px" }}>
-              <div style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: "4px" }}>Projected</div>
+              <div style={{ fontSize: "10px", fontWeight: 500, letterSpacing: "0.05em", textTransform: "uppercase", color: "#a1a1aa", marginBottom: "4px" }}>If you fix everything</div>
               <div style={{ fontSize: "14px", fontWeight: 500, color: "#18181b" }}>{projectedHigh}/100</div>
-              <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>+{projectedHigh - total} pts total</div>
+              <div style={{ fontSize: "12px", color: "#15803d", marginTop: "2px" }}>+{projectedHigh - total} pts from {total}</div>
             </div>
           </div>
 
@@ -781,6 +781,61 @@ export default function ResumeReportCard({
               {showAllPriorities ? "Show less" : `+${hiddenCount} more improvement${hiddenCount !== 1 ? "s" : ""}`}
             </button>
           )}
+        </Card>
+      )}
+
+      {/* ── 7. SCORE PROJECTION ── mirrors the docx report's "Score
+              Projection" table. Per-category headroom forecast, three
+              columns: Current / After High-Priority Fixes / After All
+              Fixes. The math: after-high = current + 60% of headroom,
+              after-all = current + 85% of headroom. Same heuristic the
+              docx generator uses, so the in-app Report and the
+              downloaded report agree on the numbers. */}
+      {subs.length > 0 && (
+        <Card>
+          <SectionLabel>Score Projection</SectionLabel>
+          <p style={{ fontSize: "13px", color: "#52525b", margin: "0 0 12px", lineHeight: 1.55 }}>
+            How each category moves as you apply fixes. Numbers below are projections — the actual value updates live when you accept a rewrite.
+          </p>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #e4e4e7" }}>
+                  <th style={{ textAlign: "left", padding: "8px 10px", fontSize: "11px", fontWeight: 500, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.04em" }}>Category</th>
+                  <th style={{ textAlign: "right", padding: "8px 10px", fontSize: "11px", fontWeight: 500, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.04em" }}>Current</th>
+                  <th style={{ textAlign: "right", padding: "8px 10px", fontSize: "11px", fontWeight: 500, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.04em" }}>High-Priority Fixes</th>
+                  <th style={{ textAlign: "right", padding: "8px 10px", fontSize: "11px", fontWeight: 500, color: "#71717a", textTransform: "uppercase", letterSpacing: "0.04em" }}>All Fixes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subs.map((s) => {
+                  const headroom = s.max - s.score;
+                  const afterHigh = Math.min(s.max, s.score + Math.round(headroom * 0.6));
+                  const afterAll = Math.min(s.max, s.score + Math.round(headroom * 0.85));
+                  return (
+                    <tr key={s.key} style={{ borderBottom: "1px solid #f4f4f5" }}>
+                      <td style={{ padding: "10px", color: "#27272a", fontWeight: 500 }}>{s.label}</td>
+                      <td style={{ padding: "10px", textAlign: "right", color: "#52525b", fontFamily: "monospace" }}>{s.score}/{s.max}</td>
+                      <td style={{ padding: "10px", textAlign: "right", color: "#15803d", fontFamily: "monospace" }}>{afterHigh}</td>
+                      <td style={{ padding: "10px", textAlign: "right", color: "#15803d", fontWeight: 600, fontFamily: "monospace" }}>{afterAll}</td>
+                    </tr>
+                  );
+                })}
+                {(() => {
+                  const totalHigh = subs.reduce((sum, s) => sum + Math.min(s.max, s.score + Math.round((s.max - s.score) * 0.6)), 0);
+                  const totalAll = subs.reduce((sum, s) => sum + Math.min(s.max, s.score + Math.round((s.max - s.score) * 0.85)), 0);
+                  return (
+                    <tr style={{ borderTop: "2px solid #18181b" }}>
+                      <td style={{ padding: "10px", color: "#18181b", fontWeight: 700, textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.04em" }}>Total</td>
+                      <td style={{ padding: "10px", textAlign: "right", color: "#18181b", fontWeight: 700, fontFamily: "monospace" }}>{total}/100</td>
+                      <td style={{ padding: "10px", textAlign: "right", color: "#15803d", fontWeight: 700, fontFamily: "monospace" }}>{totalHigh}</td>
+                      <td style={{ padding: "10px", textAlign: "right", color: "#15803d", fontWeight: 700, fontFamily: "monospace" }}>{totalAll}</td>
+                    </tr>
+                  );
+                })()}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
     </div>
