@@ -521,7 +521,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center py-12 sm:py-16 px-6 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center pt-24 sm:pt-32 pb-12 px-6 relative overflow-hidden">
       {/* Soft brand-tinted gradient background — replaces the bare white.
           Two radial blobs in the brand yellow/pink, very low opacity. */}
       <div
