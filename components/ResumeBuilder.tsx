@@ -93,6 +93,16 @@ interface ResumeBuilderProps {
   // can clear the state (so refreshing or returning later doesn't re-fire).
   pendingInstruction?: string | null;
   onPendingInstructionConsumed?: () => void;
+  // Phase 2/3: chat-first orchestrator. The parent forwards a tool call from
+  // the streaming /api/agents/resume-orchestrator response; this component
+  // executes it (switch tab, apply fix, highlight section, etc.) and then
+  // calls onChatToolConsumed so the parent clears the pending event.
+  pendingChatTool?: { ts: number; name: string; input: Record<string, unknown> } | null;
+  onChatToolConsumed?: () => void;
+  // Memory hooks: notify parent when the user accepts/rejects a fix so the
+  // orchestrator's ConversationState stays in sync.
+  onApplyAcceptedFix?: (sectionKey: string, priorityIndex: number) => void;
+  onRejectFixSignal?: (sectionKey: string) => void;
   onEditUserMessage?: (index: number, newContent: string) => void;
   // Push a non-synthesis assistant message directly into the Resume Builder
   // chat (used for skills-gap surfacing and similar system prompts).
@@ -124,6 +134,10 @@ export default function ResumeBuilder({
   onStopAgent,
   pendingInstruction,
   onPendingInstructionConsumed,
+  pendingChatTool,
+  onChatToolConsumed,
+  onApplyAcceptedFix,
+  onRejectFixSignal,
   onEditUserMessage,
   onPushAssistantMessage,
   onFileUpload,
@@ -786,6 +800,9 @@ export default function ResumeBuilder({
     const nextAccepted = new Set([...acceptedSections, sectionKey]);
     setAcceptedSections(nextAccepted);
 
+    // Phase 2/3 memory: tell the orchestrator's ConversationState.
+    onApplyAcceptedFix?.(sectionKey, priorityIndex);
+
     const pts = action.toUpperCase().startsWith("HIGH") ? 4 : action.toUpperCase().startsWith("MEDIUM") ? 2 : 1;
     setAcceptedPoints((p) => p + pts);
     if (priorityIndex >= 0) {
@@ -828,6 +845,9 @@ export default function ResumeBuilder({
     // Reject as a toast. Quick, non-celebratory.
     const logLabel = describeSection(sectionKey, editedExtraction);
     toasts.push({ kind: "info", text: `Kept your original ${logLabel}.` });
+
+    // Phase 2/3 memory: tell the orchestrator's ConversationState.
+    onRejectFixSignal?.(sectionKey);
 
     if (priorityIndex >= 0) {
       setRejectedCount((r) => r + 1);
@@ -1109,6 +1129,105 @@ export default function ResumeBuilder({
     setFixAllActive(true);
     await runFixForAction(allActions[firstPending], firstPending, editedExtraction, { fromFixAll: true });
   }, [editedExtraction, resumeAnalysis, isEditStreaming, completedActions, runFixForAction, hasCelebratedCompletion, completionBaseScore, onPushAssistantMessage, messages]);
+
+  // ── Chat-first orchestrator: tool dispatch ────────────────────────
+  // The parent forwards tool_use blocks from the streaming orchestrator
+  // response. Each tool maps to an existing handler. We consume the event
+  // by calling onChatToolConsumed once dispatched.
+  useEffect(() => {
+    if (!pendingChatTool) return;
+    const { name, input } = pendingChatTool;
+
+    try {
+      switch (name) {
+        case "show_panel": {
+          const tab = input.tab as PanelTab | undefined;
+          const validTabs: PanelTab[] = ["resume", "report", "edit", "rewrite"];
+          if (tab && validTabs.includes(tab)) {
+            setIsPanelOpen(true);
+            setActiveTab(tab);
+            // Restore tab if user had dismissed it
+            setClosedTabs((prev) => {
+              if (!prev.has(tab)) return prev;
+              const next = new Set(prev);
+              next.delete(tab);
+              return next;
+            });
+          }
+          break;
+        }
+        case "highlight_section": {
+          const sectionKey = input.section_key as string | undefined;
+          if (!sectionKey) break;
+          setIsPanelOpen(true);
+          setActiveTab("resume");
+          requestAnimationFrame(() => {
+            const el = document.querySelector(`[data-section-key^="${CSS.escape(sectionKey)}"]`) as HTMLElement | null;
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "center" });
+              el.classList.remove("stackle-fix-flash");
+              void el.offsetHeight;
+              el.classList.add("stackle-fix-flash");
+              setTimeout(() => el.classList.remove("stackle-fix-flash"), 1200);
+            }
+          });
+          break;
+        }
+        case "apply_fix": {
+          const instruction = (input.instruction as string | undefined) ?? "";
+          const priorityIndex = typeof input.priority_index === "number" ? input.priority_index : -1;
+          if (instruction && !isEditStreaming) {
+            runFixForAction(instruction, priorityIndex);
+          }
+          break;
+        }
+        case "apply_all_fixes": {
+          if (!isEditStreaming) handleFixAll();
+          break;
+        }
+        case "rewrite_section": {
+          const section = input.section as string | undefined;
+          const styleHint = input.style_hint as string | undefined;
+          if (section && !isEditStreaming) {
+            const instr = styleHint
+              ? `Rewrite the ${section} section in a ${styleHint} tone.`
+              : `Rewrite the ${section} section.`;
+            runFixForAction(instr, -1, undefined, { lockedSectionKey: section });
+          }
+          break;
+        }
+        case "open_rewrite_all": {
+          setIsPanelOpen(true);
+          setActiveTab("rewrite");
+          break;
+        }
+        case "compare_versions": {
+          setShowCompletionModal(true);
+          break;
+        }
+        case "set_style_preference": {
+          // Parent stores it in conversationState; we just toast a confirmation.
+          const style = input.style as string | undefined;
+          if (style) {
+            toasts.push({ kind: "success", text: `Got it — ${style} style noted for next rewrites.`, durationMs: 2800 });
+          }
+          break;
+        }
+        case "undo_last": {
+          // Hook up to existing undo if available — fall back to a toast.
+          toasts.push({ kind: "info", text: "Use ⌘Z to undo the last accepted edit.", durationMs: 2500 });
+          break;
+        }
+        default:
+          break;
+      }
+    } catch (err) {
+      console.warn("[chat-tool] dispatch failed:", err);
+    } finally {
+      onChatToolConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingChatTool]);
 
   // ── Global keyboard shortcuts ─────────────────────────────────────
   // Enter    → Accept the current inline fix (when buttons are visible)

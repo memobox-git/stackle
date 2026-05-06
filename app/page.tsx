@@ -149,6 +149,39 @@ export default function Page() {
   // we stash the instruction here, flip to resume-builder, and ResumeBuilder's
   // effect picks it up on mount → fires the normal fix flow → clears it.
   const [pendingBuilderInstruction, setPendingBuilderInstruction] = useState<string | null>(null);
+
+  // ── Chat-first orchestrator (Phase 2/3) ────────────────
+  // Resume Builder mode chat routes through /api/agents/resume-orchestrator
+  // which streams Sonnet 4.5 with tool use. Tool calls land here as a
+  // ChatToolEvent and ResumeBuilder consumes them via the prop below.
+  type ChatToolEvent = {
+    ts: number;
+    name: string;
+    input: Record<string, unknown>;
+  };
+  const [pendingChatTool, setPendingChatTool] = useState<ChatToolEvent | null>(null);
+  type ConversationStateLite = {
+    acceptedFixes: string[];
+    rejectedFixes: string[];
+    acceptedPriorityIndices: number[];
+    preferredStyle: "modern" | "conservative" | "senior" | "casual" | "punchy" | "default" | null;
+    styleNote: string | null;
+    customInstructions: string[];
+    scoreJourney: { at: number; score: number }[];
+    pendingConfirmation: { kind: string; payload: unknown } | null;
+  };
+  const [conversationState, setConversationState] = useState<ConversationStateLite>({
+    acceptedFixes: [],
+    rejectedFixes: [],
+    acceptedPriorityIndices: [],
+    preferredStyle: null,
+    styleNote: null,
+    customInstructions: [],
+    scoreJourney: [],
+    pendingConfirmation: null,
+  });
+  const conversationStateRef = useRef(conversationState);
+  useEffect(() => { conversationStateRef.current = conversationState; }, [conversationState]);
   // Drive row action state: which file we're currently PDF-exporting, and
   // which row just had its share link copied (shows a ✓ for ~1.5s).
   const [driveDownloadingId, setDriveDownloadingId] = useState<string | null>(null);
@@ -1178,6 +1211,125 @@ export default function Page() {
       const controller = new AbortController();
       agentAbortRef.current = controller;
 
+      // ── PHASE 2/3: Resume Builder chat-first orchestrator ───────────────
+      // When the user is in Resume Builder mode and analysis is loaded, the
+      // chat is the steering wheel. Route through Sonnet 4.5 with tool use
+      // — the orchestrator drives the panel via tools and narrates every
+      // action. Bypasses the orchestrate→analyze→synthesize chain entirely.
+      if (isResumeMode && resumeAnalysis && intakeStep >= 5) {
+        try {
+          const currentScore =
+            (resumeAnalysis.scores && typeof resumeAnalysis.scores.total === "number" && resumeAnalysis.scores.total > 0)
+              ? Math.round(resumeAnalysis.scores.total)
+              : null;
+          const res = await fetch("/api/agents/resume-orchestrator", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              messages: apiMessages,
+              extraction: resumeExtraction,
+              analysis: resumeAnalysis,
+              state: conversationStateRef.current,
+              currentScore,
+              originalScore: currentScore,
+            }),
+          });
+          if (!res.ok || !res.body) throw new Error("orchestrator HTTP error");
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let assistantText = "";
+          let chips: string[] = [];
+          const toolEvents: ChatToolEvent[] = [];
+
+          setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+          setIsLoading(false);
+
+          let buf = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() ?? "";
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              const data = line.slice(6);
+              if (data === "[DONE]") continue;
+              try {
+                const frame = JSON.parse(data);
+                if (frame.kind === "text") {
+                  assistantText += frame.text;
+                  setMessages((prev) => {
+                    const updated = [...prev];
+                    updated[updated.length - 1] = { role: "assistant", content: assistantText };
+                    return updated;
+                  });
+                } else if (frame.kind === "tool") {
+                  toolEvents.push({ ts: Date.now() + toolEvents.length, name: frame.name, input: frame.input ?? {} });
+                } else if (frame.kind === "chips") {
+                  chips = frame.chips ?? [];
+                }
+              } catch { /* skip malformed */ }
+            }
+          }
+
+          // Strip any trailing [CHIPS] line that leaked into the text (defensive).
+          const cleaned = assistantText.replace(/\n*\[CHIPS\][^\n]*$/i, "").trim();
+          const finalChat: ChatMessage[] = [
+            ...updatedMessages,
+            { role: "assistant", content: cleaned, timestamp: now() },
+          ];
+          if (chips.length > 0) {
+            finalChat.push({ role: "assistant", content: `__INLINE_CHIPS__:${chips.join("|")}` });
+          }
+          setMessages(finalChat);
+          finalMessages = finalChat;
+
+          // Dispatch tool calls one by one to the panel. Stagger ~120ms so
+          // multiple tool effects don't race within React's batching.
+          toolEvents.forEach((evt, idx) => {
+            setTimeout(() => setPendingChatTool(evt), idx * 120);
+          });
+
+          // Local state side-effects from preference tools.
+          for (const evt of toolEvents) {
+            if (evt.name === "set_style_preference") {
+              const style = (evt.input.style as ConversationStateLite["preferredStyle"]) ?? null;
+              const note = typeof evt.input.note === "string" ? evt.input.note : null;
+              setConversationState((s) => ({ ...s, preferredStyle: style, styleNote: note }));
+            }
+          }
+
+          const id = activeChatIdRef.current;
+          if (id) {
+            persistChat(id, finalChat, "resume_builder", {
+              resumeText,
+              resumeFilename,
+              resumeExtraction,
+              resumeAnalysis,
+              careerGoal,
+            });
+          }
+          return;
+        } catch (err) {
+          const wasAborted = err instanceof Error && (err.name === "AbortError" || err.message.includes("aborted"));
+          if (!wasAborted) {
+            setIsLoading(false);
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: "Hit a snag reaching the server. Try again?" },
+            ]);
+            console.error("[resume-orchestrator]", err);
+          } else {
+            setIsLoading(false);
+          }
+          if (agentAbortRef.current === controller) agentAbortRef.current = null;
+          return;
+        }
+      }
+
       try {
         // Step 1: Orchestrate
         let decision: OrchestratorDecision = DEFAULT_ORCHESTRATOR_DECISION;
@@ -2057,6 +2209,23 @@ export default function Page() {
             }}
             pendingInstruction={pendingBuilderInstruction}
             onPendingInstructionConsumed={() => setPendingBuilderInstruction(null)}
+            pendingChatTool={pendingChatTool}
+            onChatToolConsumed={() => setPendingChatTool(null)}
+            onApplyAcceptedFix={(sectionKey, priorityIndex) => {
+              setConversationState((s) => ({
+                ...s,
+                acceptedFixes: s.acceptedFixes.includes(sectionKey) ? s.acceptedFixes : [...s.acceptedFixes, sectionKey],
+                acceptedPriorityIndices: priorityIndex >= 0 && !s.acceptedPriorityIndices.includes(priorityIndex)
+                  ? [...s.acceptedPriorityIndices, priorityIndex]
+                  : s.acceptedPriorityIndices,
+              }));
+            }}
+            onRejectFixSignal={(sectionKey) => {
+              setConversationState((s) => ({
+                ...s,
+                rejectedFixes: s.rejectedFixes.includes(sectionKey) ? s.rejectedFixes : [...s.rejectedFixes, sectionKey],
+              }));
+            }}
             onEditUserMessage={handleEditUserMessage}
             onPushAssistantMessage={(text) => {
               const ts = now();
