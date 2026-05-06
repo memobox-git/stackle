@@ -179,7 +179,30 @@ export default function ScoreReveal({
   const topStrengths = (analysis?.strengths ?? []).slice(0, 2);
   const topWeaknesses = (analysis?.weaknesses ?? []).slice(0, 2);
   const topFix = analysis?.rewritePriorities?.[0] ?? null;
-  const topMatchRole = analysis?.bestFitRoles?.[0]?.title ?? analysis?.likelyTargetRole ?? null;
+  const bestFitRoles = analysis?.bestFitRoles ?? [];
+  const topMatch = bestFitRoles[0] ?? null;
+  const topMatchRole = topMatch?.title ?? analysis?.likelyTargetRole ?? null;
+  const topMatchPct = topMatch?.matchPct;
+  const altMatches = bestFitRoles.slice(1, 3);
+  // First sentence only — analysis sometimes gives multi-sentence text;
+  // the score reveal needs punch, not paragraphs.
+  const firstSentence = (s: string) => {
+    const m = s.match(/^[^.!?]+[.!?]/);
+    return (m ? m[0] : s).trim();
+  };
+  const topStrengthOne = topStrengths[0] ? firstSentence(topStrengths[0]) : null;
+  const topWeaknessOne = topWeaknesses[0] ? firstSentence(topWeaknesses[0]) : null;
+  const topFixOne = topFix ? firstSentence(topFix) : null;
+  const fixCount = (analysis?.rewritePriorities ?? []).length;
+
+  // Color that transitions WITH the displayed score. Used by the big number
+  // so as it counts up 0 → target it visibly shifts red → orange → green.
+  const liveScoreColor = analysis
+    ? (displayedScore < 31 ? "#dc2626"
+      : displayedScore < 61 ? "#ea580c"
+      : displayedScore < 80 ? "#ca8a04"
+      : "#16a34a")
+    : color;
 
   const greeting = candidateFirstName
     ? `Here's the read on your resume, ${candidateFirstName}.`
@@ -203,12 +226,15 @@ export default function ScoreReveal({
       <div className="w-full max-w-xl flex flex-col items-center text-center animate-fadein">
         <p className="text-sm text-gray-500 mb-2 tracking-wide">{greeting}</p>
 
-        {/* Score area — pulsing soft circle while loading, big number once landed. */}
+        {/* Score area — pulsing soft circle while loading, big number once
+            landed. The big number uses liveScoreColor which transitions
+            red → orange → yellow → green AS the count-up progresses, so
+            the user sees a hot-low-score cool down (or rise) in real time. */}
         {analysis ? (
-          <div className="relative my-6 flex items-baseline gap-2">
+          <div className="relative my-6 flex items-baseline gap-2 score-bounce">
             <span
-              className="text-[140px] leading-none font-bold tracking-tight tabular-nums transition-colors"
-              style={{ color }}
+              className="text-[140px] leading-none font-bold tracking-tight tabular-nums"
+              style={{ color: liveScoreColor, transition: "color 200ms linear" }}
             >
               {displayedScore}
             </span>
@@ -239,11 +265,28 @@ export default function ScoreReveal({
           {label}
         </span>
 
-        {/* Closest-match line — only appears after analysis lands. */}
+        {/* Closest-match line + alternative-fit roles. Pulls bestFitRoles
+            from the analysis so users see the depth of the match. */}
         {topMatchRole && (
-          <p className="text-sm text-gray-600 mb-8">
-            Closest match: <span className="font-semibold text-gray-900">{topMatchRole}</span>
-          </p>
+          <div className="mb-7 text-center">
+            <p className="text-sm text-gray-600">
+              Closest match: <span className="font-semibold text-gray-900">{topMatchRole}</span>
+              {typeof topMatchPct === "number" && (
+                <span className="text-gray-500"> ({topMatchPct}% fit)</span>
+              )}
+            </p>
+            {altMatches.length > 0 && (
+              <p className="text-xs text-gray-500 mt-1.5">
+                Also fits: {altMatches.map((r, i) => (
+                  <span key={i}>
+                    {i > 0 && " · "}
+                    <span className="text-gray-700">{r.title}</span>
+                    {typeof r.matchPct === "number" && <span> ({r.matchPct}%)</span>}
+                  </span>
+                ))}
+              </p>
+            )}
+          </div>
         )}
 
         {/* LOADING STATE — progress bar + rotating message */}
@@ -270,42 +313,46 @@ export default function ScoreReveal({
           </div>
         )}
 
-        {/* REVEALED STATE — Strong / Weak / Top fix cards */}
+        {/* REVEALED STATE — three one-sentence insight cards. Each card
+            takes only the FIRST sentence of the analysis text so the
+            screen scans in 6 seconds. */}
         {analysis && (
           <div className="w-full flex flex-col gap-3 mb-8 text-left">
-            {topStrengths.length > 0 && (
+            {topStrengthOne && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3">
                 <p className="text-[11px] font-semibold tracking-widest uppercase text-emerald-700 mb-1">Strong</p>
-                <p className="text-sm text-gray-800 leading-snug">{topStrengths.join(" · ")}</p>
+                <p className="text-sm text-gray-800 leading-snug">{topStrengthOne}</p>
               </div>
             )}
-            {topWeaknesses.length > 0 && (
+            {topWeaknessOne && (
               <div className="rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3">
                 <p className="text-[11px] font-semibold tracking-widest uppercase text-amber-700 mb-1">Weak</p>
-                <p className="text-sm text-gray-800 leading-snug">{topWeaknesses.join(" · ")}</p>
+                <p className="text-sm text-gray-800 leading-snug">{topWeaknessOne}</p>
               </div>
             )}
-            {topFix && (
+            {topFixOne && (
               <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-4 py-3">
                 <p className="text-[11px] font-semibold tracking-widest uppercase text-violet-700 mb-1">Top fix</p>
-                <p className="text-sm text-gray-800 leading-snug">{topFix}</p>
+                <p className="text-sm text-gray-800 leading-snug">{topFixOne}</p>
               </div>
             )}
           </div>
         )}
 
-        {/* CTA */}
+        {/* CTA — bigger and pulses once on appearance to draw the eye. */}
         <button
           onClick={onContinue}
           disabled={!analysis}
-          className="group flex items-center gap-2 px-6 py-3.5 rounded-xl bg-gray-900 text-white text-sm font-semibold hover:bg-black active:scale-[0.99] transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          className={`group flex items-center gap-2.5 px-8 py-4 rounded-xl bg-gray-900 text-white text-base font-semibold hover:bg-black active:scale-[0.99] transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed ${analysis ? "cta-pulse" : ""}`}
         >
           {analysis ? "Show me the full report" : "Building your report…"}
-          {analysis && <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" strokeWidth={2.25} />}
+          {analysis && <ArrowRight className="w-5 h-5 group-hover:translate-x-0.5 transition-transform" strokeWidth={2.25} />}
         </button>
 
-        <p className="text-xs text-gray-500 mt-6">
-          Stackle reads your resume the way a senior recruiter would. You can fix everything in the next screen.
+        <p className="text-xs text-gray-500 mt-6 max-w-sm leading-relaxed">
+          {analysis && fixCount > 0
+            ? <>Your report has <span className="text-gray-700 font-medium">{fixCount} specific fix{fixCount === 1 ? "" : "es"}</span> ready. Most users see a 15–25 point improvement.</>
+            : "Stackle reads your resume the way a senior recruiter would."}
         </p>
       </div>
 
@@ -325,6 +372,29 @@ export default function ScoreReveal({
         }
         .score-loading-pulse {
           animation: score-loading-pulse 2.4s ease-in-out infinite;
+        }
+
+        /* Subtle bounce when the big number lands — fires once, ~1.6s
+           into the count-up so it coincides with the final tick. */
+        @keyframes score-bounce {
+          0%, 100% { transform: scale(1); }
+          70%      { transform: scale(1); }
+          82%      { transform: scale(1.06); }
+          100%     { transform: scale(1); }
+        }
+        .score-bounce {
+          animation: score-bounce 2.0s ease-out 1;
+        }
+
+        /* Once-on-mount pulse around the CTA so it draws the eye when the
+           reveal lands. Single ring expanding outward, fades. */
+        @keyframes cta-pulse {
+          0%   { box-shadow: 0 0 0 0 rgba(24, 24, 27, 0.35), 0 10px 25px -10px rgba(0,0,0,0.25); }
+          70%  { box-shadow: 0 0 0 16px rgba(24, 24, 27, 0), 0 10px 25px -10px rgba(0,0,0,0.25); }
+          100% { box-shadow: 0 0 0 0 rgba(24, 24, 27, 0),    0 10px 25px -10px rgba(0,0,0,0.25); }
+        }
+        .cta-pulse {
+          animation: cta-pulse 2.4s ease-out 1;
         }
 
         /* Per-message fade as stepIdx increments. */
