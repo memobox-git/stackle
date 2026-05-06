@@ -167,7 +167,11 @@ function renderResumeContext(input: ResumeOrchestratorInput): string {
   if (a?.seniorityEstimate) parts.push(`seniority: ${a.seniorityEstimate}`);
   if (a?.rewritePriorities && a.rewritePriorities.length > 0) {
     parts.push(`action_plan:`);
-    a.rewritePriorities.slice(0, 8).forEach((p, i) => parts.push(`  ${i}. ${p}`));
+    // Show all priorities to the orchestrator — was capped at 8 back when
+    // the analyzer prompt itself capped at 6-10. Now priorities scale with
+    // resume condition (3-30) and the orchestrator should see the whole
+    // list so it can map "fix #14" or "the seniority bullet" correctly.
+    a.rewritePriorities.forEach((p, i) => parts.push(`  ${i}. ${p}`));
   }
   if (a?.weaknesses && a.weaknesses.length > 0) {
     parts.push(`top_weaknesses: ${a.weaknesses.slice(0, 3).join("; ")}`);

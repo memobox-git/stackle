@@ -200,8 +200,8 @@ Return exactly this structure:
     "scanabilityRisk": "low" | "medium" | "high",
     "notes": string[] (min 3, specific issues found, no generic statements)
   },
-  "rewritePriorities": string[] (6-10 items, sorted HIGH to LOW priority, format: "HIGH — Fix X because Y"),
-  "suggestedNextSteps": string[] (6-10 ranked actions),
+  "rewritePriorities": string[] (as many as the resume genuinely needs — between 3 and 30, sorted HIGH→LOW. DO NOT pad to a target number. A clean resume gets 3-5 items; a heavily flawed one might warrant 20+. Format: "HIGH — Fix X because Y". Every item must name a SPECIFIC concrete fix, not a generic suggestion. If you're tempted to write "consider improving your bullets" or any other vague catch-all to hit a number, STOP — fewer real items > more padding.),
+  "suggestedNextSteps": string[] (3-12 ranked actions, calibrated to the actual gap — don't pad),
   "bestFitRoles": [
     {
       "title": string,       // e.g. "Data Engineer"
