@@ -486,14 +486,14 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
       {/* Logo — pinned top-left corner. Wordmark next to the chip
           instead of stacked underneath, since horizontal real estate
           is cheap up there and we want vertical space back. */}
-      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex items-center gap-2">
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 flex items-center gap-2.5">
         <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-black text-sm font-bold shadow"
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-black text-base font-bold shadow"
           style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
         >
           S
         </div>
-        <span className="text-[11px] uppercase tracking-[0.2em] text-gray-600 font-semibold">
+        <span className="text-xs uppercase tracking-[0.2em] text-gray-600 font-semibold">
           Stackle
         </span>
       </div>
@@ -653,12 +653,12 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         {/* Step 2 — Resume upload */}
         {step >= 2 && (
           <div className="animate-fadein flex flex-col items-center gap-4">
-            <p className="text-lg font-semibold text-gray-900 text-center">
+            <h1 className="text-3xl sm:text-4xl font-semibold text-gray-900 text-center tracking-tight leading-tight">
               {q2.displayed}
-              <span className={`inline-block w-0.5 h-5 bg-gray-900 ml-0.5 align-middle ${q2.done ? "opacity-0" : "animate-pulse"}`} />
-            </p>
-            <p className="text-sm text-gray-500 -mt-2 text-center">
-              I&apos;ll pull your details from it automatically.
+              <span className={`inline-block w-0.5 h-8 bg-gray-900 ml-1 align-middle ${q2.done ? "opacity-0" : "animate-pulse"}`} />
+            </h1>
+            <p className="text-base text-gray-600 text-center max-w-md leading-relaxed">
+              Get an honest review and action plan from a senior data engineer. Free.
             </p>
 
             {resumeFilename ? (
@@ -758,12 +758,30 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                       {uploading ? "Uploading…" : "Click to upload"}
                     </span>
                     <span className="block text-[11px] text-gray-500 mt-0.5">
-                      PDF or DOCX · drag & drop coming soon
+                      PDF or DOCX · max 5MB
                     </span>
                   </div>
                 </button>
                 <input ref={resumeInputRef} type="file" accept=".pdf,.docx" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleResumeUpload(f); }} />
+
+                {/* Trust footer — confidence-builder before commit. Only
+                    shown in the empty-state (before a file is selected),
+                    so it doesn't compete with the role/JD form. */}
+                <ul className="mt-2 flex flex-col gap-1.5 text-[12px] text-gray-500">
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-600">✓</span> Reads your resume in 30 seconds
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-600">✓</span> Identifies your strongest signals
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-600">✓</span> Gives you a complete action plan
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="text-emerald-600">✓</span> No credit card required
+                  </li>
+                </ul>
               </div>
             )}
           </div>
