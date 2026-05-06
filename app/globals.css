@@ -169,6 +169,15 @@ nextjs-portal { display: none !important; }
   border-radius: 6px;
 }
 
+/* Skills — plain text by default, × button reveals on hover. Keeps the
+   skills section reading like prose ("Languages: Python, SQL, Java")
+   rather than a wall of pill chips, while still allowing per-skill
+   removal when the user wants to edit. */
+.stackle-skill-item:hover .stackle-skill-x,
+.stackle-skill-suggestion:hover .stackle-skill-x {
+  opacity: 1 !important;
+}
+
 /* Manual-edit pencil — fades in when the user hovers a section that supports
    plain-text editing (summary, bullets, etc.). Stays visible when the pencil
    itself is focused so keyboard users can tab into it. */

@@ -772,157 +772,150 @@ export default function LiveEditableResume({
           <EditableSection sectionKey="skillGroups" {...sharedProps}>
             <div>
               {(extraction.skillGroups ?? []).filter((group) => (group.skills ?? []).length > 0).map((group, i) => (
-                <div key={i} style={{ marginBottom: "8px", fontSize: "12.5px" }}>
-                  <span style={{ fontWeight: "700", color: "#000", marginRight: "6px" }}>
+                <div key={i} style={{ marginBottom: "6px", fontSize: "13px", lineHeight: 1.55 }}>
+                  <span style={{ fontWeight: "700", color: "#000", marginRight: "4px" }}>
                     {group.category}:
                   </span>
-                  <span style={{ display: "inline-flex", flexWrap: "wrap", gap: "4px", verticalAlign: "middle" }}>
-                    {group.skills.map((skill) => (
-                      <span
-                        key={skill}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "3px",
-                          padding: "1px 7px",
-                          borderRadius: "10px",
-                          background: "#f3f4f6",
-                          border: "1px solid #e5e7eb",
-                          fontSize: "11.5px",
-                          color: "#111",
-                        }}
-                      >
-                        {skill}
-                        {onRemoveSkill && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onRemoveSkill(i, skill); }}
-                            title={`Remove ${skill}`}
-                            style={{
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              padding: "0 0 0 2px",
-                              color: "#9ca3af",
-                              fontSize: "11px",
-                              lineHeight: 1,
-                            }}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </span>
-                    ))}
-                    {onAddSkill && (
-                      addingToCategory === group.category ? (
-                        <input
-                          autoFocus
-                          value={pendingSkillText}
-                          onChange={(e) => setPendingSkillText(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              const s = pendingSkillText.trim();
-                              if (s) onAddSkill(s, group.category);
-                              setPendingSkillText("");
-                              setAddingToCategory(null);
-                            } else if (e.key === "Escape") {
-                              setPendingSkillText("");
-                              setAddingToCategory(null);
-                            }
+                  {/* Plain comma-separated text, no pills. Each skill is a
+                      hover target — × appears only on hover so the resting
+                      state reads like normal prose. Matches how a real
+                      resume renders skills (Languages: Python, SQL, Java)
+                      and matches the gold-reference docx. */}
+                  {group.skills.map((skill, idx) => (
+                    <span key={skill} className="stackle-skill-item" style={{ position: "relative", color: "#111" }}>
+                      {skill}
+                      {onRemoveSkill && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onRemoveSkill(i, skill); }}
+                          title={`Remove ${skill}`}
+                          className="stackle-skill-x"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "0 0 0 2px",
+                            color: "#9ca3af",
+                            fontSize: "11px",
+                            lineHeight: 1,
+                            opacity: 0,
+                            transition: "opacity 120ms ease",
                           }}
-                          onBlur={() => {
+                        >
+                          ×
+                        </button>
+                      )}
+                      {idx < group.skills.length - 1 && <span style={{ color: "#a1a1aa" }}>, </span>}
+                    </span>
+                  ))}
+                  {onAddSkill && (
+                    addingToCategory === group.category ? (
+                      <input
+                        autoFocus
+                        value={pendingSkillText}
+                        onChange={(e) => setPendingSkillText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
                             const s = pendingSkillText.trim();
                             if (s) onAddSkill(s, group.category);
                             setPendingSkillText("");
                             setAddingToCategory(null);
-                          }}
-                          placeholder="new skill"
-                          style={{
-                            padding: "1px 7px",
-                            borderRadius: "10px",
-                            border: "1px solid #a99af9",
-                            fontSize: "11.5px",
-                            outline: "none",
-                            minWidth: "80px",
-                          }}
-                        />
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAddingToCategory(group.category);
+                          } else if (e.key === "Escape") {
                             setPendingSkillText("");
-                          }}
-                          title={`Add skill to ${group.category}`}
-                          style={{
-                            padding: "1px 7px",
-                            borderRadius: "10px",
-                            background: "transparent",
-                            border: "1px dashed #d1d5db",
-                            fontSize: "11.5px",
-                            color: "#6b7280",
-                            cursor: "pointer",
-                          }}
-                        >
-                          + Add
-                        </button>
-                      )
-                    )}
-                  </span>
+                            setAddingToCategory(null);
+                          }
+                        }}
+                        onBlur={() => {
+                          const s = pendingSkillText.trim();
+                          if (s) onAddSkill(s, group.category);
+                          setPendingSkillText("");
+                          setAddingToCategory(null);
+                        }}
+                        placeholder="new skill"
+                        style={{
+                          marginLeft: "6px",
+                          padding: "0 4px",
+                          borderRadius: "3px",
+                          border: "1px solid #a99af9",
+                          fontSize: "13px",
+                          outline: "none",
+                          minWidth: "100px",
+                        }}
+                      />
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAddingToCategory(group.category);
+                          setPendingSkillText("");
+                        }}
+                        title={`Add skill to ${group.category}`}
+                        style={{
+                          marginLeft: "6px",
+                          background: "transparent",
+                          border: "none",
+                          padding: 0,
+                          fontSize: "12px",
+                          color: "#9ca3af",
+                          cursor: "pointer",
+                          textDecoration: "underline dotted",
+                          textUnderlineOffset: "3px",
+                        }}
+                      >
+                        + add
+                      </button>
+                    )
+                  )}
                 </div>
               ))}
 
-              {/* Suggested skills row — dimmed chips with + to add */}
+              {/* Suggested skills — plain inline list under a quiet
+                  label. No pills, no fills. Each suggestion is text with
+                  a tiny + to add and an × to dismiss, both ghosted until
+                  hover. */}
               {suggestedSkills && suggestedSkills.length > 0 && (
                 <div style={{
                   marginTop: "10px",
                   paddingTop: "8px",
                   borderTop: "1px dashed #e5e7eb",
-                  fontSize: "11px",
+                  fontSize: "12px",
+                  lineHeight: 1.6,
                 }}>
-                  <span style={{ color: "#6b7280", fontWeight: "600", marginRight: "6px", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "10px" }}>
+                  <span style={{ color: "#9ca3af", fontWeight: "600", marginRight: "6px", textTransform: "uppercase", letterSpacing: "0.05em", fontSize: "10px" }}>
                     Suggested for your target role:
                   </span>
-                  <span style={{ display: "inline-flex", flexWrap: "wrap", gap: "4px", verticalAlign: "middle" }}>
-                    {suggestedSkills.map((s) => (
-                      <span
-                        key={s.skill}
-                        title={s.reason}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "3px",
-                          padding: "1px 7px",
-                          borderRadius: "10px",
-                          background: s.priority === "high" ? "#fef3c7" : "#f3f4f6",
-                          border: `1px solid ${s.priority === "high" ? "#fde68a" : "#e5e7eb"}`,
-                          fontSize: "11px",
-                          color: "#6b7280",
-                          fontStyle: "italic",
-                        }}
+                  {suggestedSkills.map((s, idx) => (
+                    <span key={s.skill} title={s.reason} className="stackle-skill-suggestion" style={{ color: "#6b7280", marginRight: "2px", fontStyle: "italic", position: "relative" }}>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); onAddSkill?.(s.skill, s.category); }}
+                        title={`Add ${s.skill}`}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#16a34a", fontWeight: "700", fontSize: "13px", padding: "0 3px 0 0" }}
                       >
+                        +
+                      </button>
+                      {s.skill}
+                      {onDismissSuggestion && (
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onAddSkill?.(s.skill, s.category);
+                          onClick={(e) => { e.stopPropagation(); onDismissSuggestion(s.skill); }}
+                          title="Dismiss"
+                          className="stackle-skill-x"
+                          style={{
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "0 0 0 3px",
+                            color: "#9ca3af",
+                            fontSize: "11px",
+                            lineHeight: 1,
+                            opacity: 0,
+                            transition: "opacity 120ms ease",
                           }}
-                          title={`Add ${s.skill}`}
-                          style={{ background: "none", border: "none", cursor: "pointer", color: "#16a34a", fontWeight: "700", fontSize: "12px", padding: 0, marginRight: "2px" }}
                         >
-                          +
+                          ×
                         </button>
-                        {s.skill}
-                        {onDismissSuggestion && (
-                          <button
-                            onClick={(e) => { e.stopPropagation(); onDismissSuggestion(s.skill); }}
-                            title="Dismiss"
-                            style={{ background: "none", border: "none", cursor: "pointer", padding: "0 0 0 2px", color: "#9ca3af", fontSize: "10px", lineHeight: 1 }}
-                          >
-                            ×
-                          </button>
-                        )}
-                      </span>
-                    ))}
-                  </span>
+                      )}
+                      {idx < suggestedSkills.length - 1 && <span style={{ color: "#d4d4d8" }}>, </span>}
+                    </span>
+                  ))}
                 </div>
               )}
             </div>
