@@ -1611,10 +1611,8 @@ export default function ResumeBuilder({
     <div
       className={`flex flex-col min-h-0 rb-chat-panel ${isPanelOpen ? "rb-chat-panel-open" : ""} ${mobileView === "panel" ? "hidden md:flex" : "flex"}`}
       style={{
-        // Chat-first: chat is the primary interface. 50/50 split with the
-        // workspace when a panel is open, full-width when nothing on the
-        // right. Was 35/65 — felt like a sidebar.
-        width: isPanelOpen ? "50%" : "100%",
+        // 25/75 split — narrow chat rail, wide workspace canvas.
+        width: isPanelOpen ? "25%" : "100%",
         transition: "width 300ms ease",
         minWidth: 0,
       }}
@@ -1930,8 +1928,8 @@ export default function ResumeBuilder({
       className={`flex-col min-h-0 bg-white overflow-hidden rb-workspace-panel ${isPanelOpen ? "rb-workspace-panel-open" : ""}
         ${mobileView === "panel" ? "flex flex-1" : "hidden md:flex"}`}
       style={{
-        // Chat-first: 50/50 split when open. Was 65 — felt panel-first.
-        width: isPanelOpen ? "50%" : "0",
+        // 25/75 split.
+        width: isPanelOpen ? "75%" : "0",
         minWidth: isPanelOpen ? "0" : "0",
         transition: "width 300ms ease",
         flexShrink: 0,
@@ -2417,10 +2415,11 @@ export default function ResumeBuilder({
           .rb-chat-panel { width: 100% !important; }
           .rb-workspace-panel { width: 100% !important; }
         }
-        /* Tablet (iPad): chat-first 50/50 split */
+        /* Tablet (iPad): chat 30%, workspace 70% — narrower screens need
+           a slightly wider chat rail to stay legible. Desktop keeps 25/75. */
         @media (min-width: 768px) and (max-width: 1199px) {
-          .rb-chat-panel-open { width: 50% !important; }
-          .rb-workspace-panel-open { width: 50% !important; }
+          .rb-chat-panel-open { width: 30% !important; }
+          .rb-workspace-panel-open { width: 70% !important; }
         }
       `}</style>
 
