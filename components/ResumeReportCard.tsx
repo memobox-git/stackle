@@ -20,6 +20,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Sparkles, X, ArrowRight } from "lucide-react";
 import { ResumeAnalysis, ScoreCategory } from "@/lib/agents/schemas/resumeIntelligence";
+import { tierLabel } from "@/lib/score";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,11 +30,15 @@ function scoreColor(pct: number): string {
   return "#dc2626";
 }
 
+// Tier badge colours per surface. Label comes from the shared tierLabel()
+// in lib/score.ts so the chat welcome, Report hero, and any future surface
+// always agree on what 73 means.
 function tierBadge(total: number): { label: string; color: string; bg: string; border: string } {
-  if (total >= 88) return { label: "STRONG", color: "#1e40af", bg: "#eff6ff", border: "#bfdbfe" };
-  if (total >= 75) return { label: "SOLID", color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" };
-  if (total >= 60) return { label: "NEEDS WORK", color: "#b45309", bg: "#fffbeb", border: "#fde68a" };
-  return { label: "WEAK", color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" };
+  const label = tierLabel(total).toUpperCase();
+  if (total >= 88) return { label, color: "#1e40af", bg: "#eff6ff", border: "#bfdbfe" };
+  if (total >= 75) return { label, color: "#15803d", bg: "#f0fdf4", border: "#bbf7d0" };
+  if (total >= 60) return { label, color: "#b45309", bg: "#fffbeb", border: "#fde68a" };
+  return { label, color: "#b91c1c", bg: "#fef2f2", border: "#fecaca" };
 }
 
 function priorityColor(label: string) {

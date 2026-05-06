@@ -1,5 +1,6 @@
 import { ResumeExtraction } from "../schemas/resumeExtraction";
 import { ResumeAnalysis } from "../schemas/resumeIntelligence";
+import { tierLabel } from "@/lib/score";
 
 /**
  * Build the opening assistant message for the Resume Builder chat panel.
@@ -85,17 +86,6 @@ function articleFor(phrase: string): string {
   if (consonantSoundAcronyms.some((a) => upper.startsWith(a))) return "a";
   if (vowelSoundAcronyms.some((a) => upper.startsWith(a))) return "an";
   return /^[aeiou]/i.test(word) ? "an" : "a";
-}
-
-// Buckets the numeric score into a human-readable tier. Matches the labels
-// ScoreReveal.tsx used in its scoreLabel() helper. Used by para 1 of the
-// welcome ("You scored 58/100 — Mixed.") so the chat narrates the same
-// framing the user sees in the Report panel hero.
-function tierLabel(score: number): string {
-  if (score >= 85) return "Strong";
-  if (score >= 70) return "Solid";
-  if (score >= 50) return "Mixed";
-  return "Needs work";
 }
 
 // ── Score (mirrors components/ScoreReveal.tsx + ResumeBuilder.tsx deriveScore)

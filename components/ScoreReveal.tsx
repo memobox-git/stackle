@@ -54,11 +54,16 @@ function computeScore(a: ResumeAnalysis): number {
   return Math.max(20, Math.min(100, Math.round(score)));
 }
 
+// Tier label imported from lib/score.ts so the loading-screen "Analyzing"
+// badge (and any future re-use of this component) reads the same buckets
+// as Report + chat welcome.
+import { tierLabel as sharedTierLabel } from "@/lib/score";
 function scoreLabel(score: number): { label: string; color: string } {
-  if (score >= 80) return { label: "Strong", color: "#10b981" };
-  if (score >= 65) return { label: "Good", color: "#22c55e" };
-  if (score >= 50) return { label: "Needs work", color: "#f59e0b" };
-  return { label: "Weak", color: "#ef4444" };
+  const label = sharedTierLabel(score);
+  if (score >= 88) return { label, color: "#10b981" };
+  if (score >= 75) return { label, color: "#22c55e" };
+  if (score >= 60) return { label, color: "#f59e0b" };
+  return { label, color: "#ef4444" };
 }
 
 // Pick "a" or "an" based on the first word's leading sound. Vowel-letter
@@ -212,9 +217,12 @@ export default function ScoreReveal({
       : "#16a34a")
     : color;
 
+  // Loading-state header. Honest about the current state — the read isn't
+  // ready yet; we're still working. The reveal moment now happens in the
+  // Resume Builder chat + Report panel after the user auto-advances.
   const greeting = candidateFirstName
-    ? `Here's the read on your resume, ${candidateFirstName}.`
-    : "Here's the read on your resume.";
+    ? `Working on your resume, ${candidateFirstName}.`
+    : "Working on your resume.";
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12 bg-gradient-to-b from-white via-white to-[#fafafa] relative">
