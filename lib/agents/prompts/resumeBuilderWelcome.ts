@@ -50,7 +50,7 @@ export function buildResumeBuilderWelcome(
   // chose seniority="Entry-level to Junior"), surface that explicitly
   // — silent re-targeting feels like gaslighting when the user later
   // sees "Junior Data Engineer" in the report.
-  const seniorityNote = buildSeniorityNote(analysis, chosenTargetRole);
+  const seniorityNote = buildSeniorityNote(analysis, chosenTargetRole, ext.totalYearsExperience);
   const para1 = seniorityNote
     ? `Hey ${firstName}. You scored ${score}/100 — ${tier}. ${seniorityNote}`
     : `Hey ${firstName}. You scored ${score}/100 — ${tier}.`;
@@ -98,43 +98,66 @@ function articleFor(phrase: string): string {
 }
 
 // ── Seniority transparency
-// When the analyzer downshifts the user's chosen target role to a more
-// junior level (because of years of experience or missing skills), say so
-// in the welcome. Returns a one-sentence note or "" if there's no
-// material mismatch.
-function buildSeniorityNote(a: ResumeAnalysis | null | undefined, chosenTargetRole: string | null | undefined): string {
+// When the user's chosen target role doesn't match their actual experience
+// level — either the analyzer downshifted ("you picked Senior, I benchmarked
+// against Junior") OR the years-of-experience clearly contradicts the
+// chosen seniority ("you picked Senior · 10-15y but you have 4 years") —
+// surface the mismatch honestly in the welcome.
+//
+// Three checks:
+//   1. Years-vs-chosen mismatch (e.g. "Senior · 10-15 yrs" but totalYears=4)
+//   2. Junior downshift (analyzer chose more junior than user)
+//   3. Senior upshift (analyzer chose more senior than user)
+function buildSeniorityNote(
+  a: ResumeAnalysis | null | undefined,
+  chosenTargetRole: string | null | undefined,
+  totalYears?: number | null,
+): string {
   if (!a || !chosenTargetRole) return "";
+
+  const chosenLower = chosenTargetRole.toLowerCase();
+  const chosenIsSenior = /\b(senior|sr\.?|staff|principal|lead|director|head|manager|10[-+]?\s*15\s*y|8\+|10\+)\b/.test(chosenLower);
+  const chosenIsJunior = /\b(junior|jr\.?|entry|intern|associate|0[-]?2|new\s*grad|grad)\b/.test(chosenLower);
+
+  // CHECK 1 — Years contradict the chosen seniority.
+  if (typeof totalYears === "number" && isFinite(totalYears) && totalYears > 0) {
+    if (chosenIsSenior && totalYears < 7) {
+      return `Note: you picked ${chosenTargetRole}, but your resume shows ${formatYears(totalYears)} of experience — Senior roles typically expect 8+ years. I'm benchmarking against the realistic target for your background.`;
+    }
+    if (chosenIsJunior && totalYears >= 5) {
+      return `Note: you picked ${chosenTargetRole}, but your resume shows ${formatYears(totalYears)} of experience — that supports a more senior target. Worth aiming higher.`;
+    }
+  }
+
+  // CHECK 2 + 3 — Analyzer's benchmark differs from user's pick.
   const benchmark = (a.likelyTargetRole ?? "").trim();
   const seniority = (a.seniorityEstimate ?? "").trim();
   if (!benchmark && !seniority) return "";
 
-  // Detect a junior downshift: chosen target doesn't say junior/entry/intern,
-  // but the seniority estimate does.
-  const chosenLower = chosenTargetRole.toLowerCase();
   const benchLower = benchmark.toLowerCase();
   const senLower = seniority.toLowerCase();
-  const chosenIsJunior = /\b(junior|jr\.?|entry|intern|associate)\b/.test(chosenLower);
   const benchmarkIsJunior =
     /\b(junior|jr\.?|entry|intern|associate)\b/.test(benchLower) ||
     /\b(junior|jr\.?|entry|intern|associate)\b/.test(senLower);
-
-  if (!chosenIsJunior && benchmarkIsJunior) {
-    // Surface the downshift honestly.
-    const targetLabel = benchmark || `${seniority} ${chosenTargetRole}`.trim();
-    return `Note: you picked ${chosenTargetRole}, but I benchmarked against ${targetLabel} based on your years of experience and stack — that's the realistic target right now.`;
-  }
-
-  // Reverse direction (chose junior, analyzer picked senior) is uncommon
-  // but worth noting — usually means strong signal.
-  const chosenIsSenior = /\b(senior|sr\.?|staff|principal|lead|manager)\b/.test(chosenLower);
   const benchmarkIsSenior =
     /\b(senior|sr\.?|staff|principal|lead|manager)\b/.test(benchLower) ||
     /\b(senior|sr\.?|staff|principal|lead|manager)\b/.test(senLower);
+
+  if (!chosenIsJunior && benchmarkIsJunior) {
+    const targetLabel = benchmark || `${seniority} ${chosenTargetRole}`.trim();
+    return `Note: you picked ${chosenTargetRole}, but I benchmarked against ${targetLabel} based on your years of experience and stack — that's the realistic target right now.`;
+  }
   if (!chosenIsSenior && benchmarkIsSenior) {
     return `Note: you picked ${chosenTargetRole}, but the analysis benchmarked against ${benchmark || seniority} — your experience supports a more senior target.`;
   }
 
   return "";
+}
+
+function formatYears(years: number): string {
+  if (years < 1) return "less than a year";
+  const rounded = Math.round(years);
+  return rounded === 1 ? "1 year" : `${rounded} years`;
 }
 
 // ── Score (delegates to lib/score.ts so welcome / Report / Edit / Rewrite
@@ -257,39 +280,110 @@ function pickBiggestWinPointer(analysis: ResumeAnalysis, ext: ResumeExtraction):
 // ── First recommended action
 type Action = { sectionPhrase: string; whyItMatters: string; howToAct: string };
 
+// Sub-score-driven recommendation. The earlier version regex-matched
+// `analysis.rewritePriorities[0]` and frequently disagreed with the
+// AI Coach's "Fastest Win" tile because each used different mapping
+// logic. NEW logic: read the actual sub-scores, pick the lowest-percentage
+// category (the real weakness), and recommend that. Falls back to the
+// first priority's section bucket only when sub-scores are missing.
+//
+// Maps weakest sub-score → recommendation:
+//   ATS lowest         → fix ATS-killers (URLs, formatting)
+//   Content lowest     → rewrite weak bullets for impact + metrics
+//   Format lowest      → restructure (section order, header)
+//   Keywords lowest    → inject missing target-role keywords
+//   Seniority lowest   → add leadership / scope signals
 function pickFirstAction(analysis: ResumeAnalysis): Action {
-  const top = analysis.rewritePriorities?.[0] ?? "";
+  const subScoreAction = pickActionFromWeakestSubScore(analysis);
+  if (subScoreAction) return subScoreAction;
 
+  // Fallback: regex on priority[0] when sub-scores aren't populated.
+  const top = analysis.rewritePriorities?.[0] ?? "";
   if (/summary|profile|objective|headline|intro/i.test(top)) {
     return {
       sectionPhrase: "the summary",
       whyItMatters: "it's the first thing recruiters read and yours leads with generic phrases that get skipped",
-      howToAct: "Click Fix Summary on the right when you're ready, or ask me anything about the report.",
+      howToAct: "Hit 'Fix top 3' on the right when you're ready, or ask me anything about the report.",
     };
   }
-
   if (/skills?|keyword|stack|tech list|tools/i.test(top)) {
     return {
       sectionPhrase: "your skills",
       whyItMatters: "the keyword section is what ATS scans against the JD before a human ever sees you",
-      howToAct: "Click Fix Skills on the right when you're ready, or ask me anything about the report.",
+      howToAct: "Hit 'Fix top 3' on the right when you're ready, or ask me anything about the report.",
     };
   }
-
   if (/bullet|impact|metric|quantif|achievement|wins/i.test(top)) {
     return {
       sectionPhrase: "your experience bullets",
       whyItMatters: "weak bullets are where most candidates lose the recruiter's attention in the first six seconds",
-      howToAct: "Click Fix this on the top priority on the right when you're ready, or ask me anything about the report.",
+      howToAct: "Hit 'Fix top 3' on the right when you're ready, or ask me anything about the report.",
     };
   }
-
-  // Default: point at the first priority generically.
   return {
     sectionPhrase: "the top priority",
     whyItMatters: "this is the highest-impact change we can make on your resume right now",
-    howToAct: "Click Fix this on the right when you're ready, or ask me anything about the report.",
+    howToAct: "Hit 'Fix top 3' on the right when you're ready, or ask me anything about the report.",
   };
+}
+
+// Look at sub-scores, find the weakest by percentage, return a recommendation
+// tailored to that category. Returns null if sub-scores aren't populated.
+function pickActionFromWeakestSubScore(analysis: ResumeAnalysis): Action | null {
+  const s = analysis.scores;
+  if (!s) return null;
+  const cats = [
+    { key: "ats",      score: s.atsCompatibility?.score ?? 0,    max: s.atsCompatibility?.max ?? 20 },
+    { key: "content",  score: s.contentImpact?.score ?? 0,        max: s.contentImpact?.max ?? 25 },
+    { key: "format",   score: s.structureFormatting?.score ?? 0,  max: s.structureFormatting?.max ?? 20 },
+    { key: "keywords", score: s.keywordCoverage?.score ?? 0,      max: s.keywordCoverage?.max ?? 20 },
+    { key: "seniority",score: s.senioritySignal?.score ?? 0,      max: s.senioritySignal?.max ?? 15 },
+  ].filter((c) => c.max > 0);
+  if (cats.length === 0) return null;
+
+  // Find the weakest by percentage. Tie-break: lower absolute score first.
+  cats.sort((a, b) => (a.score / a.max) - (b.score / b.max) || a.score - b.score);
+  const weakest = cats[0];
+  const pct = Math.round((weakest.score / weakest.max) * 100);
+
+  // Don't bother recommending a "weak" area if it's actually fine (≥80%).
+  // In that rare case let the priority-list fallback drive the recommendation.
+  if (pct >= 80) return null;
+
+  switch (weakest.key) {
+    case "ats":
+      return {
+        sectionPhrase: "your ATS compatibility",
+        whyItMatters: `it's your weakest area at ${weakest.score}/${weakest.max} (${pct}%) — ATS bots reject before a human sees the resume`,
+        howToAct: "Hit 'Fix top 3' on the right — the action plan leads with the ATS fixes.",
+      };
+    case "content":
+      return {
+        sectionPhrase: "your experience bullets",
+        whyItMatters: `Content scored lowest at ${weakest.score}/${weakest.max} (${pct}%) — too many bullets read like task lists, not impact`,
+        howToAct: "Hit 'Fix top 3' on the right — the action plan rewrites your weakest bullets first.",
+      };
+    case "format":
+      return {
+        sectionPhrase: "your section structure",
+        whyItMatters: `Format is your weakest at ${weakest.score}/${weakest.max} (${pct}%) — section ordering and header format hurt scannability`,
+        howToAct: "Hit 'Fix top 3' on the right — top fixes restructure the layout.",
+      };
+    case "keywords":
+      return {
+        sectionPhrase: "your skills section",
+        whyItMatters: `Keyword Coverage is lowest at ${weakest.score}/${weakest.max} (${pct}%) — target-role keywords missing means ATS filters you out before a human reads`,
+        howToAct: "Hit 'Fix top 3' on the right — the action plan injects missing target-role keywords.",
+      };
+    case "seniority":
+      return {
+        sectionPhrase: "your seniority signals",
+        whyItMatters: `Seniority is your weakest at ${weakest.score}/${weakest.max} (${pct}%) — recruiters can't tell your scope or ownership at a glance`,
+        howToAct: "Hit 'Fix top 3' on the right — the action plan adds leadership and scope signals to your bullets.",
+      };
+    default:
+      return null;
+  }
 }
 
 // ── Legacy fallback (kept verbatim for the rare case where analysis is missing)

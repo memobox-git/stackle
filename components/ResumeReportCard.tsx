@@ -143,30 +143,33 @@ function firstNameOf(full: string | undefined): string | undefined {
   return t.split(/\s+/)[0];
 }
 
-// Build a per-priority score impact array. Distribute the projected score
-// lift across all priorities, weighted by tier (HIGH > MEDIUM > LOW), and
-// clamp each value to its tier range so the math sums realistically:
-//   HIGH  → 6-12 pts  · MEDIUM → 3-5 pts · LOW → 1-2 pts
-function buildImpacts(priorities: string[], current: number, projected?: string): number[] {
-  // Parse projected score: "75-82" → 82, "82" → 82, "" → current+20 fallback.
-  const m = (projected ?? "").match(/(\d+)(?:\s*[-–]\s*(\d+))?/);
-  const projHigh = m ? parseInt(m[2] ?? m[1], 10) : Math.min(100, current + 20);
-  const lift = Math.max(8, projHigh - current);
-
+// Build a per-priority score impact array. Each priority gets a DIFFERENT
+// point value within its tier so the AI Coach's Fastest Win and Biggest
+// Impact tiles never read as "+6 / +6" (which made the user question the
+// math). Within-tier descending values, no two priorities share a number
+// unless the priority list is longer than the tier value pool.
+//
+//   HIGH   → 12, 10, 9, 8, 7, 6 (descending by within-tier index)
+//   MEDIUM → 5, 4, 3
+//   LOW    → 2, 1
+//
+// `current` and `projected` are advisory — we used to scale the values to
+// the projection range, but that made everything cluster at the bottom of
+// the tier when projected lift was small. Fixed values per tier-position
+// is more honest and easier to read.
+function buildImpacts(priorities: string[], _current: number, _projected?: string): number[] {
   const tiers = priorities.map((a) => extractPriority(a));
-  const weight = (t: string) => (t === "HIGH" ? 4 : t === "MEDIUM" ? 2 : 1);
-  const totalWeight = tiers.reduce((s, t) => s + weight(t), 0) || 1;
+  const HIGH_SCHEDULE   = [12, 10, 9, 8, 7, 6];
+  const MEDIUM_SCHEDULE = [5, 4, 3];
+  const LOW_SCHEDULE    = [2, 1];
 
-  // Each fix's raw share + index-based variance so two HIGH items don't
-  // both round to the same number.
+  const counters = { HIGH: 0, MEDIUM: 0, LOW: 0 } as Record<string, number>;
   return priorities.map((_, i) => {
-    const t = tiers[i];
-    const raw = (weight(t) / totalWeight) * lift;
-    const variance = (i % 3) - 1; // -1, 0, +1
-    const candidate = Math.round(raw) + variance;
-    if (t === "HIGH")   return Math.max(6, Math.min(12, candidate));
-    if (t === "MEDIUM") return Math.max(3, Math.min(5, candidate));
-    return Math.max(1, Math.min(2, candidate));
+    const t = tiers[i] === "HIGH" ? "HIGH" : tiers[i] === "MEDIUM" ? "MEDIUM" : "LOW";
+    const idx = counters[t]++;
+    if (t === "HIGH")   return HIGH_SCHEDULE[Math.min(idx, HIGH_SCHEDULE.length - 1)];
+    if (t === "MEDIUM") return MEDIUM_SCHEDULE[Math.min(idx, MEDIUM_SCHEDULE.length - 1)];
+    return LOW_SCHEDULE[Math.min(idx, LOW_SCHEDULE.length - 1)];
   });
 }
 
