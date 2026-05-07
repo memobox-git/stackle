@@ -126,7 +126,7 @@ function SessionsList({
 
         {/* Friday Forecast — Phase 2. Readiness % aggregated across past
             completed sessions. Empty state nudges the first run. */}
-        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4 mb-8">
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4 mb-4">
           <div className="flex items-baseline justify-between mb-1">
             <span className="text-[10px] uppercase tracking-wider text-violet-700 font-semibold">Friday Forecast</span>
             <span className="text-[11px] text-violet-700">{forecast.sessionCount === 0 ? "no data yet" : `${forecast.sessionCount} session${forecast.sessionCount !== 1 ? "s" : ""}`}</span>
@@ -145,6 +145,17 @@ function SessionsList({
             </>
           )}
         </div>
+
+        {/* Skill breakdown + drill recommendations — Phase 2 + 4.
+            Surfaces only when there's enough data (1+ completed sessions).
+            Bars per skill + a punch list of "drill these next" derived
+            from weakest sub-categories across completed sessions. */}
+        {forecast.sessionCount > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
+            <SkillBreakdown sessions={sessions} />
+            <DrillRecommendations sessions={sessions} />
+          </div>
+        )}
 
         <button
           onClick={onNew}
@@ -239,6 +250,27 @@ function ActiveSession({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
+  // Phase 3 — selected company persona. Set when user picks a company
+  // chip after choosing the Company lens. Passed to Skill Agent via
+  // sessionState.companyPersona.
+  const [companyKey, setCompanyKey] = useState<string | null>(null);
+  const companyPersona = useMemo(() => {
+    if (!companyKey) return null;
+    // Lazy-imported to avoid pulling all 6 personas into the bundle when
+    // the user hasn't picked a company.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getCompanyPersona } = require("@/lib/agents/interview/companies") as typeof import("@/lib/agents/interview/companies");
+    const p = getCompanyPersona(companyKey);
+    if (!p) return null;
+    return {
+      name: p.name,
+      interviewStyle: p.interviewStyle,
+      questionEmphasis: p.questionEmphasis,
+      culturalSignals: p.culturalSignals,
+      redFlagsInAnswers: p.redFlagsInAnswers,
+    };
+  }, [companyKey]);
+
   const profileSeed = useMemo(
     () => buildProfileSeed(allSessions.filter((s) => s.id !== session.id)),
     [allSessions, session.id],
@@ -314,6 +346,21 @@ function ActiveSession({
       return;
     }
 
+    // Config phase — first input may be a company chip pick. If matched,
+    // capture the persona and ask for skill. Otherwise fall through.
+    if (phase === "config" && !companyKey) {
+      const lc = t.toLowerCase();
+      const matched = ["google", "meta", "amazon", "snowflake", "databricks", "stripe"].find((c) => lc === c || lc.startsWith(c));
+      if (matched) {
+        setCompanyKey(matched);
+        pushAssistant(
+          `Locked in: ${matched.charAt(0).toUpperCase() + matched.slice(1)} interview pattern. Now — which skill do you want to drill?`,
+          ["SQL", "Python (soon)", "Spark (soon)"],
+        );
+        return;
+      }
+    }
+
     // Config / running / verdict / done — Skill Agent drives.
     await callSkillAgent([...messages, { role: "user", content: t }]);
   }
@@ -338,6 +385,7 @@ function ActiveSession({
               ? { subcategory: questions[questionIdx].subcategory, difficulty: questions[questionIdx].difficulty, prompt: questions[questionIdx].prompt }
               : undefined,
             candidateName,
+            companyPersona,
           },
           profileSeed,
         }),
@@ -620,9 +668,12 @@ function ActiveSession({
               <div className="text-[11px] font-semibold tracking-wider uppercase text-gray-500">
                 {currentQ.subcategory} · {currentQ.difficulty}
               </div>
-              <div className="text-[12px] text-gray-500 font-mono tabular-nums">
-                {Math.floor(timer / 60)}:{String(timer % 60).padStart(2, "0")}
-                <span className="text-gray-300"> · bench {Math.floor(currentQ.timeBenchmarkSeconds / 60)}:{String(currentQ.timeBenchmarkSeconds % 60).padStart(2, "0")}</span>
+              <div className="flex items-center gap-3">
+                <ConfidenceMeter answer={answer} question={currentQ} />
+                <div className="text-[12px] text-gray-500 font-mono tabular-nums">
+                  {Math.floor(timer / 60)}:{String(timer % 60).padStart(2, "0")}
+                  <span className="text-gray-300"> · bench {Math.floor(currentQ.timeBenchmarkSeconds / 60)}:{String(currentQ.timeBenchmarkSeconds % 60).padStart(2, "0")}</span>
+                </div>
               </div>
             </div>
             <textarea
@@ -747,6 +798,137 @@ function ReportSummary({ report }: { report: SessionReport }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+// Confidence meter — Phase 2 closure. Heuristic, no LLM. Updates as the
+// candidate types. Three signals:
+//   - keyword coverage: % of question.expectedKeywords present in answer
+//   - length: 0 if too short (<25 chars), 1 if 25-200 chars, 0.7 if >200
+//     (overly verbose sometimes hides confusion)
+//   - syntax: 0 if obvious red flags (banned starters, "I don't know"),
+//     1 otherwise
+// Final score = 0.6 * keyword + 0.3 * length + 0.1 * syntax → 0-100.
+//
+// Intentionally generous — we want to encourage attempts. Truth-of-the-
+// matter scoring lives in the post-submission verdict evaluator (real LLM).
+function ConfidenceMeter({ answer, question }: { answer: string; question: InterviewQuestion }) {
+  const score = useMemo(() => {
+    const txt = (answer ?? "").trim().toLowerCase();
+    if (txt.length === 0) return 0;
+
+    // Keyword coverage.
+    const expected = (question.expectedKeywords ?? []).map((k) => k.toLowerCase());
+    const hits = expected.filter((k) => txt.includes(k.toLowerCase())).length;
+    const kw = expected.length === 0 ? 1 : hits / expected.length;
+
+    // Length signal.
+    let len = 0;
+    if (txt.length >= 25 && txt.length <= 400) len = 1;
+    else if (txt.length > 400) len = 0.7;
+    else len = txt.length / 25;
+
+    // Syntax red flags — empty + giving-up phrases.
+    const redFlags = /\b(i don'?t know|no idea|not sure|skip this|gibberish)\b/i;
+    const syntax = redFlags.test(txt) ? 0 : 1;
+
+    return Math.round((0.6 * kw + 0.3 * len + 0.1 * syntax) * 100);
+  }, [answer, question]);
+
+  const colour = score >= 70 ? "#1D9E75" : score >= 40 ? "#BA7517" : "#A32D2D";
+  return (
+    <div className="flex items-center gap-2" title="Confidence (heuristic) — final verdict comes from the evaluator on submit">
+      <div className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">conf</div>
+      <div className="w-20 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${score}%`, background: colour }} />
+      </div>
+      <div className="text-[11px] font-medium tabular-nums" style={{ color: colour }}>{score}%</div>
+    </div>
+  );
+}
+
+// Skill breakdown — Phase 2 closure. Bars per skill the user has drilled,
+// coloured by avg score (red <60, amber 60-74, green 75+).
+function SkillBreakdown({ sessions }: { sessions: SkillSession[] }) {
+  const completed = sessions.filter((s) => s.status === "completed" && s.report);
+  // Aggregate per skill.
+  const perSkill: Record<string, { sum: number; count: number }> = {};
+  for (const s of completed) {
+    const k = s.config.skill;
+    if (!perSkill[k]) perSkill[k] = { sum: 0, count: 0 };
+    perSkill[k].sum += s.report?.averageScore ?? 0;
+    perSkill[k].count += 1;
+  }
+  const rows = Object.entries(perSkill).map(([skill, v]) => ({ skill, avg: Math.round(v.sum / v.count), count: v.count }));
+  if (rows.length === 0) return null;
+  rows.sort((a, b) => b.avg - a.avg);
+
+  function barColor(avg: number): string {
+    if (avg >= 75) return "#1D9E75";
+    if (avg >= 60) return "#BA7517";
+    return "#A32D2D";
+  }
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+      <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-3">Skill breakdown</div>
+      <ul className="space-y-2.5">
+        {rows.map((r) => (
+          <li key={r.skill}>
+            <div className="flex items-baseline justify-between mb-1">
+              <span className="text-[13px] text-gray-800">{r.skill}</span>
+              <span className="text-[11px] text-gray-500 tabular-nums">{r.avg}/100 · {r.count} session{r.count !== 1 ? "s" : ""}</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+              <div
+                className="h-full rounded-full"
+                style={{ width: `${r.avg}%`, background: barColor(r.avg) }}
+              />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+// Drill recommendations — Phase 4. Pulls weakest sub-categories from
+// completed sessions and produces a prioritised punch list of "drill
+// these next" items. Same data surface Friday Forecast uses, framed as
+// concrete next moves.
+function DrillRecommendations({ sessions }: { sessions: SkillSession[] }) {
+  const completed = sessions.filter((s) => s.status === "completed" && s.report);
+  // Tally weakest sub-categories by frequency.
+  const tally: Record<string, { count: number; lastSeenAt: string }> = {};
+  for (const s of completed) {
+    const k = s.report?.weakestSubcategory;
+    if (!k) continue;
+    if (!tally[k]) tally[k] = { count: 0, lastSeenAt: s.completedAt ?? s.startedAt };
+    tally[k].count += 1;
+    if ((s.completedAt ?? s.startedAt) > tally[k].lastSeenAt) tally[k].lastSeenAt = s.completedAt ?? s.startedAt;
+  }
+  const rows = Object.entries(tally)
+    .map(([sub, v]) => ({ sub, count: v.count, lastSeenAt: v.lastSeenAt }))
+    .sort((a, b) => b.count - a.count || b.lastSeenAt.localeCompare(a.lastSeenAt))
+    .slice(0, 5);
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+      <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-3">Drill these next</div>
+      <ul className="space-y-2">
+        {rows.map((r, i) => (
+          <li key={r.sub} className="flex items-baseline gap-3">
+            <span className="text-[11px] text-gray-400 tabular-nums w-4">{i + 1}.</span>
+            <span className="flex-1 text-[13px] text-gray-800">{r.sub}</span>
+            <span className="text-[11px] text-rose-600">flagged {r.count}×</span>
+          </li>
+        ))}
+      </ul>
+      <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
+        Start a session and ask for these specifically — the agent will lean into them.
+      </p>
     </div>
   );
 }

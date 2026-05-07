@@ -14,6 +14,15 @@ export type SkillAgentSessionState = {
   totalQuestions?: number;
   currentQuestion?: { subcategory: string; difficulty: string; prompt: string };
   candidateName?: string | null;
+  // Optional company persona (Phase 3). When set, the Skill Agent tilts
+  // tone + question preference toward the company's interview style.
+  companyPersona?: {
+    name: string;
+    interviewStyle: string;
+    questionEmphasis: { sql: number; distributedSystems: number; realTimeScenarios: number };
+    culturalSignals: string[];
+    redFlagsInAnswers: string[];
+  } | null;
 };
 
 export type SkillAgentProfileSeed = {
@@ -125,6 +134,20 @@ function renderLiveContext(input: SkillAgentInput): string {
   }
   if (s.currentQuestion) {
     parts.push(`current_question: ${s.currentQuestion.subcategory} (${s.currentQuestion.difficulty})`);
+  }
+
+  // Company persona injection (Phase 3). When the user picked a target
+  // company, the Skill Agent leans into that company's interview style
+  // and red-flags. Tone shifts with persona — Stripe wants idempotency
+  // mentions, Snowflake wants concurrency awareness, etc.
+  const persona = s.companyPersona;
+  if (persona) {
+    parts.push("");
+    parts.push(`company_persona: ${persona.name}`);
+    parts.push(`  interview_style: ${persona.interviewStyle}`);
+    parts.push(`  question_emphasis: SQL ${persona.questionEmphasis.sql}% · DistSys ${persona.questionEmphasis.distributedSystems}% · RealTime ${persona.questionEmphasis.realTimeScenarios}%`);
+    if (persona.culturalSignals.length > 0) parts.push(`  cultural_signals: ${persona.culturalSignals.join(", ")}`);
+    if (persona.redFlagsInAnswers.length > 0) parts.push(`  red_flags_to_warn_about: ${persona.redFlagsInAnswers.join("; ")}`);
   }
 
   const seed = input.profileSeed;
