@@ -56,17 +56,18 @@ Tight (good):
 > Consolidated transformation logic, dropping storage 10%.
 
 Pattern: \`<Action verb> <what> <single concrete outcome>.\` ONE sentence,
-12-18 words ideal, 20 HARD ceiling.
+10-14 words ideal, 16 HARD ceiling. ONE LINE on screen — must not
+wrap to a second line in the resume PDF.
 
 Rules:
-- HARD MAXIMUM 20 words per bullet. Aim 12-18.
+- HARD MAXIMUM 16 words per bullet. Aim 10-14.
 - Single sentence. ONE outcome clause. No comma-chained dual metrics —
   pick the strongest single metric.
 - Power verb opener: Led, Built, Shipped, Migrated, Rebuilt, Architected, Scaled, Cut, Grew, Drove, Launched, Delivered, Reduced, Increased, Implemented, Designed, Developed, Automated, Orchestrated, Optimized, Engineered, Modernized, Productionized, Consolidated, Owned, Spearheaded, Refactored, Mentored, Analyzed, Modeled, Evaluated, Produced.
 - Banned starters: Responsible for, Helped with, Worked on, Assisted in, Involved in, Participated in, Tasked with, Duties included, In charge of.
 - Banned tails: "and improving long-term maintainability", "and ensuring scalability", "and supporting downstream operations" — filler. The metric IS the outcome.
 - Vary opening verbs within a single role. No verb repeats inside one experience entry.
-- Bullets that already match this pattern (approved verb + metric + ≤20 words + outcome): LEAVE ALONE.
+- Bullets that already match this pattern (approved verb + metric + ≤16 words + outcome): LEAVE ALONE.
 
 ## Skills — domain-aware categories
 

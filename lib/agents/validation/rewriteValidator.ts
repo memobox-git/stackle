@@ -5,7 +5,7 @@
 // What this catches:
 // - Banned phrases ("results-driven", "passionate", "I am", etc.)
 // - Banned bullet starters ("Responsible for", "Helped with", etc.)
-// - Word-count violations (bullets over 20w, summary outside 50–90w)
+// - Word-count violations (bullets over 16w, summary outside 50–90w)
 // - First-person violations in summaries ("I", "my", "me")
 // - Multi-sentence bullets / semicolons
 // - Missing power-verb opener on bullets
@@ -103,9 +103,9 @@ export function validateBullet(text: string): ValidationIssue[] {
   const trimmed = text.trim().replace(/^[-•*]\s+/, "");
 
   const wc = wordCount(trimmed);
-  if (wc > 20) {
+  if (wc > 16) {
     issues.push({ rule: "bullet-words", severity: "error",
-      message: `Bullet is ${wc} words — over 20. Tighten to 12-18 words. Pick the single strongest metric, drop secondary clauses.` });
+      message: `Bullet is ${wc} words — over 16. Must fit on one line. Cut adjectives, drop "in order to", remove secondary clauses, keep one metric. Aim 10-14.` });
   }
   if (wc < 6) {
     issues.push({ rule: "bullet-words", severity: "warn",
