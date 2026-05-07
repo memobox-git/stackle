@@ -8,13 +8,13 @@ export const SKILL_AGENT_TOOLS: Anthropic.Tool[] = [
   {
     name: "set_session_config",
     description:
-      "Update the planned session config based on what the user just said. Call when the user picks a skill, difficulty, or count. Multiple fields can be set in one call.",
+      "Update the planned session config based on what the user just said. Call when the user picks a skill, difficulty, count, or company. Multiple fields can be set in one call. Chain with start_session() in the same turn when the user gave you everything in one go (e.g. 'do SQL medium 3').",
     input_schema: {
       type: "object",
       properties: {
         skill: {
           type: "string",
-          description: "Skill to drill — e.g. 'SQL'. Only SQL is supported in Phase 1.",
+          description: "Skill to drill — e.g. 'SQL'. Only SQL is supported today.",
         },
         difficulty: {
           type: "string",
@@ -24,6 +24,11 @@ export const SKILL_AGENT_TOOLS: Anthropic.Tool[] = [
         count: {
           type: "number",
           description: "Number of questions for the session (1-20).",
+        },
+        company: {
+          type: "string",
+          enum: ["google", "meta", "amazon", "snowflake", "databricks", "stripe"],
+          description: "Optional company persona — biases tone + question selection toward that company's interview pattern.",
         },
       },
     },

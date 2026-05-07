@@ -1,13 +1,14 @@
-// Interview Manager (Layer 2). Routes between four sub-agents:
-//   - Skill Agent  (built — drills SQL etc.)
-//   - Role Agent   (stub — coming Phase 3)
-//   - Company Agent (stub — coming Phase 3)
-//   - JD Agent     (stub — coming Phase 3)
+// Interview Manager (Layer 2) — kept as the formal classification layer
+// for the four planned sub-agents (Skill / Role / Company / JD).
 //
-// In Phase 1, only the Skill Agent is wired. The Manager's job is the
-// initial sub-agent pick (chat asks "skill / role / company / JD?")
-// and returning the appropriate sub-agent identifier so the UI can
-// dispatch to the right runner / endpoint.
+// IMPORTANT: as of the chat-first refactor, the Skill Agent owns the
+// entire conversation including company picks and skill/level/count
+// configuration. The deterministic helpers in this file (pickInterviewSubAgent,
+// interviewManagerWelcome) are no longer called from InterviewView — they
+// remain available for future Role / JD sub-agent routing where domain
+// boundaries matter beyond what one Skill Agent handles.
+//
+// Today's behaviour: empty session → Skill Agent runs → handles everything.
 
 export const INTERVIEW_MANAGER_KEY = "interview" as const;
 export const INTERVIEW_MANAGER_DESCRIPTION = "Interview Prep. Skill drills (live), Role/Company/JD coming.";

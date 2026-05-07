@@ -28,10 +28,15 @@ import {
   loadSessions, saveSession, deleteSession, generateReport, buildProfileSeed,
   type SkillSession, type ChatMsg, type SessionReport,
 } from "@/lib/interview/sessionStore";
-import { interviewManagerWelcome, pickInterviewSubAgent } from "@/lib/agents/interview/interviewManager";
-
 type View = "sessions" | "active" | "report";
-type Phase = "lens" | "config" | "running" | "evaluating" | "verdict" | "done";
+// Simplified phase state — only what affects UI surface visibility:
+//   "idle"        : agent collecting config or chatting; no question active
+//   "running"     : a question is live, code editor visible, timer ticking
+//   "evaluating"  : answer submitted, evaluator running
+//   "done"        : session report generated, agent offers next move
+// All routing decisions (skill / company / difficulty / count / hints /
+// skip / next / end) live IN the agent, NOT in this state machine.
+type Phase = "idle" | "running" | "evaluating" | "done";
 
 const VERDICT_COLOURS: Record<Verdict, { fg: string; bg: string; label: string }> = {
   strong_hire: { fg: "#1D9E75", bg: "#E8F5EE", label: "Strong Hire" },
@@ -236,7 +241,7 @@ function ActiveSession({
   onSessionUpdate: (s: SkillSession) => void;
   onExit: () => void;
 }) {
-  const [phase, setPhase] = useState<Phase>("lens");
+  const [phase, setPhase] = useState<Phase>("idle");
   const [config, setConfig] = useState(session.config);
   const [messages, setMessages] = useState<ChatMsg[]>(session.messages);
   const [composer, setComposer] = useState("");
@@ -250,14 +255,12 @@ function ActiveSession({
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  // Phase 3 — selected company persona. Set when user picks a company
-  // chip after choosing the Company lens. Passed to Skill Agent via
-  // sessionState.companyPersona.
+  // Company persona — set by the Skill Agent calling
+  // set_session_config({company: ...}). Passed back into sessionState
+  // on subsequent calls so the agent keeps the persona context.
   const [companyKey, setCompanyKey] = useState<string | null>(null);
   const companyPersona = useMemo(() => {
     if (!companyKey) return null;
-    // Lazy-imported to avoid pulling all 6 personas into the bundle when
-    // the user hasn't picked a company.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getCompanyPersona } = require("@/lib/agents/interview/companies") as typeof import("@/lib/agents/interview/companies");
     const p = getCompanyPersona(companyKey);
@@ -276,11 +279,15 @@ function ActiveSession({
     [allSessions, session.id],
   );
 
-  // First-mount: ask the Interview Manager for the lens welcome.
+  // First-mount auto-greet: when the chat is empty, ping the Skill Agent
+  // with no user message so it generates the welcome itself. The agent's
+  // system prompt knows how to open. No hardcoded greeting.
+  const greetedRef = useRef(false);
   useEffect(() => {
+    if (greetedRef.current) return;
     if (messages.length > 0) return;
-    const welcome = interviewManagerWelcome(candidateName);
-    pushAssistant(welcome.text, welcome.chips);
+    greetedRef.current = true;
+    callSkillAgent([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -315,53 +322,13 @@ function ActiveSession({
     setMessages((m) => [...m, { role: "user", content }]);
   }
 
+  // Single input handler — every user message routes to the Skill Agent.
+  // No state-machine branching. The agent decides what to do (greet, set
+  // config, start session, give hint, advance, end) via tools.
   async function handleUserInput(text: string) {
     const t = text.trim();
     if (!t) return;
     pushUser(t);
-
-    // Lens phase — Interview Manager handles deterministically.
-    if (phase === "lens") {
-      const route = pickInterviewSubAgent(t);
-      if (route.comingSoon) {
-        pushAssistant(route.comingSoonText ?? "Coming soon. Drill a skill instead?", ["Skill drill", "Cancel"]);
-        return;
-      }
-      if (route.subAgent === "skill") {
-        setPhase("config");
-        await callSkillAgent([...messages, { role: "user", content: t }]);
-        return;
-      }
-      if (route.subAgent === "company") {
-        // Phase 3 — Company lens. Ask which company first; once picked,
-        // hand to Skill Agent with the persona injected as context.
-        pushAssistant(
-          "Which company are you prepping for? I have personas for the ones below — pick one and I'll bias the practice toward their interview pattern.",
-          ["Google", "Meta", "Amazon", "Snowflake", "Databricks", "Stripe"],
-        );
-        setPhase("config");
-        return;
-      }
-      pushAssistant("Pick a lens — skill, role, company, or JD?", ["Skill drill", "By company", "By role (soon)", "By JD (soon)"]);
-      return;
-    }
-
-    // Config phase — first input may be a company chip pick. If matched,
-    // capture the persona and ask for skill. Otherwise fall through.
-    if (phase === "config" && !companyKey) {
-      const lc = t.toLowerCase();
-      const matched = ["google", "meta", "amazon", "snowflake", "databricks", "stripe"].find((c) => lc === c || lc.startsWith(c));
-      if (matched) {
-        setCompanyKey(matched);
-        pushAssistant(
-          `Locked in: ${matched.charAt(0).toUpperCase() + matched.slice(1)} interview pattern. Now — which skill do you want to drill?`,
-          ["SQL", "Python (soon)", "Spark (soon)"],
-        );
-        return;
-      }
-    }
-
-    // Config / running / verdict / done — Skill Agent drives.
     await callSkillAgent([...messages, { role: "user", content: t }]);
   }
 
@@ -453,15 +420,33 @@ function ActiveSession({
 
   async function dispatchTool(name: string, input: Record<string, unknown>) {
     if (name === "set_session_config") {
+      // Apply partial config updates. Company gets stored in companyKey
+      // state which feeds back as companyPersona on the next agent call.
+      if (typeof input.company === "string" && input.company.trim()) {
+        setCompanyKey(input.company.toLowerCase());
+      }
       setConfig((c) => ({
         skill: typeof input.skill === "string" ? input.skill : c.skill,
         difficulty: typeof input.difficulty === "string" ? input.difficulty : c.difficulty,
         count: typeof input.count === "number" ? input.count : c.count,
       }));
     } else if (name === "start_session") {
-      const qs = pickQuestions({ skill: config.skill, difficulty: config.difficulty as Difficulty | "mixed", count: config.count });
+      // The agent sometimes calls set_session_config + start_session in
+      // the same turn — read the LATEST config including any updates from
+      // the same tool batch. We snapshot from the React closure but
+      // the agent's text already has the right framing.
+      // To handle "do SQL medium 3" in one shot, peek at the most recent
+      // set_session_config call's input if present; otherwise use config.
+      const liveSkill = (input.skill as string) ?? config.skill;
+      const liveDiff = (input.difficulty as string) ?? config.difficulty;
+      const liveCount = (input.count as number) ?? config.count;
+      const qs = pickQuestions({
+        skill: liveSkill,
+        difficulty: (liveDiff as Difficulty | "mixed"),
+        count: liveCount,
+      });
       if (qs.length === 0) {
-        pushAssistant("No questions for that combo — pick something else?", ["SQL Easy", "SQL Medium", "SQL Mixed"]);
+        pushAssistant("No questions for that combo yet — try a different combo?", []);
         return;
       }
       setQuestions(qs);
@@ -479,13 +464,15 @@ function ActiveSession({
       setPhase("running");
     } else if (name === "skip_question") {
       const q = questions[questionIdx];
-      onSessionUpdate({
-        ...session,
-        questions: [
-          ...session.questions,
-          { questionId: q.id, answer: "(skipped)", evaluation: { verdict: "no_hire", score: 0, reasoning: "Skipped.", whatWorked: [], whatMissed: ["Skipped."], pushToStrong: "Take a real attempt next time." } },
-        ],
-      });
+      if (q) {
+        onSessionUpdate({
+          ...session,
+          questions: [
+            ...session.questions,
+            { questionId: q.id, answer: "(skipped)", evaluation: { verdict: "no_hire", score: 0, reasoning: "Skipped.", whatWorked: [], whatMissed: ["Skipped."], pushToStrong: "Take a real attempt next time." } },
+          ],
+        });
+      }
       const next = questionIdx + 1;
       if (next >= questions.length) {
         endSession();
@@ -497,9 +484,8 @@ function ActiveSession({
     } else if (name === "end_session") {
       endSession();
     } else if (name === "request_hint") {
-      // No-op at the UI level — the agent's narration includes the hint
-      // text. The tool call is purely a signal we can use later for
-      // analytics or to highlight the hint visually.
+      // Agent's narration carries the hint text. Tool fire is a UI
+      // signal we can wire into analytics or visual highlighting later.
     }
   }
 
@@ -545,8 +531,12 @@ function ActiveSession({
       if (isLast) {
         endSession();
       } else {
-        pushAssistant("Ready for the next one?", ["Next question", "End session"]);
-        setPhase("verdict");
+        // Drop back to idle so the chat UI doesn't show the canvas while
+        // the agent narrates. The agent will call next_question() when
+        // the user signals readiness.
+        setPhase("idle");
+        // Let the Skill Agent narrate next-step in chat.
+        await callSkillAgent(messages.concat({ role: "user" as const, content: "(answer evaluated, see verdict above)" }));
       }
     } catch (err) {
       console.error(err);
@@ -592,7 +582,9 @@ function ActiveSession({
           <button onClick={onExit} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900">
             <ChevronLeft size={16} /> Sessions
           </button>
-          <span className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{phase}</span>
+          {phase === "running" && (
+            <span className="text-[11px] uppercase tracking-wider text-violet-600 font-medium">In progress</span>
+          )}
         </div>
         <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-6 py-6">
           <div className="max-w-2xl mx-auto space-y-4">
@@ -640,7 +632,7 @@ function ActiveSession({
                   handleUserInput(v);
                 }
               }}
-              placeholder={phase === "running" ? "Use the editor on the right; type here for a hint" : "Type a reply..."}
+              placeholder={phase === "running" ? "Type for help, or write your code on the right..." : "Say what you want to drill — \"SQL medium 3\" or just chat..."}
               disabled={streaming}
               className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-[14px] focus:outline-none focus:border-violet-500 disabled:opacity-50"
             />
