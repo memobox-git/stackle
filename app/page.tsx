@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
-import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, Mic, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown } from "lucide-react";
+import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
@@ -1650,7 +1650,7 @@ export default function Page() {
       items: [
         { key: "resume-builder", label: "Resume Builder", icon: FileText,      view: "resume-builder", locked: false },
         { key: "cover-letter",   label: "Cover Letter",   icon: Mail,          view: null,             locked: true },
-        { key: "interview-prep", label: "Interview Prep", icon: Mic,           view: "interview",      locked: false },
+        { key: "interview-prep", label: "Interview Prep", icon: MessagesSquare, view: "interview",      locked: false },
         { key: "job-match",      label: "Job Match",      icon: Target,        view: null,             locked: true },
       ],
     },
