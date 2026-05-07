@@ -1,21 +1,25 @@
 "use client";
 
-// ── Stackle Interview Prep — Phase 1 MVP ──────────────────────────────────
+// ── Stackle Interview Prep — chat-first ──────────────────────────────────
 //
-// Single-component view that handles the full flow:
-//   entry → setup → session → verdict → done
+// Layout: chat on the left, code editor canvas on the right. Same shape
+// as Resume Builder. The chat IS the product — entry, setup, questions,
+// live reactions, verdicts all happen in chat. The right panel is the
+// canvas where the code is written.
 //
-// Phase 2+ adds: live reactions, confidence meter, helper chips, Friday
-// Forecast dashboard, company personas, JD parser, code editor (CodeMirror),
-// pricing enforcement, Supabase persistence. This MVP uses localStorage
-// and a styled textarea.
+// No SaaS tile grid. No standalone forecast card. The conversation drives
+// everything.
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Code, Briefcase, Building2, FileText, ArrowRight, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Send, ArrowUp } from "lucide-react";
 import { pickQuestions, listSkills } from "@/lib/agents/interview/questionBank";
-import type { InterviewQuestion, InterviewEvaluation, Verdict, Difficulty, InterviewSession } from "@/lib/agents/interview/questionBank/types";
+import type { InterviewQuestion, InterviewEvaluation, Verdict, Difficulty } from "@/lib/agents/interview/questionBank/types";
 
-type View = "entry" | "setup" | "session" | "verdict" | "done";
+type ChatMsg =
+  | { role: "assistant"; content: string; chips?: string[] }
+  | { role: "user"; content: string };
+
+type Phase = "lens" | "skill" | "level" | "count" | "running" | "evaluating" | "verdict" | "done";
 
 const VERDICT_COLOURS: Record<Verdict, { fg: string; bg: string; label: string }> = {
   strong_hire: { fg: "#1D9E75", bg: "#E8F5EE", label: "Strong Hire" },
@@ -24,29 +28,18 @@ const VERDICT_COLOURS: Record<Verdict, { fg: string; bg: string; label: string }
   no_hire:     { fg: "#A32D2D", bg: "#FBE6E6", label: "No Hire" },
 };
 
-const STORAGE_KEY = "stackle_interview_sessions";
-
-function loadSessions(): InterviewSession[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
-
-function saveSession(s: InterviewSession) {
-  try {
-    const all = loadSessions();
-    const idx = all.findIndex((x) => x.id === s.id);
-    if (idx >= 0) all[idx] = s;
-    else all.unshift(s);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(all.slice(0, 50)));
-  } catch { /* non-fatal */ }
-}
-
 export default function InterviewView({ candidateName }: { candidateName?: string | null }) {
-  const [view, setView] = useState<View>("entry");
+  const firstName = (candidateName ?? "").trim().split(/\s+/)[0] || "there";
+  const skills = useMemo(() => listSkills(), []);
+
+  const [messages, setMessages] = useState<ChatMsg[]>(() => [
+    {
+      role: "assistant",
+      content: `Hey ${firstName} — let's get you ready. Drill a specific skill, prep for a target role, target a company, or paste a JD?`,
+      chips: ["By skill", "By role (soon)", "By company (soon)", "Paste a JD (soon)"],
+    },
+  ]);
+  const [phase, setPhase] = useState<Phase>("lens");
   const [skill, setSkill] = useState<string>("SQL");
   const [difficulty, setDifficulty] = useState<Difficulty | "mixed">("mixed");
   const [count, setCount] = useState<number>(3);
@@ -54,52 +47,120 @@ export default function InterviewView({ candidateName }: { candidateName?: strin
   const [questions, setQuestions] = useState<InterviewQuestion[]>([]);
   const [questionIdx, setQuestionIdx] = useState(0);
   const [answer, setAnswer] = useState("");
-  const [evaluating, setEvaluating] = useState(false);
-  const [evaluation, setEvaluation] = useState<InterviewEvaluation | null>(null);
-  const [sessionId, setSessionId] = useState<string>("");
-  const [history, setHistory] = useState<{ q: InterviewQuestion; a: string; e: InterviewEvaluation }[]>([]);
   const [timer, setTimer] = useState(0);
+  const [composer, setComposer] = useState("");
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const skills = useMemo(() => listSkills(), []);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+  const verdictsRef = useRef<{ q: InterviewQuestion; e: InterviewEvaluation }[]>([]);
 
-  // Tick the timer while we're inside an active question.
+  // Auto-scroll chat to bottom when messages land.
   useEffect(() => {
-    if (view !== "session") {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [messages, phase]);
+
+  // Timer ticks while a question is live.
+  useEffect(() => {
+    if (phase !== "running") {
       if (timerRef.current) clearInterval(timerRef.current);
       return;
     }
     setTimer(0);
     timerRef.current = setInterval(() => setTimer((t) => t + 1), 1000);
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [view, questionIdx]);
+  }, [phase, questionIdx]);
 
-  function startSession() {
-    const qs = pickQuestions({ skill, difficulty, count });
+  function pushAssistant(content: string, chips?: string[]) {
+    setMessages((m) => [...m, { role: "assistant", content, chips }]);
+  }
+  function pushUser(content: string) {
+    setMessages((m) => [...m, { role: "user", content }]);
+  }
+
+  function handleChip(label: string) {
+    pushUser(label);
+    handleUserMessage(label);
+  }
+
+  function handleUserMessage(text: string) {
+    const t = text.trim();
+    if (!t) return;
+    if (phase === "lens") {
+      // Only "By skill" is wired in Phase 1. Other lenses respond gracefully.
+      if (/^by\s+skill$/i.test(t)) {
+        setPhase("skill");
+        pushAssistant(`Which skill — ${skills.join(", ")}, or something else?`,
+          [...skills, "Surprise me"]);
+      } else if (/role|company|jd|job\s+description|paste/i.test(t)) {
+        pushAssistant("That lens is coming in Phase 3 — it pulls company patterns and JD specifics. For now, want to drill a skill?",
+          ["By skill", "Tell me when it's ready"]);
+      } else {
+        // Treat free text as a skill name.
+        setSkill(t);
+        setPhase("level");
+        pushAssistant(`${t} it is. What level — easy, medium, hard, or mixed?`,
+          ["Easy", "Medium", "Hard", "Mixed"]);
+      }
+    } else if (phase === "skill") {
+      const matched = skills.find((s) => s.toLowerCase() === t.toLowerCase());
+      const chosen = matched ?? t;
+      setSkill(chosen);
+      setPhase("level");
+      pushAssistant(`${chosen}. Level — easy, medium, hard, or mixed?`,
+        ["Easy", "Medium", "Hard", "Mixed"]);
+    } else if (phase === "level") {
+      const lc = t.toLowerCase();
+      const d: Difficulty | "mixed" = lc.startsWith("e") ? "easy" : lc.startsWith("m") && lc.includes("ix") ? "mixed" : lc.startsWith("m") ? "medium" : lc.startsWith("h") ? "hard" : "mixed";
+      setDifficulty(d);
+      setPhase("count");
+      pushAssistant(`${d.charAt(0).toUpperCase() + d.slice(1)}. How many — quick (3), standard (5), or full (10)?`,
+        ["Quick (3)", "Standard (5)", "Full (10)"]);
+    } else if (phase === "count") {
+      const m = t.match(/(\d+)/);
+      const n = m ? Math.max(1, Math.min(20, parseInt(m[1], 10))) : 3;
+      setCount(n);
+      startSession(skill, difficulty, n);
+    } else if (phase === "verdict" || phase === "done") {
+      // After-session free chat: simple replies for now.
+      if (/another|again|more|next/i.test(t)) {
+        // Reset to lens.
+        setPhase("lens");
+        verdictsRef.current = [];
+        setQuestions([]);
+        setQuestionIdx(0);
+        setAnswer("");
+        pushAssistant("Restarting. Drill a specific skill, prep for a role, target a company, or paste a JD?",
+          ["By skill", "By role (soon)", "By company (soon)", "Paste a JD (soon)"]);
+      } else {
+        pushAssistant("Type 'another' for a fresh session, or close the tab when you're done.");
+      }
+    }
+  }
+
+  function startSession(s: string, d: Difficulty | "mixed", n: number) {
+    const qs = pickQuestions({ skill: s, difficulty: d, count: n });
     if (qs.length === 0) {
-      alert("No questions available for that filter. Try a different skill or difficulty.");
+      pushAssistant("No questions match that combo yet — try a different skill or level.",
+        ["By skill", "Easy", "Medium"]);
+      setPhase("lens");
       return;
     }
-    const id = `session-${Date.now()}`;
-    setSessionId(id);
     setQuestions(qs);
     setQuestionIdx(0);
     setAnswer(qs[0].starterCode ?? "");
-    setEvaluation(null);
-    setHistory([]);
-    setView("session");
-    saveSession({
-      id, startedAt: new Date().toISOString(),
-      lens: "skill",
-      context: { skill, difficulty, count },
-      questions: qs.map((q) => ({ questionId: q.id })),
-      status: "active",
-    });
+    verdictsRef.current = [];
+    pushAssistant(`Locked in: ${s} · ${d} · ${n} ${n === 1 ? "question" : "questions"}. Editor on the right is yours. Submit when you're done.`);
+    pushAssistant(`Question 1 of ${n} — ${qs[0].subcategory}\n\n${qs[0].prompt}\n\n${qs[0].contextSetup}\n\nSample data: ${qs[0].sampleData}`);
+    setPhase("running");
   }
 
   async function submitAnswer() {
     const q = questions[questionIdx];
-    if (!q || evaluating) return;
-    setEvaluating(true);
+    if (!q) return;
+    pushUser("(submitted)");
+    setPhase("evaluating");
+    pushAssistant("Evaluating...");
     try {
       const res = await fetch("/api/interview/evaluate", {
         method: "POST",
@@ -108,405 +169,203 @@ export default function InterviewView({ candidateName }: { candidateName?: strin
       });
       if (!res.ok) throw new Error("evaluate failed");
       const data = await res.json() as { evaluation: InterviewEvaluation };
-      setEvaluation(data.evaluation);
-      setHistory((h) => [...h, { q, a: answer, e: data.evaluation }]);
-      setView("verdict");
+      verdictsRef.current.push({ q, e: data.evaluation });
+
+      // Replace the "Evaluating..." placeholder with the real verdict.
+      setMessages((m) => {
+        const next = m.slice(0, -1);
+        const v = VERDICT_COLOURS[data.evaluation.verdict];
+        const lines: string[] = [
+          `**${v.label}** · ${data.evaluation.score}/100`,
+          data.evaluation.reasoning,
+          "",
+          ...(data.evaluation.whatWorked.length ? ["**What worked**", ...data.evaluation.whatWorked.map((s) => "• " + s)] : []),
+          ...(data.evaluation.whatMissed.length ? ["", "**What missed**", ...data.evaluation.whatMissed.map((s) => "• " + s)] : []),
+          "",
+          `**To push to Strong Hire:** ${data.evaluation.pushToStrong}`,
+        ];
+        next.push({ role: "assistant", content: lines.join("\n") });
+        return next;
+      });
+      setPhase("verdict");
+
+      const isLast = questionIdx + 1 >= questions.length;
+      if (isLast) {
+        const total = verdictsRef.current.length;
+        const avg = total === 0 ? 0 : Math.round(verdictsRef.current.reduce((s, x) => s + x.e.score, 0) / total);
+        const dist = verdictsRef.current.reduce<Record<Verdict, number>>((acc, x) => {
+          acc[x.e.verdict] = (acc[x.e.verdict] ?? 0) + 1;
+          return acc;
+        }, { strong_hire: 0, hire: 0, soft_pass: 0, no_hire: 0 });
+        const distText = (Object.keys(VERDICT_COLOURS) as Verdict[])
+          .filter((v) => dist[v] > 0)
+          .map((v) => `${dist[v]} ${VERDICT_COLOURS[v].label}`)
+          .join(" · ");
+        pushAssistant(`Session complete. Average ${avg}/100 — ${distText}. Want another round?`,
+          ["Drill weak area", "Run another", "Jump to behaviorals (soon)"]);
+        setPhase("done");
+      } else {
+        // Auto-advance: short prompt to keep flow.
+        pushAssistant("Ready for the next one?", ["Next question"]);
+      }
     } catch (err) {
       console.error(err);
-      alert("Couldn't evaluate the answer. Try again.");
-    } finally {
-      setEvaluating(false);
+      setMessages((m) => {
+        const next = m.slice(0, -1);
+        next.push({ role: "assistant", content: "Couldn't evaluate the answer — temporary outage. Try again?" });
+        return next;
+      });
+      setPhase("running");
     }
   }
 
   function nextQuestion() {
     const next = questionIdx + 1;
-    if (next >= questions.length) {
-      // Persist completed session.
-      saveSession({
-        id: sessionId,
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        lens: "skill",
-        context: { skill, difficulty, count },
-        questions: history.map(({ q, a, e }) => ({ questionId: q.id, answer: a, evaluation: e })),
-        status: "completed",
-      });
-      setView("done");
-      return;
-    }
+    if (next >= questions.length) return;
     setQuestionIdx(next);
-    setAnswer(questions[next].starterCode ?? "");
-    setEvaluation(null);
-    setView("session");
+    const q = questions[next];
+    setAnswer(q.starterCode ?? "");
+    pushAssistant(`Question ${next + 1} of ${questions.length} — ${q.subcategory}\n\n${q.prompt}\n\n${q.contextSetup}\n\nSample data: ${q.sampleData}`);
+    setPhase("running");
   }
 
-  function backToEntry() {
-    setView("entry");
-    setEvaluation(null);
-    setQuestions([]);
-    setHistory([]);
-  }
+  // ── Render ──────────────────────────────────────────────────────────────
+  const currentQ = questions[questionIdx];
+  const showCanvas = phase === "running" || phase === "evaluating";
 
   return (
-    <div className="flex flex-col w-full h-full bg-[#fafaf7] overflow-y-auto">
-      <div className="max-w-4xl mx-auto w-full px-6 py-8">
-        {view === "entry" && (
-          <EntryScreen candidateName={candidateName} onPick={(lens) => {
-            if (lens !== "skill") {
-              alert("Coming in Phase 3 — for now, jump in with the Skill lens.");
-              return;
-            }
-            setView("setup");
-          }} />
-        )}
-
-        {view === "setup" && (
-          <SetupScreen
-            skill={skill} setSkill={setSkill}
-            difficulty={difficulty} setDifficulty={setDifficulty}
-            count={count} setCount={setCount}
-            skills={skills}
-            onBack={backToEntry}
-            onStart={startSession}
-          />
-        )}
-
-        {view === "session" && questions[questionIdx] && (
-          <SessionScreen
-            question={questions[questionIdx]}
-            questionNumber={questionIdx + 1}
-            totalQuestions={questions.length}
-            answer={answer}
-            setAnswer={setAnswer}
-            timer={timer}
-            evaluating={evaluating}
-            onSubmit={submitAnswer}
-            onSkip={() => {
-              setHistory((h) => [...h, {
-                q: questions[questionIdx],
-                a: "(skipped)",
-                e: { verdict: "no_hire" as const, score: 0, reasoning: "Skipped.", whatWorked: [], whatMissed: ["You skipped this question."], pushToStrong: "Try not to skip on the real interview." },
-              }]);
-              nextQuestion();
-            }}
-          />
-        )}
-
-        {view === "verdict" && evaluation && questions[questionIdx] && (
-          <VerdictScreen
-            evaluation={evaluation}
-            question={questions[questionIdx]}
-            isLast={questionIdx + 1 >= questions.length}
-            onNext={nextQuestion}
-          />
-        )}
-
-        {view === "done" && (
-          <DoneScreen history={history} onRestart={backToEntry} />
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Subviews ──────────────────────────────────────────────────────────────
-
-function EntryScreen({ candidateName, onPick }: { candidateName?: string | null; onPick: (lens: "skill" | "role" | "company" | "jd") => void }) {
-  const firstName = (candidateName ?? "").trim().split(/\s+/)[0] || "there";
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold text-gray-900 mb-2">Hey {firstName} — let's get you ready.</h1>
-      <p className="text-sm text-gray-600 mb-8">Practice with questions calibrated to real interviews. How do you want to start?</p>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        <LensCard icon={Code}      title="By Skill"  blurb="Drill specific weak areas (SQL, Python, Spark…)" available onClick={() => onPick("skill")} />
-        <LensCard icon={Briefcase} title="By Role"   blurb="Practice for your target role." onClick={() => onPick("role")} />
-        <LensCard icon={Building2} title="By Company" blurb="Tailored to a company's interview patterns." onClick={() => onPick("company")} />
-        <LensCard icon={FileText}  title="By JD"      blurb="Paste a job description; we calibrate to it." accent onClick={() => onPick("jd")} />
-      </div>
-
-      <div className="rounded-lg bg-white border border-gray-200 px-5 py-4 text-sm text-gray-600">
-        <span className="font-medium text-gray-900">Friday Forecast:</span> No data yet. Run a calibration session to start tracking readiness.
-      </div>
-    </div>
-  );
-}
-
-function LensCard({
-  icon: Icon, title, blurb, available, accent, onClick,
-}: { icon: React.ComponentType<{ size?: number; strokeWidth?: number }>; title: string; blurb: string; available?: boolean; accent?: boolean; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`text-left rounded-2xl border bg-white px-5 py-5 transition-all hover:border-gray-400 hover:shadow-sm ${accent ? "border-emerald-200" : "border-gray-200"}`}
-    >
-      <div className={`inline-flex items-center justify-center w-9 h-9 rounded-lg mb-3 ${accent ? "bg-emerald-50 text-emerald-700" : "bg-gray-100 text-gray-700"}`}>
-        <Icon size={18} strokeWidth={2} />
-      </div>
-      <div className="flex items-baseline gap-2 mb-1">
-        <span className="text-base font-semibold text-gray-900">{title}</span>
-        {!available && <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">Soon</span>}
-      </div>
-      <p className="text-sm text-gray-600 leading-snug">{blurb}</p>
-    </button>
-  );
-}
-
-function SetupScreen({
-  skill, setSkill, difficulty, setDifficulty, count, setCount, skills, onBack, onStart,
-}: {
-  skill: string; setSkill: (s: string) => void;
-  difficulty: Difficulty | "mixed"; setDifficulty: (d: Difficulty | "mixed") => void;
-  count: number; setCount: (c: number) => void;
-  skills: string[]; onBack: () => void; onStart: () => void;
-}) {
-  return (
-    <div>
-      <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 mb-6">
-        <ChevronLeft size={16} /> Back
-      </button>
-      <h1 className="text-2xl font-semibold text-gray-900 mb-1">Set up your session</h1>
-      <p className="text-sm text-gray-600 mb-8">Pick the skill, difficulty, and length. We'll generate questions on demand.</p>
-
-      <div className="space-y-7">
-        <Field label="Which skill?">
-          <ChipRow value={skill} onChange={setSkill} options={skills.map((s) => ({ value: s, label: s }))} />
-        </Field>
-
-        <Field label="What level?">
-          <ChipRow
-            value={difficulty}
-            onChange={(v) => setDifficulty(v as Difficulty | "mixed")}
-            options={[
-              { value: "easy", label: "Easy" },
-              { value: "medium", label: "Medium" },
-              { value: "hard", label: "Hard" },
-              { value: "mixed", label: "Mixed" },
-            ]}
-          />
-        </Field>
-
-        <Field label="How many questions?">
-          <ChipRow
-            value={String(count)}
-            onChange={(v) => setCount(parseInt(v, 10))}
-            options={[
-              { value: "3", label: "Quick (3)" },
-              { value: "5", label: "Standard (5)" },
-              { value: "10", label: "Full (10)" },
-            ]}
-          />
-        </Field>
-      </div>
-
-      <div className="mt-10 flex items-center justify-end">
-        <button
-          onClick={onStart}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-black"
-        >
-          Start session <ArrowRight size={16} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[12px] font-semibold tracking-wider uppercase text-gray-500 mb-2">{label}</div>
-      {children}
-    </div>
-  );
-}
-
-function ChipRow({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((o) => {
-        const active = o.value === value;
-        return (
-          <button
-            key={o.value}
-            onClick={() => onChange(o.value)}
-            className={`px-3.5 py-1.5 rounded-full text-sm border transition-colors ${active ? "bg-gray-900 text-white border-gray-900" : "bg-white text-gray-700 border-gray-200 hover:border-gray-400"}`}
-          >
-            {o.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function SessionScreen({
-  question, questionNumber, totalQuestions, answer, setAnswer, timer, evaluating, onSubmit, onSkip,
-}: {
-  question: InterviewQuestion; questionNumber: number; totalQuestions: number;
-  answer: string; setAnswer: (s: string) => void; timer: number; evaluating: boolean;
-  onSubmit: () => void; onSkip: () => void;
-}) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <span className="text-[11px] font-semibold tracking-wider uppercase text-gray-500">
-          Question {questionNumber} of {totalQuestions}
-        </span>
-        <div className="flex items-center gap-3">
-          <span className={`text-[11px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded ${
-            question.difficulty === "easy" ? "bg-emerald-50 text-emerald-700"
-            : question.difficulty === "medium" ? "bg-amber-50 text-amber-700"
-            : "bg-rose-50 text-rose-700"
-          }`}>{question.difficulty}</span>
-          <span className="text-[12px] text-gray-500 font-mono tabular-nums">
-            {Math.floor(timer / 60)}:{String(timer % 60).padStart(2, "0")} <span className="text-gray-300">· bench {Math.floor(question.timeBenchmarkSeconds / 60)}:{String(question.timeBenchmarkSeconds % 60).padStart(2, "0")}</span>
-          </span>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-gray-200 bg-white p-6 mb-4">
-        <div className="text-[13px] text-gray-500 uppercase tracking-wider font-semibold mb-2">{question.subcategory}</div>
-        <p className="text-[15px] text-gray-900 leading-relaxed mb-4">{question.prompt}</p>
-        <pre className="text-[12px] text-gray-600 bg-gray-50 border border-gray-100 rounded-md p-3 overflow-x-auto whitespace-pre-wrap">{question.contextSetup}</pre>
-        <p className="text-[11px] text-gray-500 mt-2 italic">{question.sampleData}</p>
-      </div>
-
-      <textarea
-        value={answer}
-        onChange={(e) => setAnswer(e.target.value)}
-        spellCheck={false}
-        className="w-full min-h-[260px] rounded-xl border border-gray-300 bg-[#1a1a1a] text-emerald-100 font-mono text-[13px] leading-relaxed p-4 focus:outline-none focus:border-violet-500"
-        placeholder="Write your query here..."
-      />
-
-      <div className="flex items-center justify-between mt-4">
-        <button
-          onClick={onSkip}
-          disabled={evaluating}
-          className="text-sm text-gray-500 hover:text-gray-900 disabled:opacity-50"
-        >
-          Skip this question
-        </button>
-        <button
-          onClick={onSubmit}
-          disabled={evaluating || answer.trim().length < 5}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-black disabled:opacity-50"
-        >
-          {evaluating ? "Evaluating..." : "Submit answer"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function VerdictScreen({
-  evaluation, question, isLast, onNext,
-}: { evaluation: InterviewEvaluation; question: InterviewQuestion; isLast: boolean; onNext: () => void }) {
-  const v = VERDICT_COLOURS[evaluation.verdict];
-  return (
-    <div>
-      <div className="rounded-2xl border-2 p-6 mb-5" style={{ borderColor: v.fg, background: v.bg }}>
-        <div className="flex items-baseline justify-between">
-          <span className="text-2xl font-bold" style={{ color: v.fg }}>{v.label}</span>
-          <span className="text-2xl font-bold tabular-nums" style={{ color: v.fg }}>{evaluation.score}/100</span>
-        </div>
-        <p className="text-[14px] text-gray-700 mt-2 leading-relaxed">{evaluation.reasoning}</p>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <CheckCircle2 size={16} className="text-emerald-600" />
-            <span className="text-[12px] font-semibold tracking-wider uppercase text-emerald-700">What worked</span>
-          </div>
-          <ul className="text-[13px] text-gray-700 space-y-2 leading-relaxed">
-            {evaluation.whatWorked.length === 0 && <li className="text-gray-400 italic">Nothing significant.</li>}
-            {evaluation.whatWorked.map((s, i) => <li key={i}>• {s}</li>)}
-          </ul>
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <XCircle size={16} className="text-rose-600" />
-            <span className="text-[12px] font-semibold tracking-wider uppercase text-rose-700">What missed</span>
-          </div>
-          <ul className="text-[13px] text-gray-700 space-y-2 leading-relaxed">
-            {evaluation.whatMissed.length === 0 && <li className="text-gray-400 italic">Nothing to call out.</li>}
-            {evaluation.whatMissed.map((s, i) => <li key={i}>• {s}</li>)}
-          </ul>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-violet-200 bg-violet-50 p-5 mb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <AlertTriangle size={16} className="text-violet-700" />
-          <span className="text-[12px] font-semibold tracking-wider uppercase text-violet-800">Push to Strong Hire</span>
-        </div>
-        <p className="text-[14px] text-violet-900 leading-relaxed">{evaluation.pushToStrong}</p>
-      </div>
-
-      <details className="mb-6 text-[13px] text-gray-600">
-        <summary className="cursor-pointer text-gray-700 hover:text-gray-900">Show the rubric</summary>
-        <div className="mt-3 rounded-lg border border-gray-200 bg-white p-4 space-y-2">
-          <p><span className="font-semibold">Correct approach:</span> {question.rubric.correctApproach}</p>
-          <p><span className="font-semibold">Common mistakes:</span> {question.rubric.commonMistakes.join("; ")}</p>
-          <p><span className="font-semibold">Bonus:</span> {question.rubric.bonusPoints.join("; ")}</p>
-          <p><span className="font-semibold">Traps:</span> {question.rubric.traps.join("; ")}</p>
-        </div>
-      </details>
-
-      <div className="flex items-center justify-end">
-        <button
-          onClick={onNext}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-black"
-        >
-          {isLast ? "Finish session" : "Next question"} <ArrowRight size={16} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function DoneScreen({
-  history, onRestart,
-}: { history: { q: InterviewQuestion; a: string; e: InterviewEvaluation }[]; onRestart: () => void }) {
-  const total = history.length;
-  const avg = total === 0 ? 0 : Math.round(history.reduce((s, x) => s + x.e.score, 0) / total);
-  const distribution = history.reduce<Record<Verdict, number>>((acc, x) => {
-    acc[x.e.verdict] = (acc[x.e.verdict] ?? 0) + 1;
-    return acc;
-  }, { strong_hire: 0, hire: 0, soft_pass: 0, no_hire: 0 });
-
-  return (
-    <div>
-      <h1 className="text-2xl font-semibold text-gray-900 mb-2">Session complete</h1>
-      <p className="text-sm text-gray-600 mb-8">Saved to your local history. Run another to keep building readiness.</p>
-
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Average score</div>
-          <div className="text-3xl font-semibold text-gray-900 tabular-nums">{avg}<span className="text-base text-gray-400">/100</span></div>
-        </div>
-        <div className="rounded-2xl border border-gray-200 bg-white p-5">
-          <div className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Verdicts</div>
-          <div className="text-[13px] text-gray-700 space-y-1">
-            {(Object.keys(VERDICT_COLOURS) as Verdict[]).map((v) => (
-              <div key={v} className="flex justify-between">
-                <span>{VERDICT_COLOURS[v].label}</span>
-                <span className="tabular-nums" style={{ color: VERDICT_COLOURS[v].fg }}>{distribution[v]}</span>
+    <div className="flex w-full h-full bg-[#fafaf7] overflow-hidden">
+      {/* Left — chat */}
+      <div className="flex-1 min-w-0 flex flex-col border-r border-gray-200">
+        {/* Chat thread */}
+        <div ref={chatScrollRef} className="flex-1 overflow-y-auto px-6 py-6">
+          <div className="max-w-2xl mx-auto space-y-4">
+            {messages.map((m, i) => (
+              <div key={i} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
+                <div className={
+                  m.role === "user"
+                    ? "max-w-[85%] rounded-2xl px-4 py-2.5 bg-gray-900 text-white text-[14px]"
+                    : "max-w-[85%] text-[14px] text-gray-800 leading-relaxed whitespace-pre-wrap"
+                }>
+                  {m.role === "assistant"
+                    ? renderAssistant(m.content)
+                    : m.content}
+                  {m.role === "assistant" && m.chips && m.chips.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {m.chips.map((c) => {
+                        // Click-to-act on the chip — phase-aware so we
+                        // don't re-fire chips from old messages.
+                        const isLast = i === messages.length - 1;
+                        return (
+                          <button
+                            key={c}
+                            onClick={() => isLast && handleChip(c)}
+                            disabled={!isLast}
+                            className={`text-[12px] px-3 py-1 rounded-full border transition-colors ${
+                              isLast ? "bg-white border-gray-300 hover:border-gray-500 text-gray-800 cursor-pointer" : "bg-gray-50 border-gray-200 text-gray-400 cursor-default"
+                            }`}
+                          >
+                            {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
+            {phase === "verdict" && questionIdx + 1 < questions.length && (
+              <div className="flex">
+                <button
+                  onClick={nextQuestion}
+                  className="text-[13px] px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-black"
+                >
+                  Next question →
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Composer */}
+        <div className="border-t border-gray-200 bg-white px-6 py-3">
+          <div className="max-w-2xl mx-auto flex items-center gap-2">
+            <input
+              value={composer}
+              onChange={(e) => setComposer(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && composer.trim()) {
+                  const v = composer.trim();
+                  setComposer("");
+                  pushUser(v);
+                  handleUserMessage(v);
+                }
+              }}
+              placeholder={phase === "running" ? "Use the editor on the right; type here for help" : "Type a reply..."}
+              className="flex-1 px-4 py-2 rounded-lg border border-gray-300 text-[14px] focus:outline-none focus:border-violet-500"
+            />
+            <button
+              onClick={() => {
+                const v = composer.trim();
+                if (!v) return;
+                setComposer("");
+                pushUser(v);
+                handleUserMessage(v);
+              }}
+              disabled={!composer.trim()}
+              className="p-2 rounded-lg bg-gray-900 text-white disabled:opacity-30"
+            >
+              <ArrowUp size={16} />
+            </button>
           </div>
         </div>
       </div>
 
-      <button
-        onClick={onRestart}
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-black"
-      >
-        Run another session
-      </button>
+      {/* Right — canvas (code editor when a question is active) */}
+      <div className="flex flex-col" style={{ width: showCanvas ? "45%" : "0", minWidth: showCanvas ? "420px" : "0", transition: "width 220ms ease" }}>
+        {showCanvas && currentQ && (
+          <>
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-white">
+              <div className="text-[11px] font-semibold tracking-wider uppercase text-gray-500">
+                {currentQ.subcategory} · {currentQ.difficulty}
+              </div>
+              <div className="text-[12px] text-gray-500 font-mono tabular-nums">
+                {Math.floor(timer / 60)}:{String(timer % 60).padStart(2, "0")}
+                <span className="text-gray-300"> · bench {Math.floor(currentQ.timeBenchmarkSeconds / 60)}:{String(currentQ.timeBenchmarkSeconds % 60).padStart(2, "0")}</span>
+              </div>
+            </div>
+            <textarea
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              spellCheck={false}
+              disabled={phase === "evaluating"}
+              className="flex-1 w-full bg-[#1a1a1a] text-emerald-100 font-mono text-[13px] leading-relaxed p-5 focus:outline-none disabled:opacity-60"
+              placeholder="Write your query here..."
+            />
+            <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-white">
+              <span className="text-[12px] text-gray-500">{answer.trim().length} chars</span>
+              <button
+                onClick={submitAnswer}
+                disabled={phase === "evaluating" || answer.trim().length < 5}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-[13px] font-medium hover:bg-black disabled:opacity-50"
+              >
+                {phase === "evaluating" ? "Evaluating..." : "Submit"} <Send size={14} />
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
+  );
+}
+
+// Lightweight markdown-ish render for the assistant bubble — bold via **,
+// preserves whitespace via whitespace-pre-wrap on the wrapping div.
+function renderAssistant(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) =>
+    p.startsWith("**") && p.endsWith("**")
+      ? <strong key={i} className="font-semibold text-gray-900">{p.slice(2, -2)}</strong>
+      : <span key={i}>{p}</span>
   );
 }
