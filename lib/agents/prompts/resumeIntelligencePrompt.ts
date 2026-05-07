@@ -200,8 +200,8 @@ Return exactly this structure:
     "scanabilityRisk": "low" | "medium" | "high",
     "notes": string[] (min 3, specific issues found, no generic statements)
   },
-  "rewritePriorities": string[] (NO CAP — list every concrete fix the resume needs, sorted HIGH→LOW. A pristine resume might have 2 items; a heavily flawed one might have 40+. DO NOT pad to a target. DO NOT trim to keep the list 'manageable'. Format: "HIGH — Fix X because Y". Every item must name a SPECIFIC concrete fix, not a vague suggestion. If you're tempted to write "consider improving your bullets" or any other generic catch-all to hit a number, STOP — fewer real items > more padding. The user wants the truth, however long it is.),
-  "suggestedNextSteps": string[] (NO CAP — as many as the gap genuinely warrants, ranked, no padding),
+  "rewritePriorities": string[] (Material fixes only — items that meaningfully move the score (≥1 pt impact each). Sorted HIGH→LOW. NO ARTIFICIAL CAP, but be SELECTIVE. A pristine resume might have 2-3; a typical resume 5-8; a rough resume 10-15. Cut nitpicks: 'consider hyphenating multi-word adjectives', 'Oxford comma usage', 'one bullet has a period inconsistency' — these are noise, not priorities. If a fix won't move the score by at least 1 pt OR meaningfully change recruiter perception in 6 seconds, OMIT it. Format: "HIGH — Fix X because Y". Every item must name a SPECIFIC concrete fix, not a vague suggestion. Quality over quantity. ABSOLUTELY DO NOT pad to a target. ABSOLUTELY DO NOT add a fix just to round out the list.),
+  "suggestedNextSteps": string[] (3-8 ranked actions — same selectivity rule, only items that materially move the candidate forward),
   "bestFitRoles": [
     {
       "title": string,       // e.g. "Data Engineer"
