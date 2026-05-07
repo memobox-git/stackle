@@ -137,6 +137,33 @@ export async function runRewriteAll(input: RewriteAllInput): Promise<RewriteAllO
   return assembleOutput(better.parsed, input.extraction, betterIssues);
 }
 
+// Reject corrupted-looking values the model occasionally produces:
+//   - name "there" (bleeds from chat context "Hey there")
+//   - location "City, State" (literal placeholder)
+//   - empty arrays where original had content
+const PLACEHOLDER_NAME_RX = /^(there|candidate|user|name|john\s+doe|jane\s+doe)$/i;
+const PLACEHOLDER_LOCATION_RX = /^(city,?\s*state|location|address|n\/a)$/i;
+
+function pickStringField(rewritten: unknown, original: string | null, opts?: { rejectPattern?: RegExp }): string | null {
+  // If the model returned a string and it doesn't match a placeholder pattern, take it.
+  // Otherwise fall back to original.
+  if (typeof rewritten === "string" && rewritten.trim().length > 0) {
+    const trimmed = rewritten.trim();
+    if (opts?.rejectPattern && opts.rejectPattern.test(trimmed)) {
+      return original;
+    }
+    return trimmed;
+  }
+  return original;
+}
+
+function pickArrayField<T>(rewritten: unknown, original: T[] | undefined): T[] {
+  // If the model returned a non-empty array, take it. Otherwise restore
+  // the original's array so we never silently drop entire sections.
+  if (Array.isArray(rewritten) && rewritten.length > 0) return rewritten as T[];
+  return Array.isArray(original) ? original : [];
+}
+
 function assembleOutput(
   parsed: ResumeExtraction & { changedKeys?: unknown },
   original: ResumeExtraction,
@@ -145,11 +172,29 @@ function assembleOutput(
   const { changedKeys: rawChangedKeys, ...rest } = parsed;
   const changedKeys = Array.isArray(rawChangedKeys) ? rawChangedKeys.filter((k): k is string => typeof k === "string") : [];
 
-  // Defensive merge — if the model dropped a top-level field that exists
-  // on the original, keep the original's value. Belt-and-suspenders.
+  // Field-by-field defensive merge. The previous {...original, ...rest}
+  // spread let corrupted values through (name="there", location="City, State"),
+  // and let empty arrays from the model wipe out the original's
+  // experience/education/projects/etc. Now every field is checked
+  // individually and only replaces the original when it's clearly better.
   const merged: ResumeExtraction = {
-    ...original,
-    ...rest,
+    name:                  pickStringField(rest.name, original.name, { rejectPattern: PLACEHOLDER_NAME_RX }) ?? original.name,
+    email:                 pickStringField(rest.email, original.email),
+    phone:                 pickStringField(rest.phone, original.phone),
+    linkedin:              pickStringField(rest.linkedin, original.linkedin),
+    location:              pickStringField(rest.location, original.location, { rejectPattern: PLACEHOLDER_LOCATION_RX }),
+    summary:               pickStringField(rest.summary, original.summary),
+    totalYearsExperience:  typeof rest.totalYearsExperience === "number" ? rest.totalYearsExperience : (original.totalYearsExperience ?? null),
+    experience:            pickArrayField(rest.experience, original.experience),
+    education:             pickArrayField(rest.education, original.education),
+    skillGroups:           pickArrayField(rest.skillGroups, original.skillGroups),
+    projects:              pickArrayField(rest.projects, original.projects),
+    certifications:        pickArrayField(rest.certifications, original.certifications),
+    awards:                pickArrayField(rest.awards, original.awards),
+    volunteer:             pickArrayField(rest.volunteer, original.volunteer),
+    publications:          pickArrayField(rest.publications, original.publications),
+    links:                 pickArrayField(rest.links, original.links),
+    languages:             pickArrayField(rest.languages, original.languages),
   };
 
   return { extraction: merged, changedKeys, qualityWarnings };

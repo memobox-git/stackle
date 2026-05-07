@@ -164,7 +164,18 @@ Three lines max:
 
 Pass through unchanged unless an explicit priority says otherwise. Project bullets follow the same metric+action pattern as experience bullets.
 
-# Output
+# Output — CRITICAL FIDELITY RULES
+
+NEVER drop entire sections from the output. If the input has experience entries, education, projects, certifications, etc., the output MUST contain ALL of them. You may rewrite their content but must NOT remove them.
+
+NEVER use placeholder values:
+- name: never "there", "candidate", "John Doe", "user", "name". Echo the original name exactly.
+- location: never "City, State", "Location", "n/a", or any template placeholder. Echo the original location.
+- email/phone/linkedin: echo verbatim from input.
+
+The post-processor REJECTS placeholder values and restores from original — but the round-trip wastes Opus calls. Save the time: just echo the contact fields exactly as input.
+
+Empty arrays in your output OVERWRITE the originals. If you don't intend to delete a section, return its array exactly as input. Empty array = "delete this section" — only use that when an explicit priority says to delete the section.
 
 Respond with valid JSON only — no markdown fences, no commentary. Same shape as the input \`extraction\` object:
 
