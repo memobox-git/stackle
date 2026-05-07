@@ -5,6 +5,9 @@ import { NextRequest, NextResponse } from "next/server";
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  // Honour the `next` query param so users land back on the page they
+  // tried to reach before middleware bounced them to /signin.
+  const nextParam = searchParams.get("next") || "/";
 
   if (code) {
     const cookieStore = await cookies();
@@ -25,5 +28,8 @@ export async function GET(request: NextRequest) {
     await supabase.auth.exchangeCodeForSession(code);
   }
 
-  return NextResponse.redirect(`${origin}/`);
+  // Defensive: only redirect to relative paths within the app. An
+  // external URL in `next` would be an open-redirect vector.
+  const safeNext = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
+  return NextResponse.redirect(`${origin}${safeNext}`);
 }
