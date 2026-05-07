@@ -1252,6 +1252,35 @@ export default function Page() {
       // — the orchestrator drives the panel via tools and narrates every
       // action. Bypasses the orchestrate→analyze→synthesize chain entirely.
       if (isResumeMode && resumeAnalysis && intakeStep >= 5) {
+        // FAST-PATH: deterministic URL detection. Sonnet has a baked-in prior
+        // ("AI assistants can't fetch URLs") that occasionally beats out the
+        // tool instruction — model says "Got it, let me pull that..." but
+        // doesn't emit the tool_use. Bypass the LLM entirely when the user
+        // shares a URL: synthesise the tool dispatch client-side. The user
+        // gets immediate action, no LLM contradiction risk.
+        const urlMatch = trimmed.match(/\bhttps?:\/\/[^\s)]+/i);
+        if (urlMatch) {
+          const url = urlMatch[0].replace(/[.,);]+$/, "");
+          // Render an assistant ack + dispatch the tool to ResumeBuilder.
+          setMessages((prev) => [...prev, { role: "assistant", content: `Fetching the JD from ${new URL(url).hostname}…`, timestamp: now() }]);
+          setIsLoading(false);
+          setPendingChatTool({ ts: Date.now(), name: "tailor_for_jd_url", input: { url } });
+          if (agentAbortRef.current === controller) agentAbortRef.current = null;
+          return;
+        }
+        // FAST-PATH 2: user pastes a chunk of JD-shaped text (>200 chars,
+        // contains "responsibilities" or "requirements" or "qualifications").
+        // Same reason — bypass the LLM contradicting itself.
+        const looksLikeJD = trimmed.length > 200
+          && /(responsibilit|requirement|qualifications|what you'll do|about the role|years of experience|must.have|nice.to.have)/i.test(trimmed);
+        if (looksLikeJD) {
+          setMessages((prev) => [...prev, { role: "assistant", content: "Reading the JD…", timestamp: now() }]);
+          setIsLoading(false);
+          setPendingChatTool({ ts: Date.now(), name: "tailor_for_jd", input: { jd_text: trimmed } });
+          if (agentAbortRef.current === controller) agentAbortRef.current = null;
+          return;
+        }
+
         try {
           const currentScore =
             (resumeAnalysis.scores && typeof resumeAnalysis.scores.total === "number" && resumeAnalysis.scores.total > 0)
