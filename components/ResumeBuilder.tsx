@@ -1461,6 +1461,23 @@ export default function ResumeBuilder({
           });
           break;
         }
+        case "tailor_for_jd_url": {
+          // JD-to-Resume Phase 2. Three-step pipeline:
+          // 0) Scrape the URL (best-effort for Greenhouse/Lever/Ashby/generic;
+          //    JS-heavy sites return needsManual=true with an honest error)
+          // 1+2) Same as tailor_for_jd from there.
+          const url = (input.url as string | undefined) ?? "";
+          if (!url.trim() || !resumeExtraction) {
+            toasts.push({ kind: "warn", text: "Need both a resume and a URL to tailor." });
+            break;
+          }
+          if (onPushAssistantMessage) onPushAssistantMessage("Fetching the JD…");
+          tailorForJDUrl(url).catch((err) => {
+            console.error("[tailor_for_jd_url]", err);
+            if (onPushAssistantMessage) onPushAssistantMessage("Hit a snag fetching that URL. Try pasting the JD text instead?");
+          });
+          break;
+        }
         default:
           break;
       }
@@ -1545,6 +1562,31 @@ export default function ResumeBuilder({
     onPushAssistantMessage?.(summaryLines.slice(0, 2).join("\n\n"));
     onPushAssistantMessage?.(summaryLines[3]);
     setActiveTab("rewrite");
+  }
+
+  // JD-to-Resume Phase 2 — fetch URL → extract JD text → fall through to tailorForJD.
+  async function tailorForJDUrl(url: string) {
+    const sRes = await fetch("/api/agents/jd/scrape", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+    if (!sRes.ok) {
+      onPushAssistantMessage?.("Couldn't reach that URL — try pasting the JD text instead.");
+      return;
+    }
+    const data = await sRes.json() as
+      | { ok: true; jdText: string; sourcePlatform: string; sourceUrl: string; cached: boolean }
+      | { ok: false; sourcePlatform: string; sourceUrl: string; error: string; needsManual: boolean };
+
+    if (!data.ok) {
+      onPushAssistantMessage?.(`${data.error} Paste the JD text and I'll tailor from there.`);
+      return;
+    }
+
+    const cachedTag = data.cached ? " (cached)" : "";
+    onPushAssistantMessage?.(`Got it from ${data.sourcePlatform}${cachedTag}. Reading the JD…`);
+    return tailorForJD(data.jdText);
   }
 
   // ── Global keyboard shortcuts ─────────────────────────────────────

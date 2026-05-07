@@ -143,4 +143,19 @@ export const RESUME_ORCHESTRATOR_TOOLS: Anthropic.Tool[] = [
       required: ["jd_text"],
     },
   },
+  {
+    name: "tailor_for_jd_url",
+    description:
+      "Same as tailor_for_jd, but the user shared a URL instead of pasting text. The client scrapes the URL (best-effort for Greenhouse/Lever/Ashby/generic company pages), then runs the same analyse → rewrite → save pipeline. Use when the user shares a URL like 'https://boards.greenhouse.io/...' or pastes a job posting link. JS-heavy sites (LinkedIn, Workday, Indeed, Glassdoor) will return an honest 'paste the text instead' error — the agent should narrate that gracefully.",
+    input_schema: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The full URL of the job posting. Required.",
+        },
+      },
+      required: ["url"],
+    },
+  },
 ];
