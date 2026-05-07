@@ -117,11 +117,34 @@ function SessionsList({
   onDelete: (id: string) => void;
 }) {
   const firstName = candidateName?.trim().split(/\s+/)[0] ?? "there";
+  const forecast = useMemo(() => buildFridayForecast(sessions), [sessions]);
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-10">
         <h1 className="text-2xl font-semibold text-gray-900 mb-1">Hey {firstName} — interview prep.</h1>
-        <p className="text-sm text-gray-600 mb-8">Each session is its own chat. Start a new one or revisit a past report.</p>
+        <p className="text-sm text-gray-600 mb-6">Each session is its own chat. Start a new one or revisit a past report.</p>
+
+        {/* Friday Forecast — Phase 2. Readiness % aggregated across past
+            completed sessions. Empty state nudges the first run. */}
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4 mb-8">
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="text-[10px] uppercase tracking-wider text-violet-700 font-semibold">Friday Forecast</span>
+            <span className="text-[11px] text-violet-700">{forecast.sessionCount === 0 ? "no data yet" : `${forecast.sessionCount} session${forecast.sessionCount !== 1 ? "s" : ""}`}</span>
+          </div>
+          {forecast.sessionCount === 0 ? (
+            <p className="text-[13.5px] text-violet-900 leading-relaxed">Run your first session to start tracking interview readiness — the more you drill, the sharper this gets.</p>
+          ) : (
+            <>
+              <div className="flex items-baseline gap-3 mb-2">
+                <span className="text-3xl font-semibold text-violet-900 tabular-nums">{forecast.readiness}%</span>
+                <span className="text-[12px] text-violet-700">interview-ready</span>
+              </div>
+              <p className="text-[13px] text-violet-800 leading-relaxed">
+                {forecast.message}
+              </p>
+            </>
+          )}
+        </div>
 
         <button
           onClick={onNew}
@@ -274,14 +297,20 @@ function ActiveSession({
       }
       if (route.subAgent === "skill") {
         setPhase("config");
-        // Hand to Skill Agent.
-        await callSkillAgent([
-          ...messages,
-          { role: "user", content: t },
-        ]);
+        await callSkillAgent([...messages, { role: "user", content: t }]);
         return;
       }
-      pushAssistant("Pick a lens — skill, role, company, or JD?", ["Skill drill", "By role (soon)", "By company (soon)", "By JD (soon)"]);
+      if (route.subAgent === "company") {
+        // Phase 3 — Company lens. Ask which company first; once picked,
+        // hand to Skill Agent with the persona injected as context.
+        pushAssistant(
+          "Which company are you prepping for? I have personas for the ones below — pick one and I'll bias the practice toward their interview pattern.",
+          ["Google", "Meta", "Amazon", "Snowflake", "Databricks", "Stripe"],
+        );
+        setPhase("config");
+        return;
+      }
+      pushAssistant("Pick a lens — skill, role, company, or JD?", ["Skill drill", "By company", "By role (soon)", "By JD (soon)"]);
       return;
     }
 
@@ -604,6 +633,42 @@ function ActiveSession({
               className="flex-1 w-full bg-[#1a1a1a] text-emerald-100 font-mono text-[13px] leading-relaxed p-5 focus:outline-none disabled:opacity-60"
               placeholder="Write your query here..."
             />
+
+            {/* Helper chips — Phase 2. Free, fast assists that don't
+                spoil the answer. Hint and Trap route through the chat
+                so the Skill Agent answers; Starter pre-fills; Skip
+                advances. */}
+            {phase === "running" && (
+              <div className="flex items-center gap-2 px-5 py-2 border-t border-gray-100 bg-gray-50 flex-wrap">
+                <button
+                  onClick={() => handleUserInput("Give me a hint without spoiling the answer.")}
+                  disabled={streaming}
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-gray-400 disabled:opacity-50"
+                >Hint</button>
+                <button
+                  onClick={() => handleUserInput("I'm stuck — point me toward the right approach.")}
+                  disabled={streaming}
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-gray-400 disabled:opacity-50"
+                >I'm stuck</button>
+                <button
+                  onClick={() => handleUserInput("What's the trap on this one?")}
+                  disabled={streaming}
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-gray-400 disabled:opacity-50"
+                >What's the trap?</button>
+                <button
+                  onClick={() => setAnswer(currentQ.starterCode ?? "")}
+                  disabled={streaming}
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-700 hover:border-gray-400 disabled:opacity-50"
+                  title="Restore the starter template"
+                >Starter</button>
+                <button
+                  onClick={() => handleUserInput("Skip this question.")}
+                  disabled={streaming}
+                  className="text-[11px] px-2.5 py-1 rounded-full border border-gray-200 bg-white text-gray-500 hover:border-rose-300 hover:text-rose-700 ml-auto disabled:opacity-50"
+                >Skip</button>
+              </div>
+            )}
+
             <div className="flex items-center justify-between px-5 py-3 border-t border-gray-200 bg-white">
               <span className="text-[12px] text-gray-500">{answer.trim().length} chars</span>
               <button
@@ -684,6 +749,56 @@ function ReportSummary({ report }: { report: SessionReport }) {
       </div>
     </div>
   );
+}
+
+// Friday Forecast — Phase 2. Aggregates completed sessions into a single
+// readiness % the user can act on. Heuristic, not LLM:
+//   readiness = avg(score across recent completed sessions, weighted to recent)
+//   bonus +5 if 3+ sessions in last 7 days (consistency)
+//   bonus +5 if difficulty mix includes hard
+//   capped 0-100
+//
+// Returns a friendly message tailored to readiness band so the user
+// always has a clear next move.
+function buildFridayForecast(sessions: SkillSession[]): {
+  sessionCount: number;
+  readiness: number;
+  message: string;
+} {
+  const completed = sessions.filter((s) => s.status === "completed" && s.report);
+  if (completed.length === 0) {
+    return { sessionCount: 0, readiness: 0, message: "" };
+  }
+
+  // Sort newest first.
+  const sorted = completed.slice().sort((a, b) =>
+    (b.completedAt ?? b.startedAt).localeCompare(a.completedAt ?? a.startedAt),
+  );
+  const recentN = sorted.slice(0, 5);
+  const avg = Math.round(recentN.reduce((s, x) => s + (x.report?.averageScore ?? 0), 0) / recentN.length);
+
+  // Consistency bonus: 3+ sessions in last 7 days.
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recentCount = sorted.filter((s) => new Date(s.completedAt ?? s.startedAt).getTime() >= sevenDaysAgo).length;
+  const consistencyBonus = recentCount >= 3 ? 5 : 0;
+
+  // Difficulty bonus: any hard sessions in the mix.
+  const hardBonus = completed.some((s) => s.config.difficulty === "hard") ? 5 : 0;
+
+  const readiness = Math.max(0, Math.min(100, avg + consistencyBonus + hardBonus));
+
+  let message = "";
+  if (readiness >= 85) {
+    message = "Recruiter-ready. Time to start applying — you're past the practice threshold.";
+  } else if (readiness >= 70) {
+    message = "Solid baseline. A few more hard-difficulty drills will get you to recruiter-ready.";
+  } else if (readiness >= 55) {
+    message = `Mid-pack. Drill ${recentN[0].report?.weakestSubcategory ?? "your weakest area"} — that's where you're leaking the most points.`;
+  } else {
+    message = "Early days. Consistency matters more than score right now — aim for one session a day.";
+  }
+
+  return { sessionCount: completed.length, readiness, message };
 }
 
 // Lightweight markdown render for assistant bubbles — handles **bold** only.

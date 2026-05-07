@@ -38,11 +38,7 @@ export function pickInterviewSubAgent(message: string): InterviewManagerRoute {
     };
   }
   if (/^company$|by\s+company|google|meta|amazon|stripe|snowflake|databricks/i.test(lc)) {
-    return {
-      subAgent: null,
-      comingSoon: true,
-      comingSoonText: "Company Agent is coming after Role — tailored to a company's interview patterns. For now I can drill specific skills.",
-    };
+    return { subAgent: "company" };
   }
   if (/^jd$|paste\s+a\s+jd|job\s+description|by\s+jd/i.test(lc)) {
     return {
@@ -59,6 +55,6 @@ export function interviewManagerWelcome(candidateFirstName?: string | null): { t
   const name = candidateFirstName?.trim().split(/\s+/)[0] ?? "there";
   return {
     text: `Hey ${name} — how do you want to practice today?`,
-    chips: ["Skill drill", "By role (soon)", "By company (soon)", "By JD (soon)"],
+    chips: ["Skill drill", "By company", "By role (soon)", "By JD (soon)"],
   };
 }

@@ -1824,14 +1824,9 @@ export default function Page() {
         </div>
       )}
 
-      {/* Drive version history — only when expanded */}
-      {expanded && (
-        <DriveVersionPanel
-          driveFiles={driveFiles}
-          currentExtractionId={originalDriveFileId}
-          onRestoreVersion={() => {}}
-        />
-      )}
+      {/* Drive version history removed from sidebar — accessible via the
+          Drive nav item instead. The compact Resumes/Reports list felt
+          like clutter inside the main nav. */}
 
       {/* Bottom: sign out */}
       <div className={`mt-auto pt-2 ${expanded ? "px-2" : "px-1.5"}`}>
