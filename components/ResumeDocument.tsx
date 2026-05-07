@@ -89,10 +89,11 @@ export default function ResumeDocument({ extraction }: { extraction: ResumeExtra
         </Section>
       )}
 
-      {/* Skills */}
-      {extraction.skillGroups?.length > 0 && (
+      {/* Skills — filter empty categories so e.g. an empty "Data Quality"
+          or "ML & Analytics" group doesn't render as a blank line. */}
+      {(extraction.skillGroups ?? []).filter((g) => (g.skills ?? []).length > 0).length > 0 && (
         <Section title="Skills">
-          {extraction.skillGroups.map((group, i) => (
+          {(extraction.skillGroups ?? []).filter((g) => (g.skills ?? []).length > 0).map((group, i) => (
             <div key={i} style={{ marginBottom: "6px", fontSize: "12.5px", color: "#333" }}>
               <span style={{ fontWeight: "700", color: "#000" }}>{group.category}:</span>{" "}
               {group.skills.join(", ")}

@@ -21,13 +21,19 @@ export type TraceabilityIssue = {
 
 // Numeric-claim regex set. Captures the kinds of metrics writers typically
 // invent. Conservative — we only flag things shaped like "by X%" / "$X" /
-// "Nx" / "5+ years" / large counts. Time durations like "daily" pass.
+// "Nx" / "5+ analysts" / counts. Time durations like "daily" pass.
+//
+// Critical update (after user reported "50+ analysts" / "15+ global markets"
+// / "20+ heterogeneous source feeds" being fabricated): we now catch ANY
+// digit followed by "+" (the "10+", "50+", "200+" pattern most writers
+// reach for to invent precision they don't have).
 const METRIC_PATTERNS: RegExp[] = [
-  /\b(\d+(?:\.\d+)?)\s*%/g,                       // 35%, 12.5%
+  /\b(\d+(?:\.\d+)?)\s*%/g,                        // 35%, 12.5%
   /\$\s?(\d+(?:[.,]\d+)?)\s*[kKmMbB]?/g,           // $150K, $2M
   /\b(\d+(?:\.\d+)?)\s*[kKmMbB]\b/g,               // 2M records, 500K rows
   /\b(\d+(?:\.\d+)?)\s*x\b/gi,                     // 3x, 10x
-  /\b(\d{3,})\b/g,                                 // 12+, 10+, three-digit-plus counts
+  /\b(\d+\+)/g,                                    // 50+, 15+, 12+, 200+ — "+ suffix" counts
+  /\b(\d{2,})\b/g,                                 // any 2+ digit standalone number (50, 150, 1000)
 ];
 
 // Pull every quantitative substring out of a body of text.
@@ -118,21 +124,36 @@ const NOTABLE_TECHS = [
 // Run the traceability check on a single rewritten string (bullet, summary,
 // project description, etc) against the candidate's original extraction.
 // Returns an array of issues — empty array means the rewrite is clean.
+//
+// Algorithm: extract metric SETS from both the rewrite and the original
+// haystack using the same regex. Any metric in the rewrite-set that's NOT
+// in the original-set is flagged as invented. This is more robust than
+// substring matching (which let "50" pass when haystack contained "503"
+// or "2050").
 export function checkTraceability(rewritten: string, original: ResumeExtraction): TraceabilityIssue[] {
   if (!rewritten || !rewritten.trim()) return [];
   const issues: TraceabilityIssue[] = [];
   const haystack = buildOriginalHaystack(original);
 
-  // 1. Metrics — every numeric claim in the rewrite must appear in the haystack
-  const rewrittenMetrics = extractMetrics(rewritten);
+  // 1. Metrics — set-difference, not substring.
+  const rewrittenMetrics = new Set(extractMetrics(rewritten));
+  const originalMetrics = new Set(extractMetrics(haystack));
   for (const metric of rewrittenMetrics) {
-    if (!haystack.includes(metric)) {
-      issues.push({
-        kind: "metric",
-        claim: metric,
-        message: `"${metric}" is not in the original — looks invented. Either remove it or replace with a qualitative phrase.`,
-      });
-    }
+    if (originalMetrics.has(metric)) continue;
+    // Allow numeric matches that differ only by leading/trailing whitespace
+    // or a trailing "+" suffix vs no suffix ("50+" passes if "50" is in
+    // original, since the candidate clearly has at least 50 of whatever).
+    const stripped = metric.replace(/[+\s]/g, "");
+    if (originalMetrics.has(stripped)) continue;
+    if (originalMetrics.has(stripped + "+")) continue;
+    // 4-digit numbers are likely years — be generous (they often appear
+    // in dates the writer can legitimately reference).
+    if (/^\d{4}$/.test(stripped)) continue;
+    issues.push({
+      kind: "metric",
+      claim: metric,
+      message: `"${metric}" is not in the original — looks invented. Either remove it or replace with a scope phrase ("across multiple", "high-volume", "production-grade").`,
+    });
   }
 
   // 2. Technologies — named tools mentioned in the rewrite must appear

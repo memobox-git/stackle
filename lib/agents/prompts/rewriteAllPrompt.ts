@@ -89,7 +89,24 @@ Rules:
 - Power verb opener from the categorised lists below.
 - ONE metric where original supports it; if no number exists, use scope ("across 5 geographies", "200+ daily users", "12 microservices") instead of inventing.
 - Vary opening verbs within a single role. No verb repeats in one experience entry.
-- Bullets that match the pattern (approved verb + metric/scope + ≤25 words): LEAVE ALONE.
+- Bullets that already match the pattern (approved verb + metric OR specific scope + ≤25 words + outcome): LEAVE ALONE.
+
+CRITICAL — DO NOT LEAVE WEAK BULLETS UNCHANGED:
+The user has reported the rewrite returning identical bullets for weak originals. This is a bug. If a bullet:
+- Starts with a banned starter (Responsible for / Helped with / Worked on / etc.) OR
+- Has no metric AND no specific scope AND no outcome clause OR
+- Is over 25 words OR
+- Reads as a task list ("Engaged with stakeholders to understand requirements")
+
+Then it MUST be rewritten. NEVER pass it through unchanged. If you can't add a metric (because the original has no number), use scope/scale instead:
+  - "across X teams / regions / systems" (only if the count is in the original)
+  - "in production environment"
+  - "high-volume / high-throughput / production-grade"
+  - "for downstream / cross-functional / target consumers"
+
+DO NOT INVENT NUMBERS. The traceability validator runs on every output and will catch fabricated metrics like "50+ analysts" or "15+ global markets" if "50+" / "15+" doesn't appear in the original — and the rewrite will be REGENERATED with those metrics removed. Save yourself the regeneration: don't invent.
+
+If a bullet has zero quantifiable substance and no scope you can pull from the original, return a tightened verb-led version that names the activity and a qualitative outcome ("strengthening downstream reporting accuracy", "ensuring cross-system data consistency"). Honest > clever.
 
 POWER VERBS (must open with one):
 - Leadership: Led, Owned, Drove, Spearheaded, Championed, Orchestrated, Directed, Founded, Established

@@ -2588,12 +2588,24 @@ export default function ResumeBuilder({
                 onAcceptAll={(rewritten) => {
                   // Replace the working extraction with the AI rewrite,
                   // bump editHistory so the score banner reflects the
-                  // change, persist via the standard onUpdateExtraction
-                  // hook so Drive picks up the working copy.
+                  // change, AND persist immediately to the Drive working
+                  // copy so a refresh keeps the rewrite (the parent's
+                  // onUpdateExtraction only persists chat metadata —
+                  // Drive working copy is its own write).
                   setEditedExtraction(rewritten);
                   setEditHistory((prev) => [...prev, rewritten]);
+                  persistWorkingCopy(rewritten);
                   onUpdateExtraction(rewritten);
-                  toasts.push({ kind: "score", badge: "AI Rewrite", text: "Optimised resume applied. Save as a version when you're ready." });
+                  // Clear the cached Rewrite-tab snapshot — it's been
+                  // applied to the working copy now, so refreshing should
+                  // land the user on Resume tab with the rewrite live,
+                  // not the Rewrite tab in "generated" state.
+                  setSavedRewrite(null);
+                  if (chatId) {
+                    try { localStorage.removeItem(`stackle_rewrite_${chatId}`); }
+                    catch { /* non-fatal */ }
+                  }
+                  toasts.push({ kind: "score", badge: "AI Rewrite", text: "Optimised resume applied + saved. Hit 'Save as version' when you're ready to lock it." });
                   setActiveTab("resume");
                 }}
                 onTweakInEdit={(rewritten) => {
