@@ -8,6 +8,7 @@ import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
 import HomeInput from "@/components/HomeInput";
 import ResumeBuilder from "@/components/ResumeBuilder";
+import InterviewView from "@/components/interview/InterviewView";
 import { ChatMessage } from "@/components/Message";
 import {
   OrchestratorDecision,
@@ -41,7 +42,7 @@ import OnboardingFlow from "@/components/OnboardingFlow";
 import AuthModal from "@/components/AuthModal";
 import LandingPage from "@/components/LandingPage";
 
-type ActiveView = "chat" | "resume-builder" | "drive";
+type ActiveView = "chat" | "resume-builder" | "drive" | "interview";
 
 // Instant dark tooltip shown to the right of a collapsed sidebar icon.
 // Uses Tailwind's group-hover; must live inside a parent with `relative group`.
@@ -1649,7 +1650,7 @@ export default function Page() {
       items: [
         { key: "resume-builder", label: "Resume Builder", icon: FileText,      view: "resume-builder", locked: false },
         { key: "cover-letter",   label: "Cover Letter",   icon: Mail,          view: null,             locked: true },
-        { key: "interview-prep", label: "Interview Prep", icon: Mic,           view: null,             locked: true },
+        { key: "interview-prep", label: "Interview Prep", icon: Mic,           view: "interview",      locked: false },
         { key: "job-match",      label: "Job Match",      icon: Target,        view: null,             locked: true },
       ],
     },
@@ -2063,6 +2064,8 @@ export default function Page() {
               />
             </div>
           </div>
+        ) : activeView === "interview" ? (
+          <InterviewView candidateName={resumeExtraction?.name ?? null} />
         ) : activeView === "drive" ? (
           /* Drive view — Dropbox-style */
           <div className="flex-1 overflow-y-auto bg-white">
