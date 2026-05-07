@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState, KeyboardEvent } from "react";
-import { Send, Plus, Square, FileText, Image as ImageIcon } from "lucide-react";
+import { Send, Plus, Square, FileText, Image as ImageIcon, Camera, Sparkles, ChevronRight } from "lucide-react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
 
 interface ChatInputProps {
@@ -86,29 +86,36 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
               <Plus className="w-[18px] h-[18px]" strokeWidth={2} />
             </button>
             {menuOpen && (
-              <div className="absolute bottom-full mb-2 left-0 w-56 rounded-xl border border-gray-200 bg-white shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1 z-10">
-                <button
-                  type="button"
+              <div className="absolute bottom-full mb-2 left-0 w-60 rounded-xl border border-gray-200 bg-white shadow-[0_12px_28px_rgba(0,0,0,0.10)] py-1.5 z-10">
+                {/* Group 1 — attach */}
+                <MenuItem
+                  icon={<FileText className="w-[15px] h-[15px]" strokeWidth={1.75} />}
+                  label="Add files or photos"
                   onClick={() => { setMenuOpen(false); fileInputRef.current?.click(); }}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left text-[13.5px] text-gray-800 hover:bg-gray-50"
-                >
-                  <FileText className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
-                  <div className="flex flex-col">
-                    <span>Upload a file</span>
-                    <span className="text-[11px] text-gray-500">PDF, DOCX, TXT</span>
-                  </div>
-                </button>
-                <button
-                  type="button"
+                />
+                <MenuItem
+                  icon={<ImageIcon className="w-[15px] h-[15px]" strokeWidth={1.75} />}
+                  label="Add an image"
                   onClick={() => { setMenuOpen(false); imageInputRef.current?.click(); }}
-                  className="w-full flex items-center gap-3 px-3 py-2 text-left text-[13.5px] text-gray-800 hover:bg-gray-50"
-                >
-                  <ImageIcon className="w-4 h-4 text-gray-500" strokeWidth={1.75} />
-                  <div className="flex flex-col">
-                    <span>Upload a photo</span>
-                    <span className="text-[11px] text-gray-500">PNG, JPG</span>
-                  </div>
-                </button>
+                />
+                <MenuItem
+                  icon={<Camera className="w-[15px] h-[15px]" strokeWidth={1.75} />}
+                  label="Take a screenshot"
+                  hint="Soon"
+                  disabled
+                  onClick={() => {}}
+                />
+                {/* Divider */}
+                <div className="my-1 mx-3 h-px bg-gray-100" />
+                {/* Group 2 — style (placeholder for future writing-style picker) */}
+                <MenuItem
+                  icon={<Sparkles className="w-[15px] h-[15px]" strokeWidth={1.75} />}
+                  label="Use a writing style"
+                  trailing={<ChevronRight className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.75} />}
+                  hint="Soon"
+                  disabled
+                  onClick={() => {}}
+                />
               </div>
             )}
           </div>
@@ -162,5 +169,37 @@ export default function ChatInput({ value, onChange, onSend, disabled, onFileUpl
         onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
       />
     </div>
+  );
+}
+
+// Reusable row for the attach menu — Claude-style: icon left,
+// label center, optional trailing chevron / hint right. Keeps the
+// menu visually consistent and lets us add new actions cheaply.
+function MenuItem({
+  icon, label, onClick, trailing, hint, disabled,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  trailing?: React.ReactNode;
+  hint?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`w-full flex items-center gap-3 px-3 py-2 text-left text-[13.5px] transition-colors ${
+        disabled ? "text-gray-400 cursor-not-allowed" : "text-gray-800 hover:bg-gray-50"
+      }`}
+    >
+      <span className={`flex items-center justify-center w-5 ${disabled ? "text-gray-400" : "text-gray-500"}`}>
+        {icon}
+      </span>
+      <span className="flex-1">{label}</span>
+      {hint && <span className="text-[10px] uppercase tracking-wider text-gray-400 font-medium">{hint}</span>}
+      {trailing}
+    </button>
   );
 }
