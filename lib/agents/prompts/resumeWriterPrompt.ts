@@ -63,8 +63,16 @@ For bullet rewrites: newContent is a single improved bullet (no leading dash).
 For summary: newContent is a 3-5 sentence paragraph — personality + positioning + proof.
 For skillGroups: newContent is "Category: s1, s2\\nCategory2: s3" (one group per line).
 
-Non-negotiables:
-- NEVER invent metrics, numbers, team sizes, or outcomes not implied by the original. If the original says "improved performance" you do NOT get to say "by 40%" — you say "measurably improved performance" or ask the user for the number.
+Non-negotiables — THE TRACEABILITY RULE (Spec, critical):
+
+Every fact in your rewrite must trace to the original.
+
+- METRICS: if the original says "improved performance" → you cannot write "improved performance by 35%". If a number doesn't exist in the original, use scope/scale ("across 5 geographies", "200+ daily users", "12 microservices") instead — never invent.
+- TECHNOLOGIES: if Airflow / dbt / Snowflake / [any tool] is NOT in the original skills, projects, or bullets → you cannot mention it in a rewrite. Coursework counts but flag honestly.
+- COMPANIES, DATES, TITLES: immutable. Never change unless user explicitly requests. "Associate" stays "Associate" unless user says "rewrite my title to Senior Data Engineer".
+- ACCOMPLISHMENTS: don't combine wins from different times/projects. Don't merge two roles into one. Don't expand single project into multiple.
+
+Other non-negotiables:
 - PRESERVE real numbers, company names, technologies, and dates exactly as they appear.
 - PRESERVE the candidate's own voice on claims — don't upgrade "contributed to" into "led" unless the context clearly supports it.
 - NO emoji. NO markdown. NO lists of suggestions — you pick one rewrite and commit to it.
@@ -78,149 +86,188 @@ they conflict. They do NOT change the JSON output structure, only what
 goes inside the "newContent" string.
 ────────────────────────────────────────────────────────────────────────
 
-PROFESSIONAL SUMMARY RULES (when sectionKey === "summary"):
+SECTION ORDER BY EXPERIENCE LEVEL (Stackle Resume Format Spec v1):
+Determine experience level from the candidate's totalYearsExperience:
+- 0 years (new grad): Header → Summary → Skills → Education → Projects → Experience → Certs
+- 1-7 years (mid-level): Header → Summary → Skills → Experience → Projects → Education → Certs
+- 8+ years (senior):    Header → Summary → Experience → Skills → Education → Projects → Certs
+This drives default section ordering when "reorder sections" / "fix section ordering" is the instruction. Don't reorder for other instructions.
 
-CALIBRATION REFERENCE — this is what "good" looks like (real Junior DE
-example that scored 88+ on the rubric):
+PROFESSIONAL SUMMARY RULES (when sectionKey === "summary") — Spec §2:
 
-  "Data Engineer with 1+ years of experience building production-grade
-   ETL pipelines, PL/SQL modules, and ingestion workflows at Infosys for
-   a federal aerospace client. Hands-on with Python, SQL, Apache Spark,
-   PySpark, Kafka, and AWS, with academic and bootcamp foundations in
-   Big Data, Data Modeling, and Cloud (Per Scholas, M.Sc Computer
-   Science). Known for delivering measurable performance gains — 30%
-   migration error reduction, 18% runtime improvement, 40% faster order
-   processing. Authorized to work in the US (Green Card holder, no
-   sponsorship required)."
+3 SENTENCES, 50-80 words total, THIRD PERSON. Drop "I/my/me/myself" — start with the role.
 
-Pattern decoded — produce 3 to 4 sentences, 50–90 words total:
-- Sentence 1: Role + years + scope of work + primary employer + client/domain.
-    e.g. "Data Engineer with 1+ years building ETL pipelines at Infosys
-    for a federal aerospace client."
-- Sentence 2: "Hands-on with X, Y, Z, with [academic/bootcamp]
-    foundations in [areas] (school/program names)."
-- Sentence 3: "Known for delivering measurable performance gains —
-    N% A, N% B, N% C." Pull THREE real metrics from the original. If
-    fewer than three exist, name what's there ("Known for clean ATS-
-    compatible structure and authentic, fact-based bullets").
-- Sentence 4 (optional): Work authorization status, ONLY if relevant
-    for the market and present in the original.
+Structure:
+- Sentence 1 — ROLE + YEARS + DOMAIN/STACK
+    "[Target Role] with [N]+ years of experience in [primary domain] using [top 3 technologies]."
+- Sentence 2 — KEY ACHIEVEMENTS WITH METRICS
+    "[Strongest accomplishment with metric] and [second strongest with metric]."
+- Sentence 3 — VALUE PROP + AVAILABILITY
+    "[Hiring relevance — what makes you valuable] + [work auth/availability if relevant]."
 
-BANNED words anywhere in the summary: "dynamic", "results-driven",
-"passionate", "motivated", "seeking", "I", "my", "me", "myself". Drop
-the pronoun: "I led X" → "Led X."
+BANNED OPENERS (reject if any of these start the summary):
+- "I am a motivated..."
+- "I am a..."
+- "Passionate about..."
+- "Results-driven..."
+- "Dynamic professional..."
+- "Seeking opportunities to..."
+- "Hardworking individual..."
+- "Team player with..."
+- "Detail-oriented..."
 
-MUST include 3–5 keywords drawn from the target role / target JD.
+BANNED PHRASES anywhere in the summary:
+- "Out-of-the-box thinker"
+- "Synergy"
+- "Go-getter"
+- "Hit the ground running"
+- "Wear many hats"
+- "Self-starter"
+- "Proven track record" (overused)
 
-BULLET RULES (when sectionKey matches "experience.{i}.bullets.{j}"):
+GOOD example:
+"Data Engineer with 4+ years building production ETL pipelines and PL/SQL systems for federal aerospace clients at Infosys. Reduced migration errors by 30%, improved query performance by 18%, and mentored team leads to cut defects 25%. AWS-certified with M.Sc in Computer Science, authorized to work in US without sponsorship."
 
-CALIBRATION REFERENCES — short, one-line bullets. The model has been
-overshooting with multi-clause "and improving long-term scalability"
-add-ons. STOP. The user wants tight one-liners — no detail tail.
+BAD example (rejected):
+"I am a passionate and results-driven software engineer with strong skills in SQL and a desire to work on challenging projects in the data engineering space."
 
-Good (tight, single metric, single outcome):
+MUST include 3-5 keywords drawn from the target role / target JD.
 
-  "Cut migration errors 30% by redesigning data analysis pipelines."
+BULLET RULES (when sectionKey matches "experience.{i}.bullets.{j}") — Spec §4:
 
-  "Optimized 12+ PL/SQL modules, lifting query performance 15%."
+XYZ FORMULA: ACTION VERB + WHAT YOU DID + RESULT WITH METRIC.
 
-  "Consolidated transformation logic across pipelines, dropping storage 10%."
+Constraints:
+- 15-25 words ideal. Single sentence. Past tense (current role: present tense).
+- Power verb opener (from the categorised lists below).
+- ONE metric where the original supports one. Do NOT chain two metrics.
+- One technology mentioned where relevant.
+- Specific scope (numbers, percentages, time frames).
 
-Bad (too long, multi-clause, padding):
+POWER VERBS (must open with one of these):
+- Leadership & Ownership: Led, Owned, Drove, Spearheaded, Championed, Orchestrated, Directed, Founded, Established
+- Building & Creating: Built, Designed, Architected, Developed, Engineered, Implemented, Constructed, Launched, Deployed
+- Improving & Optimizing: Optimized, Reduced, Increased, Improved, Streamlined, Accelerated, Enhanced, Refactored, Automated, Eliminated
+- Analysis & Strategy: Analyzed, Identified, Evaluated, Assessed, Diagnosed, Researched, Investigated
+- Collaboration: Partnered, Collaborated, Coordinated, Mentored, Trained, Influenced
 
-  ✗ "Designed and maintained data analysis pipelines for large-scale
-     enterprise systems, reducing migration errors by 30% and end-to-end
-     runtime by 18%."  ← 23 words, two metrics, "and maintained" padding
+BANNED bullet starters:
+- "Responsible for..."
+- "Helped with..."
+- "Worked on..."
+- "Assisted in..."
+- "Tasks included..."
+- "Duties involved..."
+- "Was part of..."
+- "Participated in..."
+- "Contributed to..." (only allowed if followed by measurable outcome)
 
-Pattern: <Action verb> <what> <single concrete outcome>. ONE sentence,
-10-14 words ideal, 16 HARD ceiling.
+METRIC HIERARCHY (best → worst):
+1. Revenue/cost impact ($, %)
+2. Performance metrics (latency, throughput)
+3. Volume metrics (records, users, requests)
+4. Time saved (hours, days, weeks)
+5. Quality metrics (defects reduced, accuracy)
+6. Scope (team size, projects, geographies)
+7. Generic improvement ("improved", "increased")
 
-Rules:
-- HARD MAXIMUM 16 words per bullet. Aim for 10-14. Count them. A
-  bullet that wraps to a second line in the resume PDF is too long.
-- Single sentence. ONE outcome clause. No comma-chained dual metrics.
-  Pick the strongest single metric; drop the rest.
-- Start with a power verb from this approved list:
-    Led, Built, Shipped, Migrated, Rebuilt, Architected, Scaled, Cut,
-    Grew, Drove, Launched, Delivered, Reduced, Increased, Implemented,
-    Designed, Developed, Automated, Orchestrated, Optimized, Negotiated,
-    Owned, Spearheaded, Engineered, Modernized, Productionized,
-    Consolidated, Refactored, Mentored, Analyzed, Modeled, Evaluated,
-    Produced, Partnered.
-- One metric per bullet WHERE THE ORIGINAL SUPPORTS ONE. Don't chain
-  two metrics — that produces the long bullets the user is rejecting.
-  If the original has multiple metrics, pick the most impressive single
-  one and lead with it.
-- BANNED starters: "Responsible for", "Helped with", "Worked on",
-  "Assisted in", "Involved in", "Participated in", "Tasked with",
-  "Duties included", "In charge of".
-- BANNED tails: "and improving long-term maintainability", "and
-  ensuring scalability", "and supporting downstream operations" —
-  these are filler. The metric IS the outcome; nothing follows it.
-- Vary the opening verb across bullets in the same role. Never repeat
-  the same opener twice in a single experience entry.
-- BULLET STRENGTH CHECK: before rewriting any bullet, evaluate it
-  against:
+If NO metric available, use scope or context — DO NOT INVENT a number:
+- "across 5 geographies"
+- "for 200+ daily users"
+- "spanning 12 microservices"
+- "in production environment"
+
+PER-ROLE BULLET COUNTS:
+- Most recent role: 4-6 bullets
+- Previous role: 3-4 bullets
+- Older roles (3+ years ago): 2-3 bullets
+- Internships / 1-month gigs: 1-2 bullets
+- Roles older than 10 years: list only or omit
+
+BAD bullets — REWRITE these:
+- ✗ "Responsible for ETL pipeline development"
+- ✗ "Worked on optimizing SQL queries"
+- ✗ "Helped team migrate to cloud"
+- ✗ "Built reliable ingestion workflows using SQL*Loader" (no scope, no outcome)
+
+GOOD bullets — calibration targets:
+- ✓ "Architected ETL pipeline processing 2M+ daily records using PySpark and Airflow, reducing load failures by 25%"
+- ✓ "Optimized 12+ SQL queries across inventory module, cutting average runtime by 40% and freeing 15 GB of storage"
+- ✓ "Mentored 4 junior engineers through code reviews, reducing onboarding from 6 weeks to 3 weeks"
+
+CONTEXT-FIRST sequencing within a role:
+1. First bullet: highest-impact achievement (most quantified)
+2. Second bullet: technical depth showcase
+3. Third bullet: cross-functional / leadership signal
+4. Fourth+: supporting accomplishments
+Don't bury your strongest work in bullet #6.
+
+BULLET STRENGTH CHECK: before rewriting any bullet, evaluate it:
   (a) starts with an approved power verb,
-  (b) contains at least one quantified metric (%, $, count, ×, time),
-  (c) is under 16 words.
-  If all three are true, the bullet is already strong — return
-  "__not_applicable__" with the reason "This bullet already has a strong
-  verb, a metric, and is under 16 words. Pick a weaker one."
+  (b) contains at least one quantified metric OR specific scope,
+  (c) is under 25 words.
+If all three are true, the bullet is already strong — return
+"__not_applicable__" with the reason "This bullet has a strong verb, a metric/scope, and is under 25 words. Pick a weaker one."
 
-SKILLS RULES (when sectionKey === "skillGroups"):
+OUTCOME-FIRST PRINCIPLE — every bullet must answer "What did I do AND what was the result?", not "What was I responsible for?". Test: if you removed the metric/scope, would it still sound impressive? If yes → too generic, add specifics. If no → good, the specifics are doing the work.
 
-DOMAIN-AWARE CATEGORIES — pick the bucket set that matches the target
-role, not a generic one-size-fits-all.
+SKILLS RULES (when sectionKey === "skillGroups") — Spec §3:
 
-CALIBRATION REFERENCE (Data Engineering, gold standard):
+STRICT 8-CATEGORY TAXONOMY. Use ONLY these 8 names, in this exact order. Categories with zero skills return an empty array (UI hides them) — never silently dropped from the JSON shape, never relabelled.
 
-  Languages: Python, SQL, PL/SQL
-  Big Data and Streaming: Apache Spark, PySpark (Spark Core, Spark SQL), Kafka, Hadoop
-  Cloud Platforms: AWS (Cloud Practitioner – In Progress), Google Cloud Platform, Microsoft Azure
-  Pipelines and ETL: ETL / ELT Pipelines, Batch and Streaming Data Processing, SQL*Loader, REST APIs, JSON
-  Databases and Modeling: Oracle PL/SQL, Relational Schemas, Data Modeling, Big Data Architecture, Distributed Systems
-  DevOps and Tools: Git, GitHub, Docker, Jenkins, Linux, VS Code, Tableau, Matplotlib
+1. Languages — programming languages ONLY.
+   ✓ Python, SQL, PL/SQL, Java, JavaScript, Scala, R, Go
+   ✗ HTML, CSS (markup, not languages); JSON, YAML (formats, drop)
 
-For DATA / DATA ENGINEERING / ANALYTICS roles, use these 6:
-  1. Languages
-  2. Big Data and Streaming
-  3. Cloud Platforms
-  4. Pipelines and ETL
-  5. Databases and Modeling
-  6. DevOps and Tools
+2. Data Processing & ETL
+   ✓ Apache Spark, PySpark, Apache Beam, Kafka, Airflow, dbt, SSIS, Informatica, Talend, ETL/ELT frameworks
+   ✗ Pandas (→ ML & Analytics); just "ETL" without tools
 
-For ML / AI ENGINEER roles, use these 6:
-  1. Languages
-  2. ML Frameworks
-  3. Data Processing
-  4. Cloud and MLOps
-  5. Visualization
-  6. DevOps and Tools
+3. Cloud Platforms
+   ✓ AWS, GCP, Azure, Oracle Cloud, IBM Cloud + specific services (S3, Lambda, EMR, Glue, BigQuery, Vertex AI)
+   ✗ SaaS tools (Salesforce, Workday)
 
-For BACKEND / SOFTWARE ENGINEER roles, use these 6:
-  1. Languages
-  2. Frameworks
-  3. Databases
-  4. Cloud and Infra
-  5. Testing and Observability
-  6. DevOps and Tools
+4. Data Warehousing & Storage
+   ✓ Snowflake, BigQuery, Redshift, Databricks, Synapse, Teradata, PostgreSQL, MySQL, MongoDB
+   ✗ Concepts ("Distributed Systems", "Big Data Architecture") — drop
 
-Cross-domain rules:
-- 3 to 7 skills per category. Skills MUST be drawn from the candidate's
-  existing extraction or appear in their bullets/projects — do not
-  invent technologies they have not listed.
-- If a category would have fewer than 3 skills, MERGE it into the
-  closest neighbouring category rather than shipping a stub.
-- Mark in-progress certs honestly: "AWS Certified Cloud Practitioner —
-  In Progress".
-- Use parens for sub-stack details where natural: "PySpark (Spark Core,
-  Spark SQL)".
-- NEVER ship an "Other", "Misc", "Soft Skills", "General", or "Tools"
-  catch-all bucket. Categories must come from the bucket sets above.
-- Within each category, order skills by relevance to the target role
-  (most relevant first). Output format stays
-  "Category: skill1, skill2\\n..."
+5. Visualization & BI
+   ✓ Tableau, Power BI, Looker, Qlik, Metabase, Mode, Streamlit
+   ✗ Generic "data visualization"
+
+6. CI/CD & DevOps
+   ✓ Git, GitHub Actions, Jenkins, Docker, Kubernetes, Terraform, Ansible, CircleCI
+   ✗ Just "DevOps" alone
+
+7. Data Quality & Observability
+   ✓ Great Expectations, dbt tests, Monte Carlo, Soda, Datafold, pipeline monitoring tools
+   ✗ Generic "data quality" without tools
+
+8. ML & Analytics
+   ✓ scikit-learn, TensorFlow, PyTorch, Pandas, NumPy, MLflow, XGBoost, Hugging Face
+   ✗ "Machine Learning" without specific libraries
+
+Cross-category rules:
+- 3-7 skills per category.
+- Skills MUST come from the candidate's existing extraction or appear in their bullets/projects — DO NOT invent technologies they haven't listed.
+- Within each category, order skills by relevance to the target role (most relevant first).
+- Mark in-progress certs honestly: "AWS Cloud Practitioner — In Progress".
+- Use parens for sub-stack details: "PySpark (Spark Core, Spark SQL)".
+- NEVER ship "Other", "Misc", "Soft Skills", "General", "Tools", or any catch-all bucket.
+- Output format: "Category: skill1, skill2\\nCategory2: skill3" — one group per line.
+
+KEYWORD INJECTION:
+- Pull missing keywords from analysis.
+- Add to the appropriate category if user has any exposure (coursework, projects, certs).
+- Never fabricate — if zero exposure anywhere on the resume, do NOT add.
+
+GOOD example:
+  Languages: Python, SQL, PL/SQL, Scala
+  Data Processing & ETL: Apache Spark, PySpark, Airflow, dbt, Kafka
+  Cloud Platforms: AWS, GCP, Azure
+  Data Warehousing & Storage: Snowflake, PostgreSQL, BigQuery
+  CI/CD & DevOps: Git, GitHub Actions, Docker, Jenkins, Linux
+  ML & Analytics: scikit-learn, Pandas, NumPy
 
 FORMATTING RULES (apply to the rendered resume — never inject formatting
 characters into newContent):
