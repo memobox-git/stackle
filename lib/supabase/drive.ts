@@ -421,6 +421,101 @@ export async function finalizeVersion({
   return data as DriveFile;
 }
 
+// ── JD-tailored version save ─────────────────────────────────────────────────
+// Saves a JD-tailored extraction as a brand-new "version" file (parented
+// to the original). Unlike finalizeVersion this doesn't promote a working
+// copy — it creates a fresh row from the tailored extraction. Used by the
+// tailor_for_jd tool flow.
+export async function saveTailoredVersion({
+  parentId,
+  chatId,
+  extraction,
+  displayName,
+  targetRole,
+  candidateName,
+}: {
+  parentId: string;
+  chatId: string;
+  extraction: ResumeExtraction;
+  displayName: string;
+  targetRole: string;
+  candidateName?: string;
+}): Promise<DriveFile | null> {
+  const supabase = getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (!user) {
+    // localStorage fallback — same shape as the other Drive ops.
+    const files = readLocalDrive();
+    const existingVersions = files.filter(
+      (f) => f.parent_id === parentId && f.file_type === "version",
+    ).length;
+    const versionNumber = existingVersions + 1;
+    const newRow: DriveFile = {
+      id: `local-${Date.now()}`,
+      user_id: "local",
+      chat_id: chatId,
+      display_name: displayName,
+      candidate_name: candidateName ?? null,
+      target_role: targetRole,
+      file_type: "version",
+      bucket: "resumes",
+      storage_path: null,
+      version_number: versionNumber,
+      parent_id: parentId,
+      is_read_only: false,
+      is_current: true,
+      extraction_json: extraction,
+      analysis_json: null,
+      created_at: nowISO(),
+      updated_at: nowISO(),
+    };
+    // Mark prior non-original siblings as not current.
+    const updated = files.map((f) => (f.parent_id === parentId && f.file_type !== "original" ? { ...f, is_current: false } : f));
+    writeLocalDrive([...updated, newRow]);
+    return newRow;
+  }
+
+  const { count } = await supabase
+    .from("drive_files")
+    .select("*", { count: "exact", head: true })
+    .eq("parent_id", parentId)
+    .eq("file_type", "version");
+  const versionNumber = (count ?? 0) + 1;
+
+  await supabase
+    .from("drive_files")
+    .update({ is_current: false })
+    .eq("parent_id", parentId)
+    .eq("is_current", true)
+    .neq("file_type", "original");
+
+  const storagePath = `${user.id}/${safeName(displayName)}.json`;
+  await uploadJson("resumes", storagePath, { extraction });
+
+  const { data, error } = await supabase
+    .from("drive_files")
+    .insert({
+      user_id: user.id,
+      chat_id: chatId,
+      display_name: displayName,
+      candidate_name: candidateName ?? null,
+      target_role: targetRole,
+      file_type: "version",
+      bucket: "resumes",
+      storage_path: storagePath,
+      version_number: versionNumber,
+      parent_id: parentId,
+      is_current: true,
+      extraction_json: extraction,
+    })
+    .select()
+    .single();
+
+  if (error) { console.warn("saveTailoredVersion failed:", error.message); return null; }
+  return data as DriveFile;
+}
+
 // ── Task 5: Save report ───────────────────────────────────────────────────────
 export async function saveReport({
   chatId,

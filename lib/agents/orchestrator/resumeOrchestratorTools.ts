@@ -128,4 +128,19 @@ export const RESUME_ORCHESTRATOR_TOOLS: Anthropic.Tool[] = [
     description: "Undo the most recent applied fix. Use when the user says 'undo', 'revert that', 'go back'.",
     input_schema: { type: "object", properties: {} },
   },
+  {
+    name: "tailor_for_jd",
+    description:
+      "Generate a tailored resume calibrated to a specific job description the user pasted or referenced. Use when the user pastes JD text, says 'tailor for this', 'rewrite for this role', 'make a version for this JD', or shares any clearly-JD-shaped block of text. The client analyses the JD, runs a full-resume rewrite tuned to the role's must-have skills + cultural signals, and saves the output to Drive as a new version named with the company + role.",
+    input_schema: {
+      type: "object",
+      properties: {
+        jd_text: {
+          type: "string",
+          description: "The full text of the job description the user pasted. Required.",
+        },
+      },
+      required: ["jd_text"],
+    },
+  },
 ];

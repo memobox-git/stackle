@@ -1439,8 +1439,26 @@ export default function ResumeBuilder({
           break;
         }
         case "undo_last": {
-          // Hook up to existing undo if available — fall back to a toast.
           toasts.push({ kind: "info", text: "Use ⌘Z to undo the last accepted edit.", durationMs: 2500 });
+          break;
+        }
+        case "tailor_for_jd": {
+          // JD-to-Resume Phase 1. Two-step pipeline:
+          // 1) Haiku JD Analyzer extracts {company, role, seniority, ...}
+          // 2) Opus rewrite-all generates the tailored extraction with the
+          //    JD passed as jobDescription
+          // Result saved to Drive as a 'version' file named "{Company}_{Role}.docx"
+          // and surfaced in chat with download chips.
+          const jdText = (input.jd_text as string | undefined) ?? "";
+          if (!jdText.trim() || !resumeExtraction) {
+            toasts.push({ kind: "warn", text: "Need both a resume and a JD to tailor." });
+            break;
+          }
+          if (onPushAssistantMessage) onPushAssistantMessage("Reading the JD…");
+          tailorForJD(jdText).catch((err) => {
+            console.error("[tailor_for_jd]", err);
+            if (onPushAssistantMessage) onPushAssistantMessage("Hit a snag generating the tailored version. Try again?");
+          });
           break;
         }
         default:
@@ -1453,6 +1471,81 @@ export default function ResumeBuilder({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingChatTool]);
+
+  // JD-to-Resume Phase 1 — async pipeline triggered by the tailor_for_jd tool.
+  async function tailorForJD(jdText: string) {
+    if (!resumeExtraction || !resumeAnalysis) return;
+    // 1. Analyze the JD (Haiku, ~3s).
+    const aRes = await fetch("/api/agents/jd/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jdText }),
+    });
+    if (!aRes.ok) {
+      onPushAssistantMessage?.("Couldn't read the JD. Try pasting more text or check formatting.");
+      return;
+    }
+    const { analysis } = await aRes.json() as { analysis: { company: string | null; role: string; seniority: string; redFlags: string[] } };
+    const companyLabel = analysis.company ?? "the role";
+    const roleLabel = analysis.role || "Senior position";
+    onPushAssistantMessage?.(`Got it. ${roleLabel} at ${companyLabel} — ${analysis.seniority} level. Generating tailored version…`);
+
+    // 2. Run rewrite-all with the JD passed in (Opus, ~30-60s).
+    const rRes = await fetch("/api/agents/resume/rewrite-all", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        extraction: resumeExtraction,
+        analysis: resumeAnalysis,
+        targetRole: roleLabel,
+        jobDescription: jdText,
+      }),
+    });
+    if (!rRes.ok) {
+      onPushAssistantMessage?.("Generation failed. Try again in a moment?");
+      return;
+    }
+    const { extraction: tailored, changedKeys } = await rRes.json() as { extraction: ResumeExtraction; changedKeys: string[] };
+
+    // 3. Save to Drive as a version file with company-named display_name.
+    const safeName = (s: string) => s.replace(/[\/\\:*?"<>|]+/g, "").replace(/\s+/g, "_").slice(0, 40);
+    const displayName = analysis.company
+      ? `${safeName(analysis.company)}_${safeName(roleLabel)}.docx`
+      : `${safeName(roleLabel)}_v1.docx`;
+    if (chatId && originalDriveFileId) {
+      try {
+        const { saveTailoredVersion } = await import("@/lib/supabase/drive");
+        await saveTailoredVersion({
+          parentId: originalDriveFileId,
+          chatId,
+          extraction: tailored,
+          displayName,
+          targetRole: roleLabel,
+          candidateName: tailored.name,
+        });
+        await refreshDriveFiles();
+      } catch (err) {
+        console.warn("[tailor_for_jd] Drive save failed:", err);
+      }
+    }
+
+    // 4. Apply to working extraction so the user sees it in the panel + persist.
+    setEditedExtraction(tailored);
+    persistWorkingCopy(tailored);
+    onUpdateExtraction(tailored);
+
+    // 5. Narrate what changed in chat.
+    const changeCount = (changedKeys ?? []).length;
+    const summaryLines = [
+      `Done — saved as **${displayName}** in your Drive.`,
+      changeCount > 0 ? `Tailored ${changeCount} section${changeCount !== 1 ? "s" : ""} for the ${roleLabel} role.` : "Resume is now tuned for this JD.",
+      "",
+      `__INLINE_CHIPS__:Open in Editor|Download PDF|Tailor another JD`,
+    ];
+    onPushAssistantMessage?.(summaryLines.slice(0, 2).join("\n\n"));
+    onPushAssistantMessage?.(summaryLines[3]);
+    setActiveTab("rewrite");
+  }
 
   // ── Global keyboard shortcuts ─────────────────────────────────────
   // Enter    → Accept the current inline fix (when buttons are visible)
