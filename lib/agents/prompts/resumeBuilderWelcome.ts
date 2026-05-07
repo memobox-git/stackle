@@ -41,19 +41,24 @@ export function buildResumeBuilderWelcome(
   const strongestSignal = pickStrongestSignal(ext);
   const biggestWinPointer = pickBiggestWinPointer(analysis, ext);
 
-  // Chat-first refactor: para 1 leads with the score + tier so the chat
-  // narrates the aha moment the user is simultaneously seeing in the
-  // Report tab on the right. No more dedicated full-screen reveal — this
-  // line IS the score reveal in conversation form.
-  // If the analysis benchmarked against a more junior version of the
-  // user's chosen role (e.g. user picked "Data Engineer", analyzer
-  // chose seniority="Entry-level to Junior"), surface that explicitly
-  // — silent re-targeting feels like gaslighting when the user later
-  // sees "Junior Data Engineer" in the report.
+  // High-score pivot — when the resume is already recruiter-ready (≥88),
+  // stop pitching fixes. Pivot to next-level moves: JD matching, interview
+  // prep, cover letters, market intel. This is the "graduation" moment.
+  const isStrong = score >= 88;
+
   const seniorityNote = buildSeniorityNote(analysis, chosenTargetRole, ext.totalYearsExperience);
   const para1 = seniorityNote
     ? `Hey ${firstName}. You scored ${score}/100 — ${tier}. ${seniorityNote}`
     : `Hey ${firstName}. You scored ${score}/100 — ${tier}.`;
+
+  if (isStrong) {
+    // Resume is already strong — pivot to next-level work.
+    const para2Strong = strongestSignal
+      ? `${strongestSignal} Your resume is in great shape — recruiter-ready as it stands.`
+      : "Your resume is in great shape — recruiter-ready as it stands.";
+    const para3Strong = `Time to shift gears. The resume's done its job; now we work on what comes next — matching specific job descriptions, prepping for interviews, drafting tailored cover letters, or scoping the market for your target roles. What's the next move?`;
+    return [para1, para2Strong, para3Strong].join("\n\n");
+  }
 
   const quickReadParts = [`Quick read: you scored ${score}/100.`];
   if (strongestSignal) quickReadParts.push(strongestSignal);

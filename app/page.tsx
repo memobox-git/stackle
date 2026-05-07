@@ -494,6 +494,15 @@ export default function Page() {
       const score = analysis.scores && typeof analysis.scores.total === "number" && analysis.scores.total > 0
         ? Math.round(Math.max(0, Math.min(100, analysis.scores.total)))
         : null;
+
+      // High-score pivot: when the resume is already recruiter-ready
+      // (≥88), the chips shift from "fix this" to next-level moves —
+      // job matching, interview prep, cover letter, market intelligence.
+      // Stop nagging users with great resumes about fixes they don't need.
+      if (score !== null && score >= 88) {
+        return "__INLINE_CHIPS__:Match a job description|Prep for interviews|Draft a cover letter";
+      }
+
       const top = analysis.rewritePriorities?.[0] ?? "";
       const sectionLabel = /summary|profile|objective|headline|intro/i.test(top) ? "summary"
         : /skills?|keyword|stack|tools|tech list/i.test(top) ? "skills"
@@ -501,7 +510,7 @@ export default function Page() {
         : null;
       const fixChip = sectionLabel ? `Fix the ${sectionLabel}` : "Apply all fixes";
       const whyChip = score !== null ? `Why is my score ${score}?` : "Why this score?";
-      return `__INLINE_CHIPS__:${fixChip}|Show me the report|${whyChip}`;
+      return `__INLINE_CHIPS__:${fixChip}|Apply all fixes|${whyChip}`;
     })();
     const welcomeMsgs: ChatMessage[] = [
       { role: "assistant", content: welcomeText, timestamp: now() },
