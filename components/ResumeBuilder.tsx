@@ -1233,6 +1233,11 @@ export default function ResumeBuilder({
   // Fix All kicks off the first pending fix. Auto-advance chains through the
   // rest — each one shows its own typewriter + ✓/✗ so the user approves each
   // change. No silent bulk-apply.
+  // JD intake mode for "Apply all fixes" → ask for JD first. When set,
+  // the next user chat message is treated as the JD payload (or "skip").
+  const [jdIntakeFor, setJdIntakeFor] = useState<null | "apply-all">(null);
+  const jdIntakeLastMsgIdxRef = useRef<number>(-1);
+
   const handleFixAll = useCallback(async () => {
     if (!editedExtraction || !resumeAnalysis || isEditStreaming) return;
 
@@ -1502,10 +1507,56 @@ export default function ResumeBuilder({
       onPushAssistantMessage?.("Couldn't read the JD. Try pasting more text or check formatting.");
       return;
     }
-    const { analysis } = await aRes.json() as { analysis: { company: string | null; role: string; seniority: string; redFlags: string[] } };
+    const { analysis } = await aRes.json() as { analysis: {
+      company: string | null;
+      role: string;
+      seniority: string;
+      yearsRequired?: number | null;
+      mustHaveSkills?: string[];
+      niceToHaveSkills?: string[];
+      techStack?: string[];
+      responsibilities?: string[];
+      redFlags?: string[];
+    } };
     const companyLabel = analysis.company ?? "the role";
     const roleLabel = analysis.role || "Senior position";
-    onPushAssistantMessage?.(`Got it. ${roleLabel} at ${companyLabel} — ${analysis.seniority} level. Generating tailored version…`);
+
+    // Compute match vs gap by comparing the JD's must-haves to the
+    // candidate's flat skills list (case-insensitive). Gives the chat
+    // narration something concrete to point at.
+    const mustHaves = (analysis.mustHaveSkills ?? []).filter((s) => s && s.trim().length > 0);
+    const candidateSkills = new Set(
+      (resumeExtraction.skillGroups ?? [])
+        .flatMap((g) => g.skills ?? [])
+        .map((s) => s.toLowerCase().trim()),
+    );
+    const matched = mustHaves.filter((s) => candidateSkills.has(s.toLowerCase().trim()));
+    const gaps = mustHaves.filter((s) => !candidateSkills.has(s.toLowerCase().trim()));
+    const topResp = (analysis.responsibilities ?? []).slice(0, 3);
+
+    // Build a rich narration block — what the JD wants, where you match,
+    // where you're light. This is what the user actually wants to see in
+    // chat, NOT a one-liner.
+    const lines: string[] = [];
+    lines.push(`**${roleLabel}${analysis.company ? ` at ${analysis.company}` : ""}** — ${analysis.seniority} level${analysis.yearsRequired ? `, ${analysis.yearsRequired}+ yrs` : ""}.`);
+    lines.push("");
+    if (topResp.length > 0) {
+      lines.push("**What they want you to do:**");
+      topResp.forEach((r) => lines.push(`• ${r}`));
+      lines.push("");
+    }
+    if (mustHaves.length > 0) {
+      lines.push("**Must-haves:** " + mustHaves.slice(0, 8).join(", ") + (mustHaves.length > 8 ? "…" : ""));
+    }
+    if (matched.length > 0) {
+      lines.push(`**Where you match (${matched.length}):** ${matched.slice(0, 6).join(", ")}${matched.length > 6 ? "…" : ""}`);
+    }
+    if (gaps.length > 0) {
+      lines.push(`**Where you're light (${gaps.length}):** ${gaps.slice(0, 6).join(", ")}${gaps.length > 6 ? "…" : ""}`);
+    }
+    lines.push("");
+    lines.push(`Now I'll rewrite your resume to lean into the matches and address the gaps. ~30-60s.`);
+    onPushAssistantMessage?.(lines.join("\n"));
 
     // 2. Run rewrite-all with the JD passed in (Opus, ~30-60s).
     const rRes = await fetch("/api/agents/resume/rewrite-all", {
@@ -1588,6 +1639,56 @@ export default function ResumeBuilder({
     onPushAssistantMessage?.(`Got it from ${data.sourcePlatform}${cachedTag}. Reading the JD…`);
     return tailorForJD(data.jdText);
   }
+
+  // ── JD intake watcher ─────────────────────────────────────────────
+  // When jdIntakeFor is set ("Apply all fixes" awaiting a JD), pick up
+  // the next user message as the JD payload (text or URL) and route it.
+  useEffect(() => {
+    if (!jdIntakeFor) return;
+    // Find the latest user message arrived AFTER intake mode started.
+    let latestIdx = -1;
+    for (let i = messages.length - 1; i > jdIntakeLastMsgIdxRef.current; i--) {
+      const m = messages[i];
+      if (m.role === "user" && !m.content.startsWith("__")) { latestIdx = i; break; }
+    }
+    if (latestIdx === -1) return;
+    const raw = messages[latestIdx].content.trim();
+    const lower = raw.toLowerCase();
+    // Skip is also handled by chip; this catches typed "skip".
+    if (lower === "skip" || lower === "no" || lower === "no jd" || lower.startsWith("skip ")) {
+      setJdIntakeFor(null);
+      onPushAssistantMessage?.("Sure — running a generic clean-up.");
+      handleAcceptAll();
+      return;
+    }
+    // URL → tailor_for_jd_url pipeline (scrape + analyze + rewrite).
+    const isUrl = /^https?:\/\/\S+/i.test(raw);
+    if (isUrl) {
+      setJdIntakeFor(null);
+      onPushAssistantMessage?.("Fetching the JD…");
+      tailorForJDUrl(raw).catch((err) => {
+        console.error("[jd-intake-url]", err);
+        onPushAssistantMessage?.("Hit a snag fetching that URL. Try pasting the JD text instead?");
+      });
+      return;
+    }
+    // Plain JD text — needs at least 100 chars to be plausible.
+    if (raw.length >= 100) {
+      setJdIntakeFor(null);
+      onPushAssistantMessage?.("Reading the JD…");
+      tailorForJD(raw).catch((err) => {
+        console.error("[jd-intake-text]", err);
+        onPushAssistantMessage?.("Hit a snag reading that JD. Try again?");
+      });
+      return;
+    }
+    // Too short to be a JD — nudge.
+    onPushAssistantMessage?.(
+      "That looks short for a JD. Paste the full posting (200+ characters), share a URL, or type 'skip' for a generic rewrite.",
+    );
+    jdIntakeLastMsgIdxRef.current = latestIdx;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, jdIntakeFor]);
 
   // ── Global keyboard shortcuts ─────────────────────────────────────
   // Enter    → Accept the current inline fix (when buttons are visible)
@@ -2044,12 +2145,28 @@ export default function ResumeBuilder({
           resumeBuilderMode
           onStarterPromptClick={onInputChange}
           onChatEditPrompt={(text) => {
-            // Action chips → fire the real handler directly. Everything
-            // else → send to chat. Avoids the bug where "Apply all fixes"
-            // produced narration only with no actual mutation.
             const t = text.trim().toLowerCase();
+            // Apply all fixes → first ask for a target JD. With a JD we
+            // can tailor the rewrite (much higher quality). Without one,
+            // we run the generic accept-all chain.
             if (t === "apply all fixes") {
+              setJdIntakeFor("apply-all");
+              jdIntakeLastMsgIdxRef.current = messages.length;
+              onPushAssistantMessage?.(
+                "Before I rewrite, do you have a target job description? Pasting one lets me tailor the rewrite to that exact role — keywords, must-haves, the works. Otherwise I'll do a generic clean-up.",
+              );
+              onPushAssistantMessage?.("__INLINE_CHIPS__:Paste the JD|Skip — generic rewrite");
+              return;
+            }
+            if (t === "skip — generic rewrite" || t === "skip - generic rewrite") {
+              setJdIntakeFor(null);
               handleAcceptAll();
+              return;
+            }
+            if (t === "paste the jd") {
+              // Just a hint — the user's next chat message will be picked
+              // up by the intake watcher.
+              onPushAssistantMessage?.("Paste the JD text (or share the URL) in the chat below.");
               return;
             }
             if (t === "walk me through fixes" || t === "guide me through fixes") {
