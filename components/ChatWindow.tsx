@@ -422,6 +422,63 @@ function AnalysisProgress() {
   );
 }
 
+// Animated analysis-progress card for the INLINE chat sentinel. The
+// other AnalysisProgress (above) is the standalone loading-screen
+// component used when the resume builder doesn't have a chat yet.
+// This one renders when "__ANALYSIS_PROGRESS__" appears in the chat
+// stream — paces through 4 stages over ~28s so the user sees movement
+// instead of one static dot. Real analysis lands when it lands and
+// the landed watcher replaces the sentinel in-place.
+function InlineAnalysisProgress() {
+  const STAGES = [
+    "Reading your resume",
+    "Comparing to target-role benchmarks",
+    "Scoring across 5 dimensions",
+    "Identifying biggest gains",
+  ];
+  // Advance roughly every 7 seconds. Last stage stays "active" until
+  // the real analysis lands (we don't auto-complete it — the landed
+  // watcher replaces the card).
+  const [stage, setStage] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setStage((s) => (s < STAGES.length - 1 ? s + 1 : s));
+    }, 7000);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div className="flex mb-6 w-full max-w-3xl mx-auto px-4">
+      <div className="flex-1 min-w-0 text-[15px] text-gray-900">
+        <ul className="space-y-1.5">
+          {STAGES.map((label, idx) => {
+            const state = idx < stage ? "done" : idx === stage ? "active" : "pending";
+            return (
+              <li key={idx} className="flex items-center gap-2 text-[13px]">
+                {state === "done" && (
+                  <span className="inline-flex w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold items-center justify-center flex-shrink-0">✓</span>
+                )}
+                {state === "active" && (
+                  <span className="relative flex h-3.5 w-3.5 items-center justify-center flex-shrink-0">
+                    <span className="absolute inline-flex h-2 w-2 rounded-full bg-gray-400 opacity-75 animate-ping" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-gray-800" />
+                  </span>
+                )}
+                {state === "pending" && (
+                  <span className="inline-flex w-3.5 h-3.5 rounded-full border border-gray-300 flex-shrink-0" />
+                )}
+                <span className={state === "done" ? "text-gray-500 line-through decoration-gray-300" : state === "active" ? "text-gray-900 font-medium" : "text-gray-400"}>
+                  {label}{state === "active" ? "…" : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        <p className="text-[12px] text-gray-500 mt-3">About 30 seconds. I&apos;ll drop the full report here when it&apos;s ready.</p>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatWindow({
   messages,
   isLoading,
@@ -688,28 +745,7 @@ export default function ChatWindow({
         // "resume review" before the background analysis lands. Replaced
         // in-place by the analysis-landed watcher when results arrive.
         if (msg.content === "__ANALYSIS_PROGRESS__") {
-          // Inline progress — same visual treatment as a regular assistant
-          // message (avatar + plain text). No coloured box; reads as part
-          // of the conversation, not a separate UI artifact.
-          return (
-            <div key={`analysis-progress-${i}`} className="flex mb-6 w-full max-w-3xl mx-auto px-4">
-              <div className="flex-1 min-w-0 text-[15px] text-gray-900 leading-6">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75 animate-ping" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gray-700" />
-                  </span>
-                  <span className="text-[13px] text-gray-700">Reading your resume…</span>
-                </div>
-                <ul className="text-[13px] text-gray-500 space-y-0.5 ml-3.5">
-                  <li>Comparing to target-role benchmarks</li>
-                  <li>Scoring across 5 dimensions</li>
-                  <li>Identifying biggest gains</li>
-                </ul>
-                <p className="text-[12px] text-gray-500 mt-2">About 30 seconds. I'll drop the full report here when it's ready.</p>
-              </div>
-            </div>
-          );
+          return <InlineAnalysisProgress key={`analysis-progress-${i}`} />;
         }
 
         if (msg.content === "__FIX_PROGRESS_CARD__") {
