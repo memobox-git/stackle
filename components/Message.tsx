@@ -281,28 +281,30 @@ export default function Message({ message, onEdit }: MessageProps) {
 
   if (isUser) {
     return (
-      <div className="group flex flex-col items-end mb-8 w-full max-w-3xl mx-auto px-4">
-        {/* Name + avatar row */}
-        <div className="flex items-center gap-2 mb-2">
-          {ts && (
-            <span className="text-[10px] text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity duration-200 mr-1">
-              {ts}
-            </span>
-          )}
-          {onEdit && !editing && (
-            <button
-              type="button"
-              onClick={startEdit}
-              title="Edit message"
-              aria-label="Edit message"
-              className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-900 w-6 h-6 rounded-md flex items-center justify-center hover:bg-gray-100 mr-0.5"
-            >
-              <Pencil className="w-3 h-3" strokeWidth={1.75} />
-            </button>
-          )}
-          <span className="text-xs text-gray-500 font-medium">You</span>
-          <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center text-black text-[11px] font-bold">U</div>
-        </div>
+      <div className="group flex flex-col items-end mb-6 w-full max-w-3xl mx-auto px-4">
+        {/* Hover-only meta row — timestamp + edit. Removed the redundant
+            "You" label + "U" avatar circle; the right-aligned bubble shape
+            already signals user authorship. */}
+        {(ts || onEdit) && !editing && (
+          <div className="flex items-center gap-1 mb-1 h-4">
+            {ts && (
+              <span className="text-[10px] text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                {ts}
+              </span>
+            )}
+            {onEdit && (
+              <button
+                type="button"
+                onClick={startEdit}
+                title="Edit message"
+                aria-label="Edit message"
+                className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-900 w-5 h-5 rounded-md flex items-center justify-center hover:bg-gray-100"
+              >
+                <Pencil className="w-3 h-3" strokeWidth={1.75} />
+              </button>
+            )}
+          </div>
+        )}
         {/* Bubble */}
         {editing ? (
           <div className="max-w-[78%] w-full bg-white border border-gray-300 text-gray-900 rounded-2xl rounded-tr-lg px-4 py-3 text-[15px] leading-6"

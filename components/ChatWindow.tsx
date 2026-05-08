@@ -688,23 +688,28 @@ export default function ChatWindow({
         // "resume review" before the background analysis lands. Replaced
         // in-place by the analysis-landed watcher when results arrive.
         if (msg.content === "__ANALYSIS_PROGRESS__") {
+          // Inline progress — same visual treatment as a regular assistant
+          // message (avatar + plain text). No coloured box; reads as part
+          // of the conversation, not a separate UI artifact.
           return (
-            <div key={`analysis-progress-${i}`} className="flex justify-start">
-              <div className="max-w-[85%] rounded-2xl px-5 py-4 bg-violet-50 border border-violet-100 ml-10">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75 animate-ping" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-600" />
+            <div key={`analysis-progress-${i}`} className="flex gap-3 mb-8 w-full max-w-3xl mx-auto px-4">
+              <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                <MessageSquare className="w-3.5 h-3.5 text-black" strokeWidth={2} />
+              </div>
+              <div className="flex-1 min-w-0 text-[15px] text-gray-900 leading-6">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75 animate-ping" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gray-700" />
                   </span>
-                  <span className="text-[11px] uppercase tracking-wider text-violet-700 font-semibold">Building your action plan</span>
+                  <span className="text-[13px] text-gray-700">Reading your resume…</span>
                 </div>
-                <ul className="text-[13px] text-violet-900 space-y-1.5">
-                  <li className="flex items-baseline gap-2"><span className="text-violet-600">●</span> Reading your resume…</li>
-                  <li className="flex items-baseline gap-2 opacity-50"><span>○</span> Comparing to target role benchmarks</li>
-                  <li className="flex items-baseline gap-2 opacity-50"><span>○</span> Scoring across 5 dimensions</li>
-                  <li className="flex items-baseline gap-2 opacity-50"><span>○</span> Identifying biggest gains</li>
+                <ul className="text-[13px] text-gray-500 space-y-0.5 ml-3.5">
+                  <li>Comparing to target-role benchmarks</li>
+                  <li>Scoring across 5 dimensions</li>
+                  <li>Identifying biggest gains</li>
                 </ul>
-                <p className="text-[11px] text-violet-600 mt-3">About 30 seconds. I'll drop the full report here when it's ready.</p>
+                <p className="text-[12px] text-gray-500 mt-2">About 30 seconds. I'll drop the full report here when it's ready.</p>
               </div>
             </div>
           );
@@ -732,7 +737,7 @@ export default function ChatWindow({
           const labels = msg.content.slice(INLINE_CHIPS_PREFIX.length).split("|").map((s) => s.trim()).filter(Boolean);
           if (labels.length === 0) return null;
           return (
-            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 mb-6">
+            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-5 mb-6">
               <div className="ml-10 flex flex-wrap gap-2">
                 {labels.map((label, j) => (
                   <button
@@ -741,7 +746,7 @@ export default function ChatWindow({
                       if (onChatEditPrompt) onChatEditPrompt(label);
                       else onStarterPromptClick?.(label);
                     }}
-                    className="text-sm text-gray-800 bg-gray-100 hover:bg-gray-200 border border-gray-200 hover:border-gray-300 rounded-full px-4 py-1.5 transition-colors"
+                    className="text-[13px] font-medium text-gray-900 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full px-3.5 py-1.5 transition-all shadow-sm hover:shadow"
                   >
                     {label}
                   </button>
