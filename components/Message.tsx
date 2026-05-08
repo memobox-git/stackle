@@ -354,7 +354,7 @@ export default function Message({ message, onEdit }: MessageProps) {
   }
 
   return (
-    <div className="group flex mb-3 w-full max-w-3xl mx-auto px-4">
+    <div className="group flex mb-1 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
         {renderContent(message.content)}
         {ts && (
