@@ -811,10 +811,29 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                   <Step label="Report" state="idle" />
                 </div>
 
-                {/* Clean filename — strip junk, title-case, show check */}
+                {/* Clean filename — strip junk, title-case, show check.
+                    The X clears the upload so the user can pick a different
+                    file without refreshing — common when they grab the
+                    wrong PDF on the first try. */}
                 <div className="px-4 py-3 rounded-xl border border-emerald-200 bg-emerald-50 text-sm text-emerald-700 flex items-center gap-2.5 shadow-[0_2px_8px_-4px_rgba(16,185,129,0.25)]">
                   <span className="w-5 h-5 rounded-full bg-emerald-500 text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0">✓</span>
-                  <span className="truncate"><strong className="font-semibold">{prettifyFilename(resumeFilename)}</strong> — ready to analyze</span>
+                  <span className="truncate flex-1"><strong className="font-semibold">{prettifyFilename(resumeFilename)}</strong> — ready to analyze</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setResumeText("");
+                      setResumeFilename("");
+                      setParseError("");
+                    }}
+                    disabled={extracting}
+                    title="Remove this file and upload a different one"
+                    aria-label="Remove uploaded file"
+                    className="flex-shrink-0 w-6 h-6 rounded-full text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M2 2L10 10M10 2L2 10" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+                    </svg>
+                  </button>
                 </div>
 
                 {/* Target role */}
