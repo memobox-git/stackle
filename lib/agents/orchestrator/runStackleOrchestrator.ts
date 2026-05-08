@@ -1,9 +1,11 @@
 // Stackle Top-Level Orchestrator (Layer 1) runner.
 //
-// Sonnet 4.5 with FORCED TOOL USE. The model must emit a single
-// `respond` tool call with the structured route — no JSON-text mode,
-// no "wrapped in conversational preamble" failures. Anthropic's
-// constrained-decoding for tool inputs guarantees the schema is honoured.
+// Sonnet 4.5 with plain JSON output (no tool use — that added a schema-
+// validation surface that kept failing). Tolerant JSON parsing handles
+// conversational preambles. Most importantly: the FALLBACK itself is
+// now built from the resume context — so even when the API hiccups,
+// the user gets an observation-led greeting using their name + recent
+// role, NOT a generic "hit a snag" router menu.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { STACKLE_ORCHESTRATOR_SYSTEM_PROMPT } from "./stackleOrchestratorPrompt";
@@ -36,70 +38,11 @@ export interface OrchestratorRoute {
 const VALID_KEYS: ManagerKey[] = [
   "resume", "interview", "cover_letter", "career_strategy", "more_info_needed",
 ];
-const VALID_SENIORITY: SeniorityLevel[] = ["entry", "mid", "senior", "lead", null];
-const VALID_FOCUS: FocusKey[] = ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", null];
-
-const FALLBACK: OrchestratorRoute = {
-  managerKey: "more_info_needed",
-  narration: "Hit a snag on my end — try saying that again, or pick one of these:",
-  chips: ["Run a resume review", "Prep for interviews", "Tailor for a JD"],
-  extractedSignals: { role: null, seniority: null, focus: null },
-};
-
-// Tool schema. The model MUST call this tool — that's enforced via
-// tool_choice. Constrained decoding guarantees valid types.
-const RESPOND_TOOL: Anthropic.Tool = {
-  name: "respond",
-  description: "Reply to the user. ALWAYS call this exactly once per turn — never speak outside this tool.",
-  input_schema: {
-    type: "object",
-    properties: {
-      managerKey: {
-        type: "string",
-        enum: ["resume", "interview", "cover_letter", "career_strategy", "more_info_needed"],
-        description: "Which manager to route the user to. 'more_info_needed' if you need another turn to figure it out.",
-      },
-      narration: {
-        type: "string",
-        description: "What you say to the user. 1-3 sentences. No JSON, no markdown headers. Use **bold** sparingly. Reference specifics from <resume_context> when natural to prove you read it.",
-      },
-      chips: {
-        type: "array",
-        items: { type: "string" },
-        description: "2-4 short tap-to-act chip labels (each <5 words), tailored to your narration.",
-      },
-      extractedSignals: {
-        type: "object",
-        description: "Signals extracted so far. Use empty string for unknown — never null in this schema.",
-        properties: {
-          role: {
-            type: "string",
-            description: "Target role if known (e.g. 'Data Engineer'). Empty string if not yet known.",
-          },
-          seniority: {
-            type: "string",
-            enum: ["entry", "mid", "senior", "lead", ""],
-            description: "Seniority level if known. Empty string if not yet known.",
-          },
-          focus: {
-            type: "string",
-            enum: ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", ""],
-            description: "What the user wants to work on if known. Empty string if not yet known.",
-          },
-        },
-        required: ["role", "seniority", "focus"],
-      },
-    },
-    required: ["managerKey", "narration", "chips", "extractedSignals"],
-  },
-};
+const VALID_SENIORITY = ["entry", "mid", "senior", "lead"] as const;
+const VALID_FOCUS = ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy"] as const;
 
 export interface OrchestratorInput {
-  /** Conversation so far (latest message LAST). Empty array on first turn. */
   messages: { role: "user" | "assistant"; content: string }[];
-  /** Resume context — observable facts the orchestrator references in
-   *  greetings ("Senior Analyst at Medallia, 4.8 years…") and in
-   *  recommendations. */
   resumeContext?: {
     firstName?: string | null;
     fullName?: string | null;
@@ -112,8 +55,48 @@ export interface OrchestratorInput {
     topSkills?: string[];
     location?: string | null;
   };
-  /** Signals already extracted across prior turns. Persisted client-side. */
   priorSignals?: Partial<ExtractedSignals>;
+}
+
+// Smart fallback. When Sonnet fails for any reason, build a contextual
+// greeting from what we know about the resume. Way better than a
+// generic "hit a snag" — uses the user's name + observable facts.
+function buildSmartFallback(input: OrchestratorInput): OrchestratorRoute {
+  const ctx = input.resumeContext;
+  const firstName = ctx?.firstName?.trim() || null;
+
+  // Compose an observation-led greeting from resume facts.
+  let narration: string;
+  if (firstName && ctx?.topRole && ctx?.topCompany) {
+    const yrs = ctx.yearsExperience;
+    const yrsPhrase = typeof yrs === "number" && yrs > 0
+      ? ` ${yrs >= 1 ? Math.round(yrs) : "<1"}+ years.`
+      : "";
+    narration = `Hey ${firstName} — ${ctx.topRole} at ${ctx.topCompany}.${yrsPhrase} What role are you targeting?`;
+  } else if (firstName && ctx?.topRole) {
+    narration = `Hey ${firstName} — ${ctx.topRole} background. What role are you targeting?`;
+  } else if (firstName) {
+    narration = `Hey ${firstName}. What role are you targeting?`;
+  } else {
+    narration = "What role are you targeting?";
+  }
+
+  // Default role chips, with the upload-page choice leading if present.
+  const defaultRoles = ["Data Engineer", "ML Engineer", "Software Engineer", "Data Scientist", "Other"];
+  const chips = ctx?.targetRoleFromUpload && !defaultRoles.includes(ctx.targetRoleFromUpload)
+    ? [ctx.targetRoleFromUpload, ...defaultRoles].slice(0, 5)
+    : defaultRoles.slice(0, 4);
+
+  return {
+    managerKey: "more_info_needed",
+    narration,
+    chips,
+    extractedSignals: {
+      role: input.priorSignals?.role ?? null,
+      seniority: (input.priorSignals?.seniority ?? null) as SeniorityLevel,
+      focus: (input.priorSignals?.focus ?? null) as FocusKey,
+    },
+  };
 }
 
 function renderResumeContext(ctx: OrchestratorInput["resumeContext"], priorSignals?: Partial<ExtractedSignals>): string {
@@ -139,14 +122,30 @@ function renderResumeContext(ctx: OrchestratorInput["resumeContext"], priorSigna
   return parts.join("\n");
 }
 
+// Tolerant JSON extraction. Tries strict parse first; if that fails,
+// finds the first { ... last } substring and parses that.
+function extractJSON(raw: string): unknown | null {
+  let cleaned = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
+  try { return JSON.parse(cleaned); } catch { /* keep going */ }
+  const first = cleaned.indexOf("{");
+  const last = cleaned.lastIndexOf("}");
+  if (first >= 0 && last > first) {
+    cleaned = cleaned.slice(first, last + 1);
+    try { return JSON.parse(cleaned); } catch (err) {
+      console.warn("[stackle-orch] tolerant JSON parse failed:", err, "raw:", raw.slice(0, 400));
+    }
+  }
+  return null;
+}
+
 export async function runStackleOrchestrator(input: OrchestratorInput): Promise<OrchestratorRoute> {
   const { messages, resumeContext, priorSignals } = input;
   const liveContext = renderResumeContext(resumeContext, priorSignals);
 
-  // Empty conversation = first turn. Send a synthetic prompt that anchors
-  // the resume context and asks the orchestrator to greet observation-led.
+  // First-turn synthetic prompt anchors the resume context and asks for
+  // an observation-led greeting.
   const apiMessages = messages.length === 0
-    ? [{ role: "user" as const, content: `${liveContext}\n\nThis is the user's first turn. Greet them by first name and reference ONE specific observation from <resume_context> (their current/recent role + company, OR years of experience, OR a notable skill) before asking what they're targeting. Make it feel like you've actually read their resume — not a generic "thanks for sending it over". Then call respond().` }]
+    ? [{ role: "user" as const, content: `${liveContext}\n\nThis is the user's first turn. Greet them by first name and reference ONE specific observation from <resume_context> (their current/recent role + company, OR years of experience, OR a notable skill) before asking what they're targeting. Make it feel like you've actually read their resume — not a generic "thanks for sending it over". Output JSON only.` }]
     : (() => {
         const arr = messages.map((m) => ({ role: m.role, content: m.content }));
         const lastIdx = arr.length - 1;
@@ -164,60 +163,45 @@ export async function runStackleOrchestrator(input: OrchestratorInput): Promise<
       system: [
         { type: "text", text: STACKLE_ORCHESTRATOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
       ],
-      tools: [RESPOND_TOOL],
-      tool_choice: { type: "tool", name: "respond" },  // FORCE the tool — no free-form output
       messages: apiMessages,
     });
     console.log("[stackle-orch]", `${((Date.now() - startedAt) / 1000).toFixed(1)}s`, "usage:", res.usage);
 
-    // Find the tool_use block. With tool_choice forced, this is guaranteed
-    // to be present and to match the schema.
-    const toolBlock = res.content.find((b) => b.type === "tool_use");
-    if (!toolBlock || toolBlock.type !== "tool_use") {
-      console.warn("[stackle-orch] no tool_use block in response, falling back");
-      return FALLBACK;
+    const raw = res.content[0]?.type === "text" ? res.content[0].text : "";
+    const parsed = extractJSON(raw) as Partial<OrchestratorRoute> | null;
+    if (!parsed) {
+      console.warn("[stackle-orch] couldn't extract JSON; using smart fallback. raw start:", raw.slice(0, 300));
+      return buildSmartFallback(input);
     }
 
-    const parsed = toolBlock.input as Partial<OrchestratorRoute>;
-
-    // Defensive shape validation. Coerce invalid values to safe defaults.
     const managerKey: ManagerKey = VALID_KEYS.includes(parsed.managerKey as ManagerKey)
       ? (parsed.managerKey as ManagerKey)
       : "more_info_needed";
     const narration = typeof parsed.narration === "string" && parsed.narration.trim().length > 0
       ? parsed.narration.trim()
-      : FALLBACK.narration;
+      : buildSmartFallback(input).narration;
     const chips = Array.isArray(parsed.chips)
       ? parsed.chips.filter((c): c is string => typeof c === "string" && c.length < 60).slice(0, 4)
-      : FALLBACK.chips;
+      : buildSmartFallback(input).chips;
 
-    // extractedSignals — schema uses empty string for unknown (Anthropic
-    // tool schemas reject null-in-enum). Coerce empty → null on the way
-    // out so downstream code keeps treating null as "unknown".
-    const sigParsed = (parsed.extractedSignals ?? {}) as Record<string, string>;
-    const coerce = <T>(val: string | undefined, validator: (v: string) => boolean, fallback: T): T | null => {
-      if (typeof val !== "string" || val.length === 0) return fallback as T | null;
-      return validator(val) ? (val as unknown as T) : fallback as T | null;
-    };
+    const sigParsed = (parsed.extractedSignals ?? {}) as Record<string, unknown>;
+    const seniorityRaw = typeof sigParsed.seniority === "string" ? sigParsed.seniority : "";
+    const focusRaw = typeof sigParsed.focus === "string" ? sigParsed.focus : "";
     const extractedSignals: ExtractedSignals = {
-      role: typeof sigParsed.role === "string" && sigParsed.role.length > 0
-        ? sigParsed.role
+      role: typeof sigParsed.role === "string" && sigParsed.role.trim().length > 0
+        ? sigParsed.role.trim()
         : (priorSignals?.role ?? null),
-      seniority: coerce<SeniorityLevel>(
-        sigParsed.seniority,
-        (v) => ["entry", "mid", "senior", "lead"].includes(v),
-        priorSignals?.seniority ?? null,
-      ),
-      focus: coerce<FocusKey>(
-        sigParsed.focus,
-        (v) => ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy"].includes(v),
-        priorSignals?.focus ?? null,
-      ),
+      seniority: (VALID_SENIORITY as readonly string[]).includes(seniorityRaw)
+        ? (seniorityRaw as SeniorityLevel)
+        : (priorSignals?.seniority ?? null),
+      focus: (VALID_FOCUS as readonly string[]).includes(focusRaw)
+        ? (focusRaw as FocusKey)
+        : (priorSignals?.focus ?? null),
     };
 
     return { managerKey, narration, chips, extractedSignals };
   } catch (err) {
-    console.error("[stackle-orch] failed:", err);
-    return FALLBACK;
+    console.error("[stackle-orch] failed:", err instanceof Error ? err.message : err);
+    return buildSmartFallback(input);
   }
 }
