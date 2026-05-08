@@ -39,10 +39,12 @@ const VALID_KEYS: ManagerKey[] = [
 const VALID_SENIORITY: SeniorityLevel[] = ["entry", "mid", "senior", "lead", null];
 const VALID_FOCUS: FocusKey[] = ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", null];
 
+// Network/parse failure fallback. Generic but better than crashing —
+// keeps the conversation moving while we retry on the next turn.
 const FALLBACK: OrchestratorRoute = {
   managerKey: "more_info_needed",
-  narration: "What do you want to work on first?",
-  chips: ["Resume review", "Interview prep", "Tailor for a JD"],
+  narration: "Hit a snag on my end — try saying that again, or pick one of these:",
+  chips: ["Run a resume review", "Prep for interviews", "Tailor for a JD"],
   extractedSignals: { role: null, seniority: null, focus: null },
 };
 
@@ -114,7 +116,23 @@ export async function runStackleOrchestrator(input: OrchestratorInput): Promise<
 
     let raw = res.content[0]?.type === "text" ? res.content[0].text : "";
     raw = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-    const parsed = JSON.parse(raw) as Partial<OrchestratorRoute>;
+    // Tolerant JSON extraction. Sonnet sometimes wraps the JSON in
+    // a sentence ("Here's my response: {...}") despite the system
+    // prompt saying JSON-only. Find the first { … last } and parse
+    // that. If still fails, throw → fall through to FALLBACK.
+    let parsed: Partial<OrchestratorRoute>;
+    try {
+      parsed = JSON.parse(raw) as Partial<OrchestratorRoute>;
+    } catch {
+      const firstBrace = raw.indexOf("{");
+      const lastBrace = raw.lastIndexOf("}");
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        const slice = raw.slice(firstBrace, lastBrace + 1);
+        parsed = JSON.parse(slice) as Partial<OrchestratorRoute>;
+      } else {
+        throw new Error("orchestrator returned non-JSON: " + raw.slice(0, 200));
+      }
+    }
 
     // Defensive shape validation. Coerce invalid values to safe defaults.
     const managerKey: ManagerKey = VALID_KEYS.includes(parsed.managerKey as ManagerKey)
