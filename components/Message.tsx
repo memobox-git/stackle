@@ -222,7 +222,7 @@ function renderContent(content: string) {
     // Emoji-prefixed chip-style line that wasn't parsed as a chip — render as styled hint
     if (/^[\p{Emoji}]\s/u.test(line.trim())) {
       elements.push(
-        <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-500 italic">
+        <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-500 italic m-0">
           {inlineFormat(line)}
         </p>
       );
@@ -230,9 +230,11 @@ function renderContent(content: string) {
       continue;
     }
 
-    // Regular paragraph
+    // Regular paragraph. m-0 kills the user-agent <p> margin (~16px top
+    // + bottom) — without this the wrapper's mb-1 was being shadowed by
+    // browser default and the chip row sat 25-30px below the question.
     elements.push(
-      <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-700">
+      <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-700 m-0">
         {inlineFormat(line)}
       </p>
     );
