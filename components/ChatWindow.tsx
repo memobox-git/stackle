@@ -164,7 +164,7 @@ function StatusBanner({ icon, label, sub, color }: { icon: string; label: string
   );
 }
 
-const SENTINELS = ["__RESUME_PREVIEW__", "__RESUME_ANALYSIS__", "__RESUME_PRIORITIES__", "__MARKET_ANALYSIS__", "__RESUME_EXTRACTION__", "__INTERVIEW_PREP__", "__RESUME_WELCOME_CARD__", "__FIX_PROGRESS_CARD__"];
+const SENTINELS = ["__RESUME_PREVIEW__", "__RESUME_ANALYSIS__", "__RESUME_PRIORITIES__", "__MARKET_ANALYSIS__", "__RESUME_EXTRACTION__", "__INTERVIEW_PREP__", "__RESUME_WELCOME_CARD__", "__FIX_PROGRESS_CARD__", "__ANALYSIS_PROGRESS__"];
 
 // Inline chip sentinel. Format: "__INLINE_CHIPS__:Label one|Label two|Label three"
 // Renders as a row of clickable pills inside the chat (no avatar / bubble),
@@ -682,6 +682,32 @@ export default function ChatWindow({
           // new resume. Without this the skeleton can get stuck on old state.
           const cardKey = `welcome-${i}-${resumeExtraction?.name ?? "none"}-${resumeAnalysis ? "ready" : "pending"}`;
           return <ResumeWelcomeCard key={cardKey} analysis={resumeAnalysis ?? null} />;
+        }
+
+        // Analysis-in-progress placeholder. Pushed when user picks
+        // "resume review" before the background analysis lands. Replaced
+        // in-place by the analysis-landed watcher when results arrive.
+        if (msg.content === "__ANALYSIS_PROGRESS__") {
+          return (
+            <div key={`analysis-progress-${i}`} className="flex justify-start">
+              <div className="max-w-[85%] rounded-2xl px-5 py-4 bg-violet-50 border border-violet-100 ml-10">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75 animate-ping" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-violet-600" />
+                  </span>
+                  <span className="text-[11px] uppercase tracking-wider text-violet-700 font-semibold">Building your action plan</span>
+                </div>
+                <ul className="text-[13px] text-violet-900 space-y-1.5">
+                  <li className="flex items-baseline gap-2"><span className="text-violet-600">●</span> Reading your resume…</li>
+                  <li className="flex items-baseline gap-2 opacity-50"><span>○</span> Comparing to target role benchmarks</li>
+                  <li className="flex items-baseline gap-2 opacity-50"><span>○</span> Scoring across 5 dimensions</li>
+                  <li className="flex items-baseline gap-2 opacity-50"><span>○</span> Identifying biggest gains</li>
+                </ul>
+                <p className="text-[11px] text-violet-600 mt-3">About 30 seconds. I'll drop the full report here when it's ready.</p>
+              </div>
+            </div>
+          );
         }
 
         if (msg.content === "__FIX_PROGRESS_CARD__") {

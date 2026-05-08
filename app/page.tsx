@@ -113,6 +113,16 @@ export default function Page() {
   // (auto-detected). Chat welcome flags mismatches between this and the
   // seniority the analyzer chose to benchmark against.
   const [chosenTargetRole, setChosenTargetRole] = useState<string | null>(null);
+  // Stackle Orchestrator outputs the user's focus signal (resume / interview
+  // / tailor_jd / cover_letter / career_strategy / null). We mirror it here
+  // so the analysis-landed watcher knows whether to drop the report and so
+  // the sendMessage Phase B branch can act on routing decisions across
+  // turns.
+  type FocusKey = "resume" | "interview" | "tailor_jd" | "cover_letter" | "career_strategy" | null;
+  const [orchFocus, setOrchFocus] = useState<FocusKey>(null);
+  const [orchSeniority, setOrchSeniority] = useState<string | null>(null);
+  const orchFocusRef = useRef<FocusKey>(null);
+  useEffect(() => { orchFocusRef.current = orchFocus; }, [orchFocus]);
 
   // ── Chat sessions ─────────────────────────────────────
   const [chatList, setChatList] = useState<SupabaseChat[]>([]);
@@ -603,11 +613,16 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, resumeExtraction, chatMessages.length, activeChatId]);
 
-  // ── Analysis-landed watcher (chat-first analysis flow) ───────────────
-  // When the calibration welcome fired (analysis was null) and the
-  // background analyze call resolves, append the score-led report
-  // message + chips to the chat as a follow-up. This is the "drop the
-  // report after the conversation" beat the user asked for.
+  // ── Analysis-landed watcher ───────────────────────────────────────────
+  // Fires when the background analysis arrives. Two things to handle:
+  //   1. A `__ANALYSIS_PROGRESS__` placeholder message exists (user picked
+  //      'Resume review' BEFORE analysis was ready). Replace the
+  //      placeholder with the real report.
+  //   2. User has indicated focus=resume but no placeholder (e.g. they
+  //      picked review and analysis came back fast). Drop the report
+  //      after the most recent message.
+  // Skip otherwise — the user might be on Interview Prep or another path
+  // and dumping the report mid-conversation would be jarring.
   const analysisLandedFiredRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (activeView !== "resume-builder") return;
@@ -616,38 +631,43 @@ export default function Page() {
     const id = activeChatId ?? "local-chat";
     if (analysisLandedFiredRef.current.has(id)) return;
 
-    // Only fire when the existing chat opens with the calibration
-    // welcome (i.e. we're in the post-upload flow). If the chat has
-    // user messages or non-calibration content, skip — the user has
-    // moved on, and dumping the report mid-conversation would be jarring.
-    const hasUserMessages = chatMessages.some((m) => m.role === "user" && !m.content.startsWith("__"));
-    const firstAssistant = chatMessages.find((m) => m.role === "assistant");
-    const isCalibrationWelcome = !!firstAssistant && /reading through it now|while I do/i.test(firstAssistant.content);
-    if (!isCalibrationWelcome) return;
-    if (hasUserMessages) {
-      // User answered calibration — that's fine. Still drop the report
-      // but acknowledge the answer first.
-    }
+    // Detect the rotating-status placeholder pushed when user asked for
+    // resume review before analysis finished.
+    const hasProgressPlaceholder = chatMessages.some((m) => m.content === "__ANALYSIS_PROGRESS__");
+
+    // Only fire if the user has signalled they want the resume review
+    // (focus=resume from the orchestrator) OR if the placeholder exists.
+    // Otherwise the user might be in another flow and we'd interrupt them.
+    const userWantsResumeReview = orchFocusRef.current === "resume" || hasProgressPlaceholder;
+    if (!userWantsResumeReview) return;
 
     analysisLandedFiredRef.current.add(id);
 
     const welcomeText = buildResumeBuilderWelcome(resumeExtraction, null, resumeAnalysis, chosenTargetRole);
     const chipLine = buildWelcomeChipsForAnalysis(resumeAnalysis);
-    const reportMsgs: ChatMessage[] = [
-      ...chatMessages,
+    const reportBlock: ChatMessage[] = [
       { role: "assistant", content: "Done reading. Here's where you stand:", timestamp: now() },
       { role: "assistant", content: welcomeText, timestamp: now() },
       { role: "assistant", content: chipLine },
     ];
+
+    let reportMsgs: ChatMessage[];
+    if (hasProgressPlaceholder) {
+      // Replace the placeholder in-place so the chat reads naturally.
+      reportMsgs = chatMessages.flatMap((m) =>
+        m.content === "__ANALYSIS_PROGRESS__" ? reportBlock : [m],
+      );
+    } else {
+      // Append at the end.
+      reportMsgs = [...chatMessages, ...reportBlock];
+    }
+
     setChatMessages(reportMsgs);
     if (activeChatId) {
       persistChat(activeChatId, reportMsgs, "resume_builder", {
         resumeText, resumeFilename, resumeExtraction, resumeAnalysis,
       });
     }
-    // Now that analysis has landed, open the right panel to the Report
-    // tab. We held off opening it during the calibration phase to avoid
-    // showing an empty/loading panel that looked broken.
     setOpenReportSignal((n) => n + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeAnalysis, activeView]);
@@ -1365,22 +1385,63 @@ export default function Page() {
             };
           };
           const r = data.route;
+          // Persist orchestrator-extracted signals so we can act across turns.
+          if (r.extractedSignals?.focus) setOrchFocus(r.extractedSignals.focus as FocusKey);
+          if (r.extractedSignals?.seniority) setOrchSeniority(r.extractedSignals.seniority);
+
           const reply: ChatMessage[] = [
             ...updatedMessages,
             { role: "assistant" as const, content: r.narration, timestamp: now() },
             ...(r.chips.length > 0 ? [{ role: "assistant" as const, content: `__INLINE_CHIPS__:${r.chips.join("|")}` }] : []),
           ];
+
+          // Route on managerKey when the orchestrator commits.
+          // - "resume": if analysis already done, the watcher (separate
+          //   useEffect) appends the report after this reply lands. If
+          //   analysis still running, append a rotating-status placeholder
+          //   that gets replaced when analysis arrives.
+          // - "interview": switch the active view so the user lands in
+          //   Interview Prep next render.
+          // - "cover_letter" / "career_strategy": orchestrator's narration
+          //   already says "coming soon" — no extra routing needed.
+          // - "more_info_needed": continue chatting; orchestrator asked
+          //   another question.
+          if (r.managerKey === "resume") {
+            if (!resumeAnalysis) {
+              reply.push({
+                role: "assistant",
+                content: "__ANALYSIS_PROGRESS__",
+                timestamp: now(),
+              });
+            }
+            // If analysis is ready, the analysis-landed watcher (which now
+            // watches orchFocus too) won't fire because it's already
+            // landed. Drop the report inline instead.
+            else {
+              const reportText = buildResumeBuilderWelcome(
+                resumeExtraction, null, resumeAnalysis, chosenTargetRole,
+              );
+              const reportChips = buildWelcomeChipsForAnalysis(resumeAnalysis);
+              reply.push(
+                { role: "assistant", content: "Done reading. Here's where you stand:", timestamp: now() },
+                { role: "assistant", content: reportText, timestamp: now() },
+                { role: "assistant", content: reportChips },
+              );
+              // Open the panel since analysis is ready.
+              setOpenReportSignal((n) => n + 1);
+            }
+          } else if (r.managerKey === "interview") {
+            // Defer view switch to next tick so this turn's chat persists first.
+            setTimeout(() => setActiveView("interview"), 200);
+          }
+
           setMessages(reply);
           setIsLoading(false);
           if (activeChatIdRef.current) {
             persistChat(activeChatIdRef.current, reply, "resume_builder", {
-              resumeText, resumeFilename, resumeExtraction, resumeAnalysis: null,
+              resumeText, resumeFilename, resumeExtraction, resumeAnalysis,
             });
           }
-          // If orchestrator routed to a manager AND that manager is "resume",
-          // and user picked focus=resume, the analysis-landed watcher will
-          // surface the report when ready. For other manager keys, future
-          // commits handle the routing (interview/cover/strategy verticals).
           if (agentAbortRef.current === controller) agentAbortRef.current = null;
           return;
         } catch (err) {
