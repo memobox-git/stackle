@@ -70,10 +70,22 @@ const RESPOND_TOOL: Anthropic.Tool = {
       },
       extractedSignals: {
         type: "object",
+        description: "Signals extracted so far. Use empty string for unknown — never null in this schema.",
         properties: {
-          role: { type: ["string", "null"], description: "Target role if known, e.g. 'Data Engineer'." },
-          seniority: { type: ["string", "null"], enum: ["entry", "mid", "senior", "lead", null], description: "Seniority level if known." },
-          focus: { type: ["string", "null"], enum: ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", null], description: "What the user wants to work on if known." },
+          role: {
+            type: "string",
+            description: "Target role if known (e.g. 'Data Engineer'). Empty string if not yet known.",
+          },
+          seniority: {
+            type: "string",
+            enum: ["entry", "mid", "senior", "lead", ""],
+            description: "Seniority level if known. Empty string if not yet known.",
+          },
+          focus: {
+            type: "string",
+            enum: ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", ""],
+            description: "What the user wants to work on if known. Empty string if not yet known.",
+          },
         },
         required: ["role", "seniority", "focus"],
       },
@@ -179,17 +191,28 @@ export async function runStackleOrchestrator(input: OrchestratorInput): Promise<
       ? parsed.chips.filter((c): c is string => typeof c === "string" && c.length < 60).slice(0, 4)
       : FALLBACK.chips;
 
-    // extractedSignals — merge with priorSignals so we never lose
-    // earlier extractions.
-    const sigParsed = (parsed.extractedSignals ?? {}) as Partial<ExtractedSignals>;
+    // extractedSignals — schema uses empty string for unknown (Anthropic
+    // tool schemas reject null-in-enum). Coerce empty → null on the way
+    // out so downstream code keeps treating null as "unknown".
+    const sigParsed = (parsed.extractedSignals ?? {}) as Record<string, string>;
+    const coerce = <T>(val: string | undefined, validator: (v: string) => boolean, fallback: T): T | null => {
+      if (typeof val !== "string" || val.length === 0) return fallback as T | null;
+      return validator(val) ? (val as unknown as T) : fallback as T | null;
+    };
     const extractedSignals: ExtractedSignals = {
-      role: typeof sigParsed.role === "string" ? sigParsed.role : (priorSignals?.role ?? null),
-      seniority: VALID_SENIORITY.includes(sigParsed.seniority as SeniorityLevel)
-        ? (sigParsed.seniority as SeniorityLevel)
-        : (priorSignals?.seniority ?? null),
-      focus: VALID_FOCUS.includes(sigParsed.focus as FocusKey)
-        ? (sigParsed.focus as FocusKey)
-        : (priorSignals?.focus ?? null),
+      role: typeof sigParsed.role === "string" && sigParsed.role.length > 0
+        ? sigParsed.role
+        : (priorSignals?.role ?? null),
+      seniority: coerce<SeniorityLevel>(
+        sigParsed.seniority,
+        (v) => ["entry", "mid", "senior", "lead"].includes(v),
+        priorSignals?.seniority ?? null,
+      ),
+      focus: coerce<FocusKey>(
+        sigParsed.focus,
+        (v) => ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy"].includes(v),
+        priorSignals?.focus ?? null,
+      ),
     };
 
     return { managerKey, narration, chips, extractedSignals };
