@@ -230,11 +230,12 @@ function renderContent(content: string) {
       continue;
     }
 
-    // Regular paragraph. m-0 kills the user-agent <p> margin (~16px top
-    // + bottom) — without this the wrapper's mb-1 was being shadowed by
-    // browser default and the chip row sat 25-30px below the question.
+    // Regular paragraph. m-0 kills the user-agent <p> margin and
+    // leading-snug (1.375) trims the descender space under the last
+    // line — without that, the visual gap to chips reads as bigger
+    // than the actual pixel margin.
     elements.push(
-      <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-700 m-0">
+      <p key={`p-${i}`} className="text-[15px] leading-snug text-gray-700 m-0">
         {inlineFormat(line)}
       </p>
     );
@@ -356,7 +357,7 @@ export default function Message({ message, onEdit }: MessageProps) {
   }
 
   return (
-    <div className="group flex mb-1 w-full max-w-3xl mx-auto px-4">
+    <div className="group flex mb-0 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
         {renderContent(message.content)}
         {ts && (
