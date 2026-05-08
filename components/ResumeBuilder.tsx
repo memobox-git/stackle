@@ -1935,7 +1935,12 @@ export default function ResumeBuilder({
   const baseScore = deriveScore(effectiveAnalysis);
   const currentEditScore = Math.min(100, baseScore + Math.min(editHistory.length * 3, 15));
 
-  const hasPanelContent = !!resumeExtraction;
+  // Panel content gate. Strict: require analysis to be ready before the
+  // panel + toggle button materialise. The post-upload calibration phase
+  // shows ONE column — chat only — until "Done reading. Here's where
+  // you stand." lands and analysis populates. Eliminates the
+  // empty/loading panel that looked broken.
+  const hasPanelContent = !!resumeAnalysis;
 
   // ── Chat panel ──────────────────────────────────────────────────
   const chatPanel = (
