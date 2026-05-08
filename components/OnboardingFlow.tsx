@@ -407,10 +407,12 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
       // (image-only PDF, OCR failure, password-protected file, garbage
       // input) returns 200 but produces a useless object. Don't pretend
       // it worked.
-      const hasMinimumContent =
-        (ext.name && ext.name.trim().length > 0) ||
-        (ext.experience && ext.experience.length > 0) ||
-        (ext.skillGroups && ext.skillGroups.length > 0);
+      // Require a real name AND at least one substantive section. OR-only
+      // validation was too permissive — would pass on a stray name token
+      // with zero experience/skills, leaking placeholder content into chat.
+      const hasName = !!(ext.name && ext.name.trim().length > 0 && ext.name.trim().toLowerCase() !== "there");
+      const hasBody = (ext.experience && ext.experience.length > 0) || (ext.skillGroups && ext.skillGroups.length > 0);
+      const hasMinimumContent = hasName && hasBody;
       if (!hasMinimumContent) {
         setParseError("I couldn't pick up enough from this resume — image-only PDFs and password-protected files don't parse. Try a different file, or paste the text.");
         setExtracting(false);
