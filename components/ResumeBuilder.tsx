@@ -1313,7 +1313,12 @@ export default function ResumeBuilder({
         skipped++;
         newCompletedActions.add(i);
         if (onPushAssistantMessage) {
-          onPushAssistantMessage(`Skipped fix ${i + 1} of ${allActions.length} — couldn't improve without more context.`);
+          // Surface the action label so the user sees what we skipped
+          // rather than an opaque number — e.g. "Skipped: Move Education
+          // section below Work Experience — needs structural changes I
+          // can't do without your call."
+          const shortAction = allActions[i].replace(/^(HIGH|MEDIUM|LOW):\s*/i, "").slice(0, 90);
+          onPushAssistantMessage(`Skipped (${i + 1}/${allActions.length}): ${shortAction}${shortAction.length === 90 ? "…" : ""} — needs more context or a manual call.`);
         }
         continue;
       }
@@ -1665,6 +1670,8 @@ export default function ResumeBuilder({
     const isUrl = /^https?:\/\/\S+/i.test(raw);
     if (isUrl) {
       setJdIntakeFor(null);
+      setIsPanelOpen(true);
+      setActiveTab("resume");
       onPushAssistantMessage?.("Fetching the JD…");
       tailorForJDUrl(raw).catch((err) => {
         console.error("[jd-intake-url]", err);
@@ -1675,6 +1682,8 @@ export default function ResumeBuilder({
     // Plain JD text — needs at least 100 chars to be plausible.
     if (raw.length >= 100) {
       setJdIntakeFor(null);
+      setIsPanelOpen(true);
+      setActiveTab("resume");
       onPushAssistantMessage?.("Reading the JD…");
       tailorForJD(raw).catch((err) => {
         console.error("[jd-intake-text]", err);
@@ -2146,6 +2155,15 @@ export default function ResumeBuilder({
           onStarterPromptClick={onInputChange}
           onChatEditPrompt={(text) => {
             const t = text.trim().toLowerCase();
+            // Any chip that triggers a rewrite needs the right panel
+            // open — otherwise the user can't see the typewriter, the
+            // accept/reject buttons, or the live document changes. The
+            // panel was kept closed during calibration chat by design;
+            // explicit action chips override that.
+            const openPanelForAction = () => {
+              setIsPanelOpen(true);
+              setActiveTab("resume");
+            };
             // Apply all fixes → first ask for a target JD. With a JD we
             // can tailor the rewrite (much higher quality). Without one,
             // we run the generic accept-all chain.
@@ -2160,6 +2178,7 @@ export default function ResumeBuilder({
             }
             if (t === "skip — generic rewrite" || t === "skip - generic rewrite") {
               setJdIntakeFor(null);
+              openPanelForAction();
               handleAcceptAll();
               return;
             }
@@ -2170,6 +2189,7 @@ export default function ResumeBuilder({
               return;
             }
             if (t === "walk me through fixes" || t === "guide me through fixes") {
+              openPanelForAction();
               handleFixAll();
               return;
             }
