@@ -166,16 +166,21 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   // now happens via the Report tab + chat welcome — not as a dedicated
   // takeover screen. Without this effect the user would sit on the
   // analyzing progress bar forever after analysis returns.
+  // Chat-first analysis: the moment we hit step 3 (extraction done),
+  // drop the user into Resume Builder IMMEDIATELY — don't wait for the
+  // ~30-50s analysis. The chat fires calibration questions ("what role
+  // are you targeting?") to fill the dead time, and Resume Builder
+  // injects the report into chat when the analysis lands. Net: dead
+  // waiting time becomes useful conversation.
   const autoAdvancedRef = useRef(false);
   useEffect(() => {
     if (step !== 3) return;
     if (autoAdvancedRef.current) return;
-    if (!resumeAnalysisState) return;
     autoAdvancedRef.current = true;
     const profile = persistProfile();
     onComplete(profile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, resumeAnalysisState]);
+  }, [step]);
 
   function handleAvatarChange(file: File) {
     // New file picked — revoke the old raw URL if any, reset framing

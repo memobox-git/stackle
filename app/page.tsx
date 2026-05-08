@@ -57,6 +57,26 @@ function SidebarTooltip({ label }: { label: string }) {
   );
 }
 
+// Build the chips line for a score-led welcome message. Score < 88 →
+// surgical/commit/understand chips. Score ≥ 88 → next-level moves.
+function buildWelcomeChipsForAnalysis(analysis: ResumeAnalysis | null): string {
+  if (!analysis) return "__INLINE_CHIPS__:Walk me through the report|What's my biggest weakness?";
+  const score = analysis.scores && typeof analysis.scores.total === "number" && analysis.scores.total > 0
+    ? Math.round(Math.max(0, Math.min(100, analysis.scores.total)))
+    : null;
+  if (score !== null && score >= 88) {
+    return "__INLINE_CHIPS__:Match a job description|Prep for interviews|Draft a cover letter";
+  }
+  const top = analysis.rewritePriorities?.[0] ?? "";
+  const sectionLabel = /summary|profile|objective|headline|intro/i.test(top) ? "summary"
+    : /skills?|keyword|stack|tools|tech list/i.test(top) ? "skills"
+    : /bullet|impact|metric|quantif/i.test(top) ? "bullets"
+    : null;
+  const fixChip = sectionLabel ? `Fix the ${sectionLabel}` : "Apply all fixes";
+  const whyChip = score !== null ? `Why is my score ${score}?` : "Why this score?";
+  return `__INLINE_CHIPS__:${fixChip}|Apply all fixes|${whyChip}`;
+}
+
 const SENTINELS = [
   "__RESUME_PREVIEW__",
   "__RESUME_ANALYSIS__",
@@ -483,54 +503,48 @@ export default function Page() {
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     )[0];
     const lastFinalized = latestFinal ? { displayName: latestFinal.display_name } : null;
-    const welcomeText = buildResumeBuilderWelcome(resumeExtraction, lastFinalized, resumeAnalysis, chosenTargetRole);
-    // Chat-first refactor: after the welcome text (which now leads with the
-    // score + tier), surface 3 quick-reply chips so the user can act in one
-    // tap. Chips are derived from the analysis: top priority section gets
-    // the "Fix the X" chip, score becomes the "Why is my score X?" chip.
-    // Falls back to a generic chip set when analysis is missing.
-    const chipLine = (() => {
-      const analysis = resumeAnalysis;
-      if (!analysis) return "__INLINE_CHIPS__:Walk me through the report|What's my biggest weakness?";
-      const score = analysis.scores && typeof analysis.scores.total === "number" && analysis.scores.total > 0
-        ? Math.round(Math.max(0, Math.min(100, analysis.scores.total)))
-        : null;
 
-      // High-score pivot: when the resume is already recruiter-ready
-      // (≥88), the chips shift from "fix this" to next-level moves —
-      // job matching, interview prep, cover letter, market intelligence.
-      // Stop nagging users with great resumes about fixes they don't need.
-      if (score !== null && score >= 88) {
-        return "__INLINE_CHIPS__:Match a job description|Prep for interviews|Draft a cover letter";
+    // Chat-first analysis flow: when analysis isn't ready yet (just-uploaded
+    // resume, ~30-50s pending), open with calibration questions instead of
+    // making the user stare at a loading screen. The analysis lands later
+    // and a separate watcher (below this useEffect) drops the report into
+    // chat as a follow-up. Dead waiting time → useful conversation.
+    if (!resumeAnalysis) {
+      const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || "there";
+      const calibrationMsgs: ChatMessage[] = [
+        {
+          role: "assistant",
+          content: `Got your resume, ${firstName}. I'm reading through it now — about 30 seconds. While I do, what role are you targeting?`,
+          timestamp: now(),
+        },
+        {
+          role: "assistant",
+          content: "__INLINE_CHIPS__:Data Engineer|ML Engineer|Software Engineer|Other",
+        },
+      ];
+      setChatMessages(calibrationMsgs);
+      if (activeChatId) {
+        persistChat(activeChatId, calibrationMsgs, "resume_builder", {
+          resumeText, resumeFilename, resumeExtraction, resumeAnalysis: null,
+        });
       }
-
-      const top = analysis.rewritePriorities?.[0] ?? "";
-      const sectionLabel = /summary|profile|objective|headline|intro/i.test(top) ? "summary"
-        : /skills?|keyword|stack|tools|tech list/i.test(top) ? "skills"
-        : /bullet|impact|metric|quantif/i.test(top) ? "bullets"
-        : null;
-      const fixChip = sectionLabel ? `Fix the ${sectionLabel}` : "Apply all fixes";
-      const whyChip = score !== null ? `Why is my score ${score}?` : "Why this score?";
-      return `__INLINE_CHIPS__:${fixChip}|Apply all fixes|${whyChip}`;
-    })();
-    const welcomeMsgs: ChatMessage[] = [
-      { role: "assistant", content: welcomeText, timestamp: now() },
-      { role: "assistant", content: chipLine },
-    ];
-    setChatMessages(welcomeMsgs);
-
-    // Persist to the active chat so the welcome doesn't re-fire on reload.
-    // Only persist when we have a real Supabase chat id — local-chat is the
-    // unauth fallback and doesn't have a row to write to.
-    if (activeChatId) {
-      persistChat(activeChatId, welcomeMsgs, "resume_builder", {
-        resumeText,
-        resumeFilename,
-        resumeExtraction,
-        resumeAnalysis,
-      });
+      // Continue to kick off the analysis fetch below.
+    } else {
+      // Analysis already ready (returning chat, cached, etc) — fire the
+      // standard score-led welcome.
+      const welcomeText = buildResumeBuilderWelcome(resumeExtraction, lastFinalized, resumeAnalysis, chosenTargetRole);
+      const chipLine = buildWelcomeChipsForAnalysis(resumeAnalysis);
+      const welcomeMsgs: ChatMessage[] = [
+        { role: "assistant", content: welcomeText, timestamp: now() },
+        { role: "assistant", content: chipLine },
+      ];
+      setChatMessages(welcomeMsgs);
+      if (activeChatId) {
+        persistChat(activeChatId, welcomeMsgs, "resume_builder", {
+          resumeText, resumeFilename, resumeExtraction, resumeAnalysis,
+        });
+      }
     }
-
     // Kick off analysis in the background if we don't have it yet. Use a ref
     // keyed on the resume text so we don't re-trigger the same analysis on
     // every auth reset.
@@ -551,21 +565,61 @@ export default function Page() {
         .then((r) => (r.ok ? r.json() : null))
         .then((a: ResumeAnalysis | null) => {
           if (a) {
+            // Just set state — the analysis-landed watcher (separate
+            // useEffect) handles dropping the score message into chat
+            // and re-persisting. Keeps the kickoff site simple.
             setResumeAnalysis(a);
-            if (activeChatId) {
-              persistChat(activeChatId, welcomeMsgs, "resume_builder", {
-                resumeText,
-                resumeFilename,
-                resumeExtraction,
-                resumeAnalysis: a,
-              });
-            }
           }
         })
         .catch(() => { /* non-fatal — card stays in skeleton */ });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, resumeExtraction, chatMessages.length, activeChatId]);
+
+  // ── Analysis-landed watcher (chat-first analysis flow) ───────────────
+  // When the calibration welcome fired (analysis was null) and the
+  // background analyze call resolves, append the score-led report
+  // message + chips to the chat as a follow-up. This is the "drop the
+  // report after the conversation" beat the user asked for.
+  const analysisLandedFiredRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (activeView !== "resume-builder") return;
+    if (!resumeAnalysis) return;
+    if (!resumeExtraction) return;
+    const id = activeChatId ?? "local-chat";
+    if (analysisLandedFiredRef.current.has(id)) return;
+
+    // Only fire when the existing chat opens with the calibration
+    // welcome (i.e. we're in the post-upload flow). If the chat has
+    // user messages or non-calibration content, skip — the user has
+    // moved on, and dumping the report mid-conversation would be jarring.
+    const hasUserMessages = chatMessages.some((m) => m.role === "user" && !m.content.startsWith("__"));
+    const firstAssistant = chatMessages.find((m) => m.role === "assistant");
+    const isCalibrationWelcome = !!firstAssistant && /reading through it now|while I do/i.test(firstAssistant.content);
+    if (!isCalibrationWelcome) return;
+    if (hasUserMessages) {
+      // User answered calibration — that's fine. Still drop the report
+      // but acknowledge the answer first.
+    }
+
+    analysisLandedFiredRef.current.add(id);
+
+    const welcomeText = buildResumeBuilderWelcome(resumeExtraction, null, resumeAnalysis, chosenTargetRole);
+    const chipLine = buildWelcomeChipsForAnalysis(resumeAnalysis);
+    const reportMsgs: ChatMessage[] = [
+      ...chatMessages,
+      { role: "assistant", content: "Done reading. Here's where you stand:", timestamp: now() },
+      { role: "assistant", content: welcomeText, timestamp: now() },
+      { role: "assistant", content: chipLine },
+    ];
+    setChatMessages(reportMsgs);
+    if (activeChatId) {
+      persistChat(activeChatId, reportMsgs, "resume_builder", {
+        resumeText, resumeFilename, resumeExtraction, resumeAnalysis,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeAnalysis, activeView]);
 
   // ── Main chat welcome greeting ────────────────────────────
   // When the user lands in the main chat view (not Resume Builder) with a
