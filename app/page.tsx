@@ -382,8 +382,14 @@ export default function Page() {
           setActiveChatId(newChat.id);
         } else {
           setChatList(chats);
-          setActiveChatId(chats[0].id);
-          restoreChatState(chats[0]);
+          // Prefer the most recent chat that already has a parsed resume
+          // attached. Falls back to the first chat. This way a returning
+          // user always lands on the chat where their work actually is,
+          // not on a blank "new chat" they happened to create last.
+          const chatWithResume = chats.find((c) => c.resume_extraction)
+            ?? chats[0];
+          setActiveChatId(chatWithResume.id);
+          restoreChatState(chatWithResume);
         }
       })
       .catch(() => {});
@@ -882,6 +888,18 @@ export default function Page() {
       const orig = files.find((f) => f.file_type === "original");
       if (orig) setOriginalDriveFileId(orig.id);
     }).catch(() => {});
+
+    // Returning user: if this chat already has a parsed resume (or one
+    // is available from the profile fallback), skip the upload screen.
+    // Without this, an authed user on a fresh device (no localStorage
+    // onboarding flag) would be forced to re-upload despite their
+    // resume + drive files + chat history living in Supabase.
+    const restoredExtraction = chat.mode === "resume_builder"
+      ? chat.resume_extraction
+      : (chat.resume_extraction ?? getProfileResume().resumeExtraction);
+    if (restoredExtraction) {
+      setOnboardingCompleted(true);
+    }
   }
 
   // Read the profile-level resume saved during onboarding. Returns null if
