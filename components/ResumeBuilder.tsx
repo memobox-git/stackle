@@ -1856,17 +1856,11 @@ export default function ResumeBuilder({
   // already present (user just finished onboarding and lands here), open
   // the Report tab — that's the wow moment they expect. Otherwise default
   // to the Resume preview tab.
-  useEffect(() => {
-    // Gate panel auto-open on BOTH extraction AND analysis being ready.
-    // Without analysis the panel would render to a half-loaded state
-    // while the chat is still asking calibration questions — looks
-    // broken. With analysis, the report tab has real content to show.
-    if (resumeExtraction && resumeAnalysis && !didAutoOpenForExtraction.current) {
-      didAutoOpenForExtraction.current = true;
-      setIsPanelOpen(true);
-      setActiveTab("report");
-    }
-  }, [resumeExtraction, resumeAnalysis]);
+  // No auto-open. Panel only opens when the user explicitly asks for the
+  // report (clicks the chip / picks Resume Review / asks in chat). Showing
+  // it unprompted is jarring — the chat is the conversation, the panel is
+  // the artifact. User stays in control of when artifact appears.
+  // (Effect intentionally removed.)
 
   // When analysis arrives, DON'T auto-switch to Report — that was annoying.
   // Just mark Report as "new" so the tab has a small dot indicating fresh
