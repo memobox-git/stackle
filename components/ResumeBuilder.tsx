@@ -2043,7 +2043,14 @@ export default function ResumeBuilder({
           acceptedPoints={0}
           resumeBuilderMode
           onStarterPromptClick={onInputChange}
-          onChatEditPrompt={(text) => runFixForAction(text, -1)}
+          onChatEditPrompt={(text) => {
+            // Chip clicks are CONTEXT replies (e.g. "Mid", "Senior",
+            // "Resume review"), NOT rewrite requests. Send them through
+            // the chat as user messages so the orchestrator can advance
+            // the conversation. Rewrites are only triggered by explicit
+            // Fix buttons on priority cards / "fix my <section>" intent.
+            onSendMessage(text);
+          }}
           onEditUserMessage={onEditUserMessage}
         />
       )}
