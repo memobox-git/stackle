@@ -67,14 +67,12 @@ function buildWelcomeChipsForAnalysis(analysis: ResumeAnalysis | null): string {
   if (score !== null && score >= 88) {
     return "__INLINE_CHIPS__:Match a job description|Prep for interviews|Draft a cover letter";
   }
-  const top = analysis.rewritePriorities?.[0] ?? "";
-  const sectionLabel = /summary|profile|objective|headline|intro/i.test(top) ? "summary"
-    : /skills?|keyword|stack|tools|tech list/i.test(top) ? "skills"
-    : /bullet|impact|metric|quantif/i.test(top) ? "bullets"
-    : null;
-  const fixChip = sectionLabel ? `Fix the ${sectionLabel}` : "Apply all fixes";
+  // Three distinct intents — never duplicate "fix" actions:
+  //   1. Walk me through fixes  → guided per-step (handleFixAll)
+  //   2. Apply all fixes        → one-shot auto-apply (handleAcceptAll)
+  //   3. Why this score?        → explanation, no mutation
   const whyChip = score !== null ? `Why is my score ${score}?` : "Why this score?";
-  return `__INLINE_CHIPS__:${fixChip}|Apply all fixes|${whyChip}`;
+  return `__INLINE_CHIPS__:Walk me through fixes|Apply all fixes|${whyChip}`;
 }
 
 const SENTINELS = [

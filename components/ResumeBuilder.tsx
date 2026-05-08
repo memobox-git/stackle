@@ -2044,11 +2044,20 @@ export default function ResumeBuilder({
           resumeBuilderMode
           onStarterPromptClick={onInputChange}
           onChatEditPrompt={(text) => {
-            // Chip clicks are CONTEXT replies (e.g. "Mid", "Senior",
-            // "Resume review"), NOT rewrite requests. Send them through
-            // the chat as user messages so the orchestrator can advance
-            // the conversation. Rewrites are only triggered by explicit
-            // Fix buttons on priority cards / "fix my <section>" intent.
+            // Action chips → fire the real handler directly. Everything
+            // else → send to chat. Avoids the bug where "Apply all fixes"
+            // produced narration only with no actual mutation.
+            const t = text.trim().toLowerCase();
+            if (t === "apply all fixes") {
+              handleAcceptAll();
+              return;
+            }
+            if (t === "walk me through fixes" || t === "guide me through fixes") {
+              handleFixAll();
+              return;
+            }
+            // Context replies (chip text not matching any action) just go
+            // through chat. Rewrites only fire from explicit Fix buttons.
             onSendMessage(text);
           }}
           onEditUserMessage={onEditUserMessage}

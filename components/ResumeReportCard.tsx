@@ -499,7 +499,11 @@ export default function ResumeReportCard({
             <button
               onClick={() => {
                 if (top3.length === 0) return;
-                onFixItem?.(top3[0], 0);
+                // "Fix top 3" was only firing the first item. Use the
+                // guided fix-all chain (handleFixAll) so all three run
+                // back-to-back with per-step accept/reject.
+                if (onFixAll) onFixAll();
+                else onFixItem?.(top3[0], 0);
               }}
               disabled={top3.length === 0}
               style={{
