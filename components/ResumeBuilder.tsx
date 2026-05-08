@@ -1857,10 +1857,14 @@ export default function ResumeBuilder({
   // the Report tab — that's the wow moment they expect. Otherwise default
   // to the Resume preview tab.
   useEffect(() => {
-    if (resumeExtraction && !didAutoOpenForExtraction.current) {
+    // Gate panel auto-open on BOTH extraction AND analysis being ready.
+    // Without analysis the panel would render to a half-loaded state
+    // while the chat is still asking calibration questions — looks
+    // broken. With analysis, the report tab has real content to show.
+    if (resumeExtraction && resumeAnalysis && !didAutoOpenForExtraction.current) {
       didAutoOpenForExtraction.current = true;
       setIsPanelOpen(true);
-      setActiveTab(resumeAnalysis ? "report" : "resume");
+      setActiveTab("report");
     }
   }, [resumeExtraction, resumeAnalysis]);
 

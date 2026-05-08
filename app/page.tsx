@@ -504,30 +504,57 @@ export default function Page() {
     )[0];
     const lastFinalized = latestFinal ? { displayName: latestFinal.display_name } : null;
 
-    // Chat-first analysis flow: when analysis isn't ready yet (just-uploaded
-    // resume, ~30-50s pending), open with calibration questions instead of
-    // making the user stare at a loading screen. The analysis lands later
-    // and a separate watcher (below this useEffect) drops the report into
-    // chat as a follow-up. Dead waiting time → useful conversation.
+    // Chat-first analysis flow: when analysis isn't ready yet, the
+    // Stackle Orchestrator (Sonnet 4.5) drives the conversation. Same
+    // intelligence ceiling as Claude — extracts role/seniority/focus
+    // from natural language, recommends paths based on what it learns,
+    // routes to a Manager only when ready. NOT a hardcoded chip menu.
     if (!resumeAnalysis) {
-      const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || "there";
-      const calibrationMsgs: ChatMessage[] = [
-        {
-          role: "assistant",
-          content: `Got your resume, ${firstName}. I'm reading through it now — about 30 seconds. While I do, what role are you targeting?`,
-          timestamp: now(),
-        },
-        {
-          role: "assistant",
-          content: "__INLINE_CHIPS__:Data Engineer|ML Engineer|Software Engineer|Other",
-        },
-      ];
-      setChatMessages(calibrationMsgs);
-      if (activeChatId) {
-        persistChat(activeChatId, calibrationMsgs, "resume_builder", {
-          resumeText, resumeFilename, resumeExtraction, resumeAnalysis: null,
+      const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || null;
+      // Show "thinking" placeholder while the orchestrator generates
+      // its greeting (~3-5s). Replaced with real reply when it lands.
+      setChatMessages([
+        { role: "assistant", content: "…", timestamp: now() },
+      ]);
+      // Fire orchestrator with empty messages → it generates the warm
+      // greeting + first question per its system prompt.
+      fetch("/api/agents/orchestrator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [],
+          resumeContext: {
+            firstName,
+            targetRoleFromUpload: chosenTargetRole,
+            yearsExperience: resumeExtraction.totalYearsExperience,
+          },
+          priorSignals: { role: chosenTargetRole, seniority: null, focus: null },
+        }),
+      })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data: { route?: { narration: string; chips: string[]; extractedSignals?: { role?: string | null; seniority?: string | null; focus?: string | null } } } | null) => {
+          if (!data?.route) return;
+          const r = data.route;
+          const msgs: ChatMessage[] = [
+            { role: "assistant", content: r.narration, timestamp: now() },
+            ...(r.chips.length > 0 ? [{ role: "assistant" as const, content: `__INLINE_CHIPS__:${r.chips.join("|")}` }] : []),
+          ];
+          setChatMessages(msgs);
+          if (activeChatId) {
+            persistChat(activeChatId, msgs, "resume_builder", {
+              resumeText, resumeFilename, resumeExtraction, resumeAnalysis: null,
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn("[orchestrator] greet failed:", err);
+          // Fallback to a simple hardcoded greeting if orchestrator dies.
+          const fallback: ChatMessage[] = [
+            { role: "assistant", content: `Hi ${firstName ?? "there"} — thanks for sending it over. What role are you targeting?`, timestamp: now() },
+            { role: "assistant", content: "__INLINE_CHIPS__:Data Engineer|ML Engineer|Software Engineer|Other" },
+          ];
+          setChatMessages(fallback);
         });
-      }
       // Continue to kick off the analysis fetch below.
     } else {
       // Analysis already ready (returning chat, cached, etc) — fire the
@@ -1303,6 +1330,75 @@ export default function Page() {
       // Fresh controller for this send — previous one (if any) already resolved.
       const controller = new AbortController();
       agentAbortRef.current = controller;
+
+      // ── PHASE B: Stackle Top-Level Orchestrator (analysis still running) ──
+      // Resume Builder mode + extraction present + no analysis yet.
+      // The Stackle Orchestrator (Sonnet 4.5) handles the calibration
+      // conversation. Extracts role/seniority/focus from natural language,
+      // recommends paths, routes to a Manager when ready.
+      if (isResumeMode && resumeExtraction && !resumeAnalysis) {
+        try {
+          const apiHistory = updatedMessages
+            .filter((m) => !m.content.startsWith("__"))
+            .map((m) => ({ role: m.role, content: m.content }));
+          const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || null;
+          const oRes = await fetch("/api/agents/orchestrator", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: JSON.stringify({
+              messages: apiHistory,
+              resumeContext: {
+                firstName,
+                targetRoleFromUpload: chosenTargetRole,
+                yearsExperience: resumeExtraction.totalYearsExperience,
+              },
+            }),
+          });
+          if (!oRes.ok) throw new Error("orchestrator http error");
+          const data = await oRes.json() as {
+            route: {
+              managerKey: string;
+              narration: string;
+              chips: string[];
+              extractedSignals: { role: string | null; seniority: string | null; focus: string | null };
+            };
+          };
+          const r = data.route;
+          const reply: ChatMessage[] = [
+            ...updatedMessages,
+            { role: "assistant" as const, content: r.narration, timestamp: now() },
+            ...(r.chips.length > 0 ? [{ role: "assistant" as const, content: `__INLINE_CHIPS__:${r.chips.join("|")}` }] : []),
+          ];
+          setMessages(reply);
+          setIsLoading(false);
+          if (activeChatIdRef.current) {
+            persistChat(activeChatIdRef.current, reply, "resume_builder", {
+              resumeText, resumeFilename, resumeExtraction, resumeAnalysis: null,
+            });
+          }
+          // If orchestrator routed to a manager AND that manager is "resume",
+          // and user picked focus=resume, the analysis-landed watcher will
+          // surface the report when ready. For other manager keys, future
+          // commits handle the routing (interview/cover/strategy verticals).
+          if (agentAbortRef.current === controller) agentAbortRef.current = null;
+          return;
+        } catch (err) {
+          const wasAborted = err instanceof Error && (err.name === "AbortError" || err.message.includes("aborted"));
+          if (!wasAborted) {
+            console.error("[stackle-orch send]", err);
+            setIsLoading(false);
+            setMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: "Hit a snag — try again?", timestamp: now() },
+            ]);
+          } else {
+            setIsLoading(false);
+          }
+          if (agentAbortRef.current === controller) agentAbortRef.current = null;
+          return;
+        }
+      }
 
       // ── PHASE 2/3: Resume Builder chat-first orchestrator ───────────────
       // When the user is in Resume Builder mode and analysis is loaded, the
