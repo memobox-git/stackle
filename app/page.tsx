@@ -618,6 +618,10 @@ export default function Page() {
         resumeText, resumeFilename, resumeExtraction, resumeAnalysis,
       });
     }
+    // Now that analysis has landed, open the right panel to the Report
+    // tab. We held off opening it during the calibration phase to avoid
+    // showing an empty/loading panel that looked broken.
+    setOpenReportSignal((n) => n + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeAnalysis, activeView]);
 
@@ -1966,11 +1970,14 @@ export default function Page() {
             }
             if (ra) setResumeAnalysis(ra);
             if (goal) setCareerGoal(goal);
-            // After the score-reveal CTA fires, land the user on the Resume
-            // Builder with the Report tab open. The score they just saw is
-            // the report's TL;DR — they expect the full breakdown next.
+            // Land the user on Resume Builder. DO NOT open the right
+            // panel here — analysis isn't ready yet, and showing the
+            // empty/loading panel makes the chat look broken. The
+            // analysis-landed watcher fires the panel open when the
+            // report arrives. If analysis is already cached (returning
+            // user with completed analysis), open immediately.
             setActiveView("resume-builder");
-            setOpenReportSignal((n) => n + 1);
+            if (ra) setOpenReportSignal((n) => n + 1);
             setOnboardingCompleted(true);
           }}
           onSignIn={() => setShowAuthModal(true)}

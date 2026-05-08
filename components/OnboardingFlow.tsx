@@ -97,6 +97,10 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   const [resumeFilename, setResumeFilename] = useState("");
   const [resumeText, setResumeText] = useState("");
   const [extracting, setExtracting] = useState(false);
+  // Surface parse failures inline on the upload screen so the user can
+  // retry instead of getting auto-advanced into a broken chat. Cleared
+  // on every retry attempt.
+  const [parseError, setParseError] = useState<string>("");
   const [resumeExtraction, setResumeExtraction] = useState<ResumeExtraction | null>(null);
   const resumeAnalysisRef = useRef<ResumeAnalysis | null>(null);
   const analysisInFlightRef = useRef<Promise<ResumeAnalysis | null> | null>(null);
@@ -166,21 +170,38 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   // now happens via the Report tab + chat welcome — not as a dedicated
   // takeover screen. Without this effect the user would sit on the
   // analyzing progress bar forever after analysis returns.
-  // Chat-first analysis: the moment we hit step 3 (extraction done),
-  // drop the user into Resume Builder IMMEDIATELY — don't wait for the
-  // ~30-50s analysis. The chat fires calibration questions ("what role
-  // are you targeting?") to fill the dead time, and Resume Builder
-  // injects the report into chat when the analysis lands. Net: dead
-  // waiting time becomes useful conversation.
+  // Chat-first analysis: when extraction completes successfully, drop
+  // the user into Resume Builder IMMEDIATELY — don't wait for the
+  // ~30-50s analysis. The chat fires calibration questions while the
+  // analysis runs in the background.
+  //
+  // BUT — validate extraction first. An empty/garbage extraction (PDF
+  // image-only, OCR failure, password-protected file) should NOT
+  // auto-advance — the user needs to retry or paste text. Parse-error
+  // state stays on the loading screen with retry options.
   const autoAdvancedRef = useRef(false);
   useEffect(() => {
     if (step !== 3) return;
     if (autoAdvancedRef.current) return;
+    if (!resumeExtraction) return;
+    // Validate: extraction must have at least one of name, experience,
+    // skills. Empty extraction = parse failed even though the API
+    // returned 200.
+    const hasMinimumContent =
+      (resumeExtraction.name && resumeExtraction.name.trim().length > 0) ||
+      (resumeExtraction.experience && resumeExtraction.experience.length > 0) ||
+      (resumeExtraction.skillGroups && resumeExtraction.skillGroups.length > 0);
+    if (!hasMinimumContent) {
+      // Don't auto-advance — keep user on loading screen with retry path.
+      // Surface error via setExtracting(false) + a flag the loading
+      // screen reads (handled via parseError state below).
+      return;
+    }
     autoAdvancedRef.current = true;
     const profile = persistProfile();
     onComplete(profile);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step]);
+  }, [step, resumeExtraction]);
 
   function handleAvatarChange(file: File) {
     // New file picked — revoke the old raw URL if any, reset framing
@@ -369,13 +390,32 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
     // returns text. This guard is just a safety net.
     if (!resumeText) return;
     setExtracting(true);
+    setParseError("");
     try {
       const res = await fetch("/api/agents/resume/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ resumeText }),
       });
+      if (!res.ok) {
+        setParseError(`Couldn't read the resume (HTTP ${res.status}). Try uploading again, or paste the text.`);
+        setExtracting(false);
+        return;
+      }
       const ext: ResumeExtraction = await res.json();
+      // Validate the extraction has minimum content. An empty extraction
+      // (image-only PDF, OCR failure, password-protected file, garbage
+      // input) returns 200 but produces a useless object. Don't pretend
+      // it worked.
+      const hasMinimumContent =
+        (ext.name && ext.name.trim().length > 0) ||
+        (ext.experience && ext.experience.length > 0) ||
+        (ext.skillGroups && ext.skillGroups.length > 0);
+      if (!hasMinimumContent) {
+        setParseError("I couldn't pick up enough from this resume — image-only PDFs and password-protected files don't parse. Try a different file, or paste the text.");
+        setExtracting(false);
+        return;
+      }
       setResumeExtraction(ext);
 
       // Resolve target role: dropdown selection, or custom typed value when
@@ -456,9 +496,9 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
         state,
       });
       setStep(3);
-    } catch {
-      // Extraction failed — still advance so the user can hand-enter details.
-      setStep(3);
+    } catch (err) {
+      console.error("[onboarding] extract failed:", err);
+      setParseError("Network error while reading the resume. Try again, or paste the text instead.");
     } finally {
       setExtracting(false);
     }
@@ -856,11 +896,20 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
                           }}
                         />
                       )}
-                      <span className="relative">{extracting ? "Analyzing your resume…" : "Analyze My Resume"}</span>
+                      <span className="relative">{extracting ? "Reading your resume…" : "Read my resume"}</span>
                     </button>
-                    <p className="text-[12px] text-gray-500 text-center leading-relaxed mt-1">
-                      Takes about 30 seconds. We&apos;ll score your resume across 5 dimensions and give you a complete action plan.
-                    </p>
+                    {parseError ? (
+                      <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 mt-2">
+                        <p className="text-[13px] text-rose-800 leading-relaxed">{parseError}</p>
+                        <p className="text-[12px] text-rose-700 mt-2">
+                          Click <strong>Read my resume</strong> again with a different file, or paste the text directly.
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[12px] text-gray-500 text-center leading-relaxed mt-1">
+                        Takes about 30 seconds. We&apos;ll score your resume across 5 dimensions and give you a complete action plan.
+                      </p>
+                    )}
                   </>
                 )}
               </div>
