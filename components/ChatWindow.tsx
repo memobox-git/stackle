@@ -743,7 +743,7 @@ export default function ChatWindow({
                       if (onChatEditPrompt) onChatEditPrompt(label);
                       else onStarterPromptClick?.(label);
                     }}
-                    className="text-[13px] font-medium text-gray-900 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full px-3.5 py-1.5 transition-all shadow-sm hover:shadow"
+                    className="text-[12px] font-medium text-gray-800 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full px-2.5 py-1 transition-all shadow-sm hover:shadow"
                   >
                     {label}
                   </button>
