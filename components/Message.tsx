@@ -354,10 +354,7 @@ export default function Message({ message, onEdit }: MessageProps) {
   }
 
   return (
-    <div className="group flex gap-3 mb-8 w-full max-w-3xl mx-auto px-4">
-      <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center flex-shrink-0 mt-0.5">
-        <MessageSquare className="w-3.5 h-3.5 text-black" strokeWidth={2} />
-      </div>
+    <div className="group flex mb-3 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
         {renderContent(message.content)}
         {ts && (

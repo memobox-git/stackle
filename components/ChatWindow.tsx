@@ -692,10 +692,7 @@ export default function ChatWindow({
           // message (avatar + plain text). No coloured box; reads as part
           // of the conversation, not a separate UI artifact.
           return (
-            <div key={`analysis-progress-${i}`} className="flex gap-3 mb-8 w-full max-w-3xl mx-auto px-4">
-              <div className="w-7 h-7 rounded-full bg-white flex items-center justify-center flex-shrink-0 mt-0.5">
-                <MessageSquare className="w-3.5 h-3.5 text-black" strokeWidth={2} />
-              </div>
+            <div key={`analysis-progress-${i}`} className="flex mb-6 w-full max-w-3xl mx-auto px-4">
               <div className="flex-1 min-w-0 text-[15px] text-gray-900 leading-6">
                 <div className="flex items-center gap-2 mb-1.5">
                   <span className="relative flex h-1.5 w-1.5">
@@ -737,8 +734,8 @@ export default function ChatWindow({
           const labels = msg.content.slice(INLINE_CHIPS_PREFIX.length).split("|").map((s) => s.trim()).filter(Boolean);
           if (labels.length === 0) return null;
           return (
-            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-5 mb-6">
-              <div className="ml-10 flex flex-wrap gap-2">
+            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-1 mb-6">
+              <div className="flex flex-wrap gap-2">
                 {labels.map((label, j) => (
                   <button
                     key={j}
