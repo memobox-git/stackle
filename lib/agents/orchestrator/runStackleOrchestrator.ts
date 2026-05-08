@@ -1,9 +1,9 @@
 // Stackle Top-Level Orchestrator (Layer 1) runner.
 //
-// Sonnet 4.5 — full-conversation intelligence, not Haiku one-shot
-// classification. Costs more per turn (~5s, ~$0.005) but earns it by
-// extracting multi-signal intent from natural language and producing
-// contextual chips + recommendations.
+// Sonnet 4.5 with FORCED TOOL USE. The model must emit a single
+// `respond` tool call with the structured route — no JSON-text mode,
+// no "wrapped in conversational preamble" failures. Anthropic's
+// constrained-decoding for tool inputs guarantees the schema is honoured.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { STACKLE_ORCHESTRATOR_SYSTEM_PROMPT } from "./stackleOrchestratorPrompt";
@@ -39,8 +39,6 @@ const VALID_KEYS: ManagerKey[] = [
 const VALID_SENIORITY: SeniorityLevel[] = ["entry", "mid", "senior", "lead", null];
 const VALID_FOCUS: FocusKey[] = ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", null];
 
-// Network/parse failure fallback. Generic but better than crashing —
-// keeps the conversation moving while we retry on the next turn.
 const FALLBACK: OrchestratorRoute = {
   managerKey: "more_info_needed",
   narration: "Hit a snag on my end — try saying that again, or pick one of these:",
@@ -48,29 +46,76 @@ const FALLBACK: OrchestratorRoute = {
   extractedSignals: { role: null, seniority: null, focus: null },
 };
 
+// Tool schema. The model MUST call this tool — that's enforced via
+// tool_choice. Constrained decoding guarantees valid types.
+const RESPOND_TOOL: Anthropic.Tool = {
+  name: "respond",
+  description: "Reply to the user. ALWAYS call this exactly once per turn — never speak outside this tool.",
+  input_schema: {
+    type: "object",
+    properties: {
+      managerKey: {
+        type: "string",
+        enum: ["resume", "interview", "cover_letter", "career_strategy", "more_info_needed"],
+        description: "Which manager to route the user to. 'more_info_needed' if you need another turn to figure it out.",
+      },
+      narration: {
+        type: "string",
+        description: "What you say to the user. 1-3 sentences. No JSON, no markdown headers. Use **bold** sparingly. Reference specifics from <resume_context> when natural to prove you read it.",
+      },
+      chips: {
+        type: "array",
+        items: { type: "string" },
+        description: "2-4 short tap-to-act chip labels (each <5 words), tailored to your narration.",
+      },
+      extractedSignals: {
+        type: "object",
+        properties: {
+          role: { type: ["string", "null"], description: "Target role if known, e.g. 'Data Engineer'." },
+          seniority: { type: ["string", "null"], enum: ["entry", "mid", "senior", "lead", null], description: "Seniority level if known." },
+          focus: { type: ["string", "null"], enum: ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", null], description: "What the user wants to work on if known." },
+        },
+        required: ["role", "seniority", "focus"],
+      },
+    },
+    required: ["managerKey", "narration", "chips", "extractedSignals"],
+  },
+};
+
 export interface OrchestratorInput {
   /** Conversation so far (latest message LAST). Empty array on first turn. */
   messages: { role: "user" | "assistant"; content: string }[];
-  /** Resume context — name, target_role, totalYears, seniorityEstimate, etc.
-   *  The orchestrator references these in its greeting and inference. */
+  /** Resume context — observable facts the orchestrator references in
+   *  greetings ("Senior Analyst at Medallia, 4.8 years…") and in
+   *  recommendations. */
   resumeContext?: {
     firstName?: string | null;
+    fullName?: string | null;
     targetRoleFromUpload?: string | null;
     yearsExperience?: number | null;
     inferredSeniority?: string | null;
     summary?: string | null;
+    topRole?: string | null;
+    topCompany?: string | null;
+    topSkills?: string[];
+    location?: string | null;
   };
-  /** Signals already extracted across prior turns. Persisted client-side
-   *  and fed back so the orchestrator doesn't re-ask. */
+  /** Signals already extracted across prior turns. Persisted client-side. */
   priorSignals?: Partial<ExtractedSignals>;
 }
 
 function renderResumeContext(ctx: OrchestratorInput["resumeContext"], priorSignals?: Partial<ExtractedSignals>): string {
   const parts: string[] = ["<resume_context>"];
   if (ctx?.firstName) parts.push(`first_name: ${ctx.firstName}`);
+  if (ctx?.fullName) parts.push(`full_name: ${ctx.fullName}`);
   if (ctx?.targetRoleFromUpload) parts.push(`target_role_from_upload: ${ctx.targetRoleFromUpload}`);
   if (typeof ctx?.yearsExperience === "number") parts.push(`years_experience: ${ctx.yearsExperience}`);
   if (ctx?.inferredSeniority) parts.push(`inferred_seniority: ${ctx.inferredSeniority}`);
+  if (ctx?.topRole && ctx?.topCompany) parts.push(`current_or_recent: ${ctx.topRole} at ${ctx.topCompany}`);
+  else if (ctx?.topRole) parts.push(`current_or_recent_role: ${ctx.topRole}`);
+  if (ctx?.location) parts.push(`location: ${ctx.location}`);
+  if (ctx?.topSkills && ctx.topSkills.length > 0) parts.push(`top_skills: ${ctx.topSkills.slice(0, 8).join(", ")}`);
+  if (ctx?.summary) parts.push(`summary: ${ctx.summary.slice(0, 300)}`);
   if (priorSignals) {
     const known: string[] = [];
     if (priorSignals.role) known.push(`role=${priorSignals.role}`);
@@ -86,14 +131,11 @@ export async function runStackleOrchestrator(input: OrchestratorInput): Promise<
   const { messages, resumeContext, priorSignals } = input;
   const liveContext = renderResumeContext(resumeContext, priorSignals);
 
-  // Special case: empty conversation. Send a "start" sentinel as the user
-  // message so the orchestrator generates the warm greeting from scratch.
-  // The system prompt teaches it how to open.
+  // Empty conversation = first turn. Send a synthetic prompt that anchors
+  // the resume context and asks the orchestrator to greet observation-led.
   const apiMessages = messages.length === 0
-    ? [{ role: "user" as const, content: `${liveContext}\n\nSTART: greet the candidate by first name, then ask what role they're targeting. Pre-fill chips with the upload-page role if present.` }]
+    ? [{ role: "user" as const, content: `${liveContext}\n\nThis is the user's first turn. Greet them by first name and reference ONE specific observation from <resume_context> (their current/recent role + company, OR years of experience, OR a notable skill) before asking what they're targeting. Make it feel like you've actually read their resume — not a generic "thanks for sending it over". Then call respond().` }]
     : (() => {
-        // Anchor the latest user turn with the live context so the model
-        // sees current signals on every reply. (Not the assistant turns.)
         const arr = messages.map((m) => ({ role: m.role, content: m.content }));
         const lastIdx = arr.length - 1;
         if (arr[lastIdx]?.role === "user") {
@@ -110,29 +152,21 @@ export async function runStackleOrchestrator(input: OrchestratorInput): Promise<
       system: [
         { type: "text", text: STACKLE_ORCHESTRATOR_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
       ],
+      tools: [RESPOND_TOOL],
+      tool_choice: { type: "tool", name: "respond" },  // FORCE the tool — no free-form output
       messages: apiMessages,
     });
     console.log("[stackle-orch]", `${((Date.now() - startedAt) / 1000).toFixed(1)}s`, "usage:", res.usage);
 
-    let raw = res.content[0]?.type === "text" ? res.content[0].text : "";
-    raw = raw.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```\s*$/i, "").trim();
-    // Tolerant JSON extraction. Sonnet sometimes wraps the JSON in
-    // a sentence ("Here's my response: {...}") despite the system
-    // prompt saying JSON-only. Find the first { … last } and parse
-    // that. If still fails, throw → fall through to FALLBACK.
-    let parsed: Partial<OrchestratorRoute>;
-    try {
-      parsed = JSON.parse(raw) as Partial<OrchestratorRoute>;
-    } catch {
-      const firstBrace = raw.indexOf("{");
-      const lastBrace = raw.lastIndexOf("}");
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        const slice = raw.slice(firstBrace, lastBrace + 1);
-        parsed = JSON.parse(slice) as Partial<OrchestratorRoute>;
-      } else {
-        throw new Error("orchestrator returned non-JSON: " + raw.slice(0, 200));
-      }
+    // Find the tool_use block. With tool_choice forced, this is guaranteed
+    // to be present and to match the schema.
+    const toolBlock = res.content.find((b) => b.type === "tool_use");
+    if (!toolBlock || toolBlock.type !== "tool_use") {
+      console.warn("[stackle-orch] no tool_use block in response, falling back");
+      return FALLBACK;
     }
+
+    const parsed = toolBlock.input as Partial<OrchestratorRoute>;
 
     // Defensive shape validation. Coerce invalid values to safe defaults.
     const managerKey: ManagerKey = VALID_KEYS.includes(parsed.managerKey as ManagerKey)
@@ -145,8 +179,8 @@ export async function runStackleOrchestrator(input: OrchestratorInput): Promise<
       ? parsed.chips.filter((c): c is string => typeof c === "string" && c.length < 60).slice(0, 4)
       : FALLBACK.chips;
 
-    // extractedSignals — merge with priorSignals so the client never
-    // loses earlier extractions even if the model omits them this turn.
+    // extractedSignals — merge with priorSignals so we never lose
+    // earlier extractions.
     const sigParsed = (parsed.extractedSignals ?? {}) as Partial<ExtractedSignals>;
     const extractedSignals: ExtractedSignals = {
       role: typeof sigParsed.role === "string" ? sigParsed.role : (priorSignals?.role ?? null),

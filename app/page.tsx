@@ -514,37 +514,87 @@ export default function Page() {
     )[0];
     const lastFinalized = latestFinal ? { displayName: latestFinal.display_name } : null;
 
-    // First-greeting path. Skip the orchestrator API call for the
-    // opening message — it's:
-    //   (a) slow (~3-5s of placeholder dots that look like a stutter),
-    //   (b) brittle (Sonnet sometimes returns non-JSON → fallback fires
-    //       generic chips, no name).
-    // The greeting is deterministic anyway: "Hi {name} — thanks for
-    // sending it over. What role are you targeting?" Build it inline.
-    // Subsequent user replies (sendMessage Phase B branch) DO route
-    // through the orchestrator for real conversational intelligence.
+    // First-greeting path. The Stackle Orchestrator (Sonnet 4.5 with
+    // forced tool use → bulletproof structured output) reads the resume
+    // context and generates an observation-led greeting tailored to the
+    // user's actual background. NOT a hardcoded "thanks for sending it
+    // over" — it sees their current role + company, years, top skills,
+    // and leads with the most distinctive thing.
+    //
+    // Forced tool use means schema is guaranteed valid (constrained
+    // decoding), so the JSON-parse failures that hit the fallback in
+    // earlier turns are gone.
     if (!resumeAnalysis) {
       const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || null;
-      const greetingText = firstName
-        ? `Hi ${firstName} — thanks for sending it over. I have your resume now. What role are you targeting?`
-        : `Thanks for sending your resume over. I have it now — what role are you targeting?`;
-      // Suggest the most-common roles + Other. If the user picked one on
-      // the upload page we lead with that as the first chip.
-      const defaultRoles = ["Data Engineer", "ML Engineer", "Software Engineer", "Data Scientist", "Other"];
-      const orderedRoles = chosenTargetRole && !defaultRoles.includes(chosenTargetRole)
-        ? [chosenTargetRole, ...defaultRoles]
-        : defaultRoles;
-      const chipLine = `__INLINE_CHIPS__:${orderedRoles.slice(0, 5).join("|")}`;
-      const msgs: ChatMessage[] = [
-        { role: "assistant", content: greetingText, timestamp: now() },
-        { role: "assistant", content: chipLine },
-      ];
-      setChatMessages(msgs);
-      if (activeChatId) {
-        persistChat(activeChatId, msgs, "resume_builder", {
-          resumeText, resumeFilename, resumeExtraction, resumeAnalysis: null,
+      const fullName = (resumeExtraction.name ?? "").trim() || null;
+      // Pull the most recent real-employer role for the orchestrator to
+      // observe. Skip projects / academic entries (we don't have a strict
+      // filter here so first experience entry is good enough).
+      const topExp = resumeExtraction.experience?.[0];
+      const topRole = topExp?.title?.trim() || null;
+      const topCompany = topExp?.company?.trim() || null;
+      const topSkills = (resumeExtraction.skillGroups ?? [])
+        .flatMap((g) => g.skills ?? [])
+        .slice(0, 8);
+
+      // Show a placeholder while the orchestrator is composing
+      // (~2-4s on Sonnet). Replaced inline when the response lands.
+      setChatMessages([{ role: "assistant", content: "…", timestamp: now() }]);
+
+      fetch("/api/agents/orchestrator", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [],
+          resumeContext: {
+            firstName,
+            fullName,
+            targetRoleFromUpload: chosenTargetRole,
+            yearsExperience: resumeExtraction.totalYearsExperience,
+            topRole,
+            topCompany,
+            topSkills,
+            location: resumeExtraction.location,
+            summary: resumeExtraction.summary,
+          },
+          priorSignals: { role: chosenTargetRole, seniority: null, focus: null },
+        }),
+      })
+        .then((r) => r.ok ? r.json() : null)
+        .then((data: { route?: { narration: string; chips: string[]; extractedSignals?: { role?: string | null; seniority?: string | null; focus?: string | null } } } | null) => {
+          if (!data?.route) {
+            // True API failure (rate limit, model down). Honest fallback
+            // that uses their first name at minimum.
+            const fallback: ChatMessage[] = [
+              { role: "assistant", content: `Hey${firstName ? ` ${firstName}` : ""}. What role are you targeting?`, timestamp: now() },
+              { role: "assistant", content: "__INLINE_CHIPS__:Data Engineer|ML Engineer|Software Engineer|Other" },
+            ];
+            setChatMessages(fallback);
+            return;
+          }
+          const r = data.route;
+          if (r.extractedSignals?.focus) setOrchFocus(r.extractedSignals.focus as FocusKey);
+          if (r.extractedSignals?.seniority) setOrchSeniority(r.extractedSignals.seniority);
+
+          const msgs: ChatMessage[] = [
+            { role: "assistant", content: r.narration, timestamp: now() },
+            ...(r.chips.length > 0 ? [{ role: "assistant" as const, content: `__INLINE_CHIPS__:${r.chips.join("|")}` }] : []),
+          ];
+          setChatMessages(msgs);
+          if (activeChatId) {
+            persistChat(activeChatId, msgs, "resume_builder", {
+              resumeText, resumeFilename, resumeExtraction, resumeAnalysis: null,
+            });
+          }
+        })
+        .catch((err) => {
+          console.warn("[orch greet failed]", err);
+          const fallback: ChatMessage[] = [
+            { role: "assistant", content: `Hey${firstName ? ` ${firstName}` : ""}. What role are you targeting?`, timestamp: now() },
+            { role: "assistant", content: "__INLINE_CHIPS__:Data Engineer|ML Engineer|Software Engineer|Other" },
+          ];
+          setChatMessages(fallback);
         });
-      }
       // Continue to kick off the analysis fetch below.
     } else {
       // Analysis already ready (returning chat, cached, etc) — fire the
@@ -1342,6 +1392,8 @@ export default function Page() {
             .filter((m) => !m.content.startsWith("__"))
             .map((m) => ({ role: m.role, content: m.content }));
           const firstName = (resumeExtraction.name ?? "").trim().split(/\s+/)[0] || null;
+          const topExp = resumeExtraction.experience?.[0];
+          const topSkills = (resumeExtraction.skillGroups ?? []).flatMap((g) => g.skills ?? []).slice(0, 8);
           const oRes = await fetch("/api/agents/orchestrator", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -1350,9 +1402,16 @@ export default function Page() {
               messages: apiHistory,
               resumeContext: {
                 firstName,
+                fullName: resumeExtraction.name,
                 targetRoleFromUpload: chosenTargetRole,
                 yearsExperience: resumeExtraction.totalYearsExperience,
+                topRole: topExp?.title,
+                topCompany: topExp?.company,
+                topSkills,
+                location: resumeExtraction.location,
+                summary: resumeExtraction.summary,
               },
+              priorSignals: { role: orchFocus ? null : chosenTargetRole, seniority: orchSeniority, focus: orchFocus },
             }),
           });
           if (!oRes.ok) throw new Error("orchestrator http error");
