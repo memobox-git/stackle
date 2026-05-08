@@ -29,15 +29,23 @@ export async function runResumeExtraction({
 }: {
   resumeText: string;
 }): Promise<ResumeExtraction> {
-  const userMessage = `Extract all structured data from this resume.\n\n<resume>\n${resumeText}\n</resume>`;
+  // Cap extra-long resumes — first 10k chars cover ~3 pages.
+  const cappedResume = resumeText.length > 10000 ? resumeText.slice(0, 10000) + "\n…[truncated]" : resumeText;
+  const userMessage = `Extract all structured data from this resume.\n\n<resume>\n${cappedResume}\n</resume>`;
 
   try {
+    const startedAt = Date.now();
     const response = await client.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 4096,
-      system: RESUME_EXTRACTION_SYSTEM_PROMPT,
+      // Prompt caching — system prompt is static across calls. Saves
+      // ~50% of input-token reprocessing on cache hits within 5 min.
+      system: [
+        { type: "text", text: RESUME_EXTRACTION_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+      ],
       messages: [{ role: "user", content: userMessage }],
     });
+    console.log("[extraction]", `${((Date.now() - startedAt) / 1000).toFixed(1)}s`, "usage:", response.usage);
     let rawText = response.content[0].type === "text" ? response.content[0].text : "";
     // Strip markdown code fences if present
     rawText = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
