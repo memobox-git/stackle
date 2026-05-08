@@ -40,8 +40,12 @@ export async function runResumeExtraction({
   try {
     const startedAt = Date.now();
     const response = await client.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 4096,
+      // Pinned model id (the bare alias "claude-sonnet-4-5" 404s in some
+      // regions). max_tokens bumped to 16k — 4096 was truncating JSON on
+      // detailed resumes, producing an unclosed object that JSON.parse
+      // rejected and silently dropped us into the fallback.
+      model: "claude-sonnet-4-5-20250929",
+      max_tokens: 16000,
       // Prompt caching — system prompt is static across calls. Saves
       // ~50% of input-token reprocessing on cache hits within 5 min.
       system: [
@@ -49,7 +53,10 @@ export async function runResumeExtraction({
       ],
       messages: [{ role: "user", content: userMessage }],
     });
-    console.log("[extraction]", `${((Date.now() - startedAt) / 1000).toFixed(1)}s`, "usage:", response.usage);
+    console.log("[extraction]", `${((Date.now() - startedAt) / 1000).toFixed(1)}s`, "stop:", response.stop_reason, "usage:", response.usage);
+    if (response.stop_reason === "max_tokens") {
+      console.error("[extraction] HIT max_tokens — JSON will be truncated. Bump max_tokens.");
+    }
     let rawText = response.content[0].type === "text" ? response.content[0].text : "";
     // Strip markdown code fences if present
     rawText = rawText.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
