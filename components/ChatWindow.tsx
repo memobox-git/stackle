@@ -436,22 +436,40 @@ function InlineAnalysisProgress() {
     "Scoring across 5 dimensions",
     "Identifying biggest gains",
   ];
-  // Advance roughly every 7 seconds. Last stage stays "active" until
-  // the real analysis lands (we don't auto-complete it — the landed
-  // watcher replaces the card).
-  const [stage, setStage] = useState(0);
+  // Tail messages shown after the 4 stages complete — keeps the panel
+  // alive while the API is still working past the optimistic 28s
+  // estimate. Rotates every 4s so the user sees text actually changing.
+  const FINAL_MSGS = [
+    "Wrapping up the report",
+    "Cross-checking ATS rules",
+    "Polishing the recommendations",
+    "Almost there",
+  ];
+  const STAGE_MS = 7000;
+  // Advance through stages then rotate final messages indefinitely.
+  const [tick, setTick] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => {
-      setStage((s) => (s < STAGES.length - 1 ? s + 1 : s));
-    }, 7000);
-    return () => clearInterval(id);
+    const t = setInterval(() => setTick((n) => n + 1), STAGE_MS);
+    return () => clearInterval(t);
   }, []);
+  useEffect(() => {
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const stage = Math.min(tick, STAGES.length - 1);
+  const allDone = tick >= STAGES.length;
+  const finalIdx = (tick - STAGES.length) % FINAL_MSGS.length;
+  const stuck = elapsed > 75; // ~75s past expected — surface "longer than usual" hint
   return (
     <div className="flex mb-6 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0 text-[15px] text-gray-900">
         <ul className="space-y-1.5">
           {STAGES.map((label, idx) => {
-            const state = idx < stage ? "done" : idx === stage ? "active" : "pending";
+            const state =
+              allDone || idx < stage ? "done"
+                : idx === stage ? "active"
+                  : "pending";
             return (
               <li key={idx} className="flex items-center gap-2 text-[13px]">
                 {state === "done" && (
@@ -473,7 +491,22 @@ function InlineAnalysisProgress() {
             );
           })}
         </ul>
-        <p className="text-[12px] text-gray-500 mt-3">About 30 seconds. I&apos;ll drop the full report here when it&apos;s ready.</p>
+        {allDone && (
+          <div className="flex items-center gap-2 mt-2 text-[13px] text-gray-700">
+            <span className="relative flex h-3.5 w-3.5 items-center justify-center flex-shrink-0">
+              <span className="absolute inline-flex h-2 w-2 rounded-full bg-gray-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-gray-800" />
+            </span>
+            <span key={finalIdx} className="font-medium" style={{ animation: "fadeIn 400ms ease" }}>
+              {FINAL_MSGS[finalIdx]}…
+            </span>
+          </div>
+        )}
+        <p className="text-[12px] text-gray-500 mt-3">
+          {stuck
+            ? `Taking a bit longer than usual (${elapsed}s) — still working. If nothing lands in another minute, refresh and try again.`
+            : `${elapsed}s elapsed. I'll drop the full report here when it's ready.`}
+        </p>
       </div>
     </div>
   );
