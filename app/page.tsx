@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
-import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown } from "lucide-react";
+import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
@@ -1941,6 +1941,9 @@ export default function Page() {
     icon: typeof FileText;
     view: ActiveView | null;
     locked: boolean;
+    // Optional route to navigate to instead of switching activeView.
+    // Used for surfaces that live at their own URL (e.g. /learn).
+    href?: string;
   };
   type NavGroup = { label: string; items: NavChild[] };
   const NAV_GROUPS: NavGroup[] = [
@@ -1957,6 +1960,7 @@ export default function Page() {
       label: "Library",
       items: [
         { key: "drive",     label: "Drive",     icon: FolderOpen, view: "drive", locked: false },
+        { key: "learn",     label: "Learn",     icon: BookOpen,   view: null,    locked: false, href: "/learn" },
         { key: "published", label: "Published", icon: Globe,      view: null,    locked: true },
         { key: "versions",  label: "Versions",  icon: GitBranch,  view: null,    locked: true },
       ],
@@ -2024,6 +2028,13 @@ export default function Page() {
                 const handleClick = () => {
                   if (item.locked) {
                     showNavToast(item.label);
+                    return;
+                  }
+                  // External-route entries (e.g. /learn) navigate via
+                  // window.location so they get a full page transition
+                  // out of the SPA shell.
+                  if (item.href) {
+                    window.location.href = item.href;
                     return;
                   }
                   if (item.view) {
