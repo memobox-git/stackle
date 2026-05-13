@@ -36,9 +36,9 @@ export const CURRICULUM: { track: string; modules: Module[] }[] = [
         blurb: "Get oriented. Where DE sits, what DEs actually do, and how the role differs from analytics and ML.",
         lessons: [
           { slug: "what-is-data-engineering",    title: "What is Data Engineering?",                  minutes: 5, free: true, status: "ready" },
-          { slug: "de-vs-analyst-vs-scientist",  title: "DE vs Analyst vs Scientist",                 minutes: 4, free: true, status: "coming-soon" },
-          { slug: "a-day-in-the-life",           title: "A day in the life of a DE",                  minutes: 5, free: true, status: "coming-soon" },
-          { slug: "the-modern-data-stack",       title: "The modern data stack — the 60-second tour", minutes: 6, free: true, status: "coming-soon" },
+          { slug: "de-vs-analyst-vs-scientist",  title: "DE vs Analyst vs Scientist",                 minutes: 4, free: true, status: "ready" },
+          { slug: "a-day-in-the-life",           title: "A day in the life of a DE",                  minutes: 5, free: true, status: "ready" },
+          { slug: "the-modern-data-stack",       title: "The modern data stack — the 60-second tour", minutes: 6, free: true, status: "ready" },
         ],
       },
       {
@@ -47,8 +47,8 @@ export const CURRICULUM: { track: string; modules: Module[] }[] = [
         blurb: "The vocabulary you're expected to be fluent in by week one.",
         lessons: [
           { slug: "etl-vs-elt",                  title: "ETL vs ELT — and why ELT won",               minutes: 5, free: true, status: "ready" },
-          { slug: "batch-vs-streaming",          title: "Batch vs streaming",                         minutes: 6, free: false, status: "coming-soon" },
-          { slug: "star-vs-snowflake-schema",    title: "Star vs snowflake schema",                   minutes: 7, free: false, status: "coming-soon" },
+          { slug: "batch-vs-streaming",          title: "Batch vs streaming",                         minutes: 6, free: false, status: "ready" },
+          { slug: "star-vs-snowflake-schema",    title: "Star vs snowflake schema",                   minutes: 7, free: false, status: "ready" },
           { slug: "scd-types",                   title: "Slowly-changing dimensions (SCD types)",     minutes: 8, free: false, status: "coming-soon" },
           { slug: "data-lake-vs-warehouse",      title: "Data lake vs data warehouse vs lakehouse",   minutes: 6, free: false, status: "coming-soon" },
         ],
