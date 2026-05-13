@@ -102,7 +102,12 @@ export default function Page() {
   const [authEmail, setAuthEmail] = useState("");
   const [authSent, setAuthSent] = useState(false);
   const [authError, setAuthError] = useState("");
-  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  // Default true: every user lands on the chat hero immediately. The
+  // old multi-step OnboardingFlow (upload → configure → analyze) is
+  // bypassed — the orchestrator + chip handlers (e.g. Review my resume
+  // → 'Which resume?' chooser → file picker when none loaded) invite
+  // the user to upload exactly when it matters.
+  const [onboardingCompleted, setOnboardingCompleted] = useState(true);
   // True while we're still figuring out whether this is a returning
   // user (loadChats + Drive check in flight). Prevents the upload
   // screen from briefly flashing for users who'll be rehydrated from
