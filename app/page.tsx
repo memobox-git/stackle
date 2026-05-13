@@ -2,13 +2,17 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
-import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown } from "lucide-react";
+import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen, Sparkles, ScrollText, BookMarked, Briefcase, Mic, FileEdit, GraduationCap } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
 import HomeInput from "@/components/HomeInput";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import InterviewView from "@/components/interview/InterviewView";
+import LearnView from "@/components/LearnView";
+import MarketingLanding from "@/components/marketing/LandingPage";
+import { pickHeroGreeting } from "@/lib/heroGreetings";
+import { pickHeroExamples } from "@/lib/heroExamples";
 import { ChatMessage } from "@/components/Message";
 import {
   OrchestratorDecision,
@@ -40,9 +44,8 @@ import { IntakeData } from "@/components/IntakeForm";
 import type { User } from "@supabase/supabase-js";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import AuthModal from "@/components/AuthModal";
-import LandingPage from "@/components/LandingPage";
 
-type ActiveView = "chat" | "resume-builder" | "drive" | "interview";
+type ActiveView = "chat" | "resume-builder" | "drive" | "interview" | "learn";
 
 // Instant dark tooltip shown to the right of a collapsed sidebar icon.
 // Uses Tailwind's group-hover; must live inside a parent with `relative group`.
@@ -100,7 +103,17 @@ export default function Page() {
   const [authEmail, setAuthEmail] = useState("");
   const [authSent, setAuthSent] = useState(false);
   const [authError, setAuthError] = useState("");
-  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  // Default true: every user lands on the chat hero immediately. The
+  // old multi-step OnboardingFlow (upload → configure → analyze) is
+  // bypassed — the orchestrator + chip handlers (e.g. Review my resume
+  // → 'Which resume?' chooser → file picker when none loaded) invite
+  // the user to upload exactly when it matters.
+  const [onboardingCompleted, setOnboardingCompleted] = useState(true);
+  // True while we're still figuring out whether this is a returning
+  // user (loadChats + Drive check in flight). Prevents the upload
+  // screen from briefly flashing for users who'll be rehydrated from
+  // Drive a second later.
+  const [bootChecking, setBootChecking] = useState(true);
 
   // ── Career goal (from onboarding step 3) ──────────────
   // Hoisted to component scope so synthesis prompt + Career Profile
@@ -268,6 +281,19 @@ export default function Page() {
   const [interviewPrepPlan, setInterviewPrepPlan] = useState<InterviewPrepPlan | null>(null);
   const resumePreview = null;
   const homeFileInputRef = useRef<HTMLInputElement>(null);
+  // Always-mounted hidden file input for the in-chat "Upload a new one"
+  // chip from the resume-review chooser. The homeFileInputRef above is
+  // only rendered when the Home view is active, so a separate input is
+  // needed for chat-driven uploads.
+  const chatUploadInputRef = useRef<HTMLInputElement>(null);
+  // True after the user clicked "Review my resume" — the next chip click
+  // is interpreted as their choice of source. Cleared when they pick or
+  // cancel.
+  const [pendingResumeReviewSource, setPendingResumeReviewSource] = useState(false);
+  // Snapshot of Drive files at the moment the user opened "Pick from
+  // Drive" so the chip labels and the click handler agree on the same
+  // list (avoids a race if Drive refreshes mid-pick).
+  const driveResumesForPickerRef = useRef<DriveFile[]>([]);
 
   // ── Derived ───────────────────────────────────────────
   const isSignedUp = user !== null;
@@ -359,18 +385,69 @@ export default function Page() {
   // We wait until authLoading is false so we know whether we're auth'd.
   useEffect(() => {
     if (authLoading) return;
+    setBootChecking(true);
+    console.log("[boot] starting check", { authed: !!user, userId: user?.id });
     loadChats()
       .then(async (chats) => {
-        console.log("[loadChats]", {
+        console.log("[boot] loadChats →", {
           count: chats.length,
           firstChatMessages: chats[0]?.messages?.length ?? 0,
           firstChatMode: chats[0]?.mode,
+          firstChatHasExtraction: !!chats[0]?.resume_extraction,
         });
         if (chats.length === 0) {
-          // No existing chat (auth'd: empty Supabase, unauth: no localStorage).
-          // Seed one with the profile resume so welcome + future messages
-          // have a chat to attach to.
-          console.log("[createChat] from loadChats — no existing chats");
+          // No chat rows. For an AUTH'D user this can still be a
+          // returning user — they might have a saved resume in Drive
+          // from a previous session (chats sometimes get wiped while
+          // Drive files survive). Check Drive before deciding.
+          if (user) {
+            try {
+              const driveFiles = await loadAllDriveFiles();
+              console.log("[boot] Drive scan →", {
+                totalFiles: driveFiles.length,
+                originals: driveFiles.filter((f) => f.file_type === "original").length,
+                typesPresent: [...new Set(driveFiles.map((f) => f.file_type))],
+              });
+              const original = driveFiles.find((f) => f.file_type === "original");
+              if (original) {
+                console.log("[boot] ✓ Drive original found — skipping onboarding", {
+                  id: original.id,
+                  displayName: original.display_name,
+                  hasExtraction: !!original.extraction_json,
+                  hasAnalysis: !!original.analysis_json,
+                });
+                const ext = original.extraction_json;
+                if (ext) {
+                  setResumeExtraction(ext);
+                  setResumeText("");
+                  setResumeFilename(original.display_name ?? "resume.pdf");
+                  if (original.analysis_json) setResumeAnalysis(original.analysis_json);
+                  setOnboardingCompleted(true);
+                } else {
+                  console.warn("[boot] Drive original has no extraction_json — staying on upload");
+                }
+                // Seed a fresh chat tied to this restored resume so
+                // future messages have somewhere to persist to.
+                const newChat = await createChat("chat", {
+                  resumeText: "",
+                  resumeFilename: original.display_name ?? null,
+                  resumeExtraction: ext,
+                  resumeAnalysis: original.analysis_json,
+                });
+                setChatList([newChat]);
+                setActiveChatId(newChat.id);
+                return;
+              } else {
+                console.log("[boot] no Drive original — treating as new user");
+              }
+            } catch (err) {
+              console.warn("[boot] Drive check failed:", err);
+            }
+          }
+          // Genuine empty state: new user or unauth without localStorage.
+          // Seed a placeholder chat so future messages have somewhere to
+          // attach. Onboarding flow stays gated until they upload.
+          console.log("[createChat] from loadChats — no existing chats, no Drive original");
           const prof = getProfileResume();
           const newChat = await createChat("chat", {
             resumeText: prof.resumeText,
@@ -390,9 +467,35 @@ export default function Page() {
             ?? chats[0];
           setActiveChatId(chatWithResume.id);
           restoreChatState(chatWithResume);
+
+          // Fallback: even if the chosen chat has no extraction, the
+          // user may still have one saved in Drive from earlier (e.g.
+          // they signed in fresh-device and we picked an old chat row
+          // that pre-dates the resume). Try Drive before falling back
+          // to onboarding.
+          if (user && !chatWithResume.resume_extraction) {
+            try {
+              const driveFiles = await loadAllDriveFiles();
+              const original = driveFiles.find((f) => f.file_type === "original");
+              if (original?.extraction_json) {
+                setResumeExtraction(original.extraction_json!);
+                setResumeText("");
+                setResumeFilename(original.display_name ?? "resume.pdf");
+                setOnboardingCompleted(true);
+              }
+            } catch (err) {
+              console.warn("[loadChats] Drive fallback check failed:", err);
+            }
+          }
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn("[boot] loadChats failed:", err);
+      })
+      .finally(() => {
+        setBootChecking(false);
+        console.log("[boot] check complete");
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
 
@@ -561,11 +664,11 @@ export default function Page() {
             location: resumeExtraction.location,
             summary: resumeExtraction.summary,
           },
-          priorSignals: { role: chosenTargetRole, seniority: null, focus: null },
+          priorSignals: { role: chosenTargetRole, seniority: null, focus: null, careerGoal },
         }),
       })
         .then((r) => r.ok ? r.json() : null)
-        .then((data: { route?: { narration: string; chips: string[]; extractedSignals?: { role?: string | null; seniority?: string | null; focus?: string | null } } } | null) => {
+        .then((data: { route?: { narration: string; chips: string[]; extractedSignals?: { role?: string | null; seniority?: string | null; focus?: string | null; careerGoal?: string | null } } } | null) => {
           if (!data?.route) {
             // True API failure (rate limit, model down). Honest fallback
             // that uses their first name at minimum.
@@ -579,6 +682,12 @@ export default function Page() {
           const r = data.route;
           if (r.extractedSignals?.focus) setOrchFocus(r.extractedSignals.focus as FocusKey);
           if (r.extractedSignals?.seniority) setOrchSeniority(r.extractedSignals.seniority);
+          // Persist conversationally-captured target role + career goal
+          // so subsequent turns / managers can use them. The orchestrator
+          // echoes whatever it captured on every turn — we only write
+          // when there's a non-empty value so we never null-out state.
+          if (r.extractedSignals?.role && !chosenTargetRole) setChosenTargetRole(r.extractedSignals.role);
+          if (r.extractedSignals?.careerGoal && !careerGoal) setCareerGoal(r.extractedSignals.careerGoal);
 
           const msgs: ChatMessage[] = [
             { role: "assistant", content: r.narration, timestamp: now() },
@@ -711,6 +820,13 @@ export default function Page() {
   // parsed resume and no chat messages yet, push a short personal greeting
   // instead of the generic "Career advice for data & AI roles" hero. Makes
   // it feel like Stackle knows who they are from the moment they arrive.
+  // Auto-firing a 'Hey {name} — read through your resume…' message on
+  // every new chat made new conversations look identical to old ones and
+  // triggered a 'why is the same old chat back?' reaction. Removed in
+  // favour of the rotating empty-hero greeting + launcher chips, which
+  // invite the user without claiming any prior context. The orchestrator
+  // surfaces resume context the moment it's relevant to what they ask.
+  /* DISABLED — keep the empty hero clean.
   useEffect(() => {
     if (activeView !== "chat") return;
     if (!resumeExtraction) return;
@@ -730,9 +846,6 @@ export default function Page() {
       console.log("[welcome:chat] skip — messages present", decision);
       return;
     }
-    // Wait for analysis if it's actively loading — the rich welcome
-    // depends on bestFitRoles / strengths / weaknesses. If analysis isn't
-    // running anymore (failed or never started), proceed with header-only.
     if (isAnalyzingResume && !resumeAnalysis) {
       console.log("[welcome:chat] skip — analysis still loading", decision);
       return;
@@ -795,19 +908,25 @@ export default function Page() {
       bodyParts.push(`What's holding you back:\n${lines.join("\n")}`);
     }
 
-    const closer = careerGoal
-      ? `You said your goal is *${careerGoal}*. Want to start there, or talk about something else?`
-      : `What's going on?`;
-    bodyParts.push(closer);
+    // Only add a closer when there's actual analysis content to anchor
+    // it. Otherwise the chips below already imply 'what next?' — adding
+    // a literal 'What's going on?' question reads as the assistant
+    // floundering. The career-goal version is fine because it cites
+    // something specific.
+    if (careerGoal) {
+      bodyParts.push(`You said your goal is *${careerGoal}*. Want to start there, or pick something else?`);
+    } else if (bodyParts.length > 0) {
+      bodyParts.push(`Where do you want to start?`);
+    }
 
     const fullBody = bodyParts.length > 0 ? `\n\n${bodyParts.join("\n\n")}` : "";
 
     const greetMsgs: ChatMessage[] = [
       { role: "assistant", content: `${header}${fullBody}`, timestamp: now() },
-      // Inline chip row — chips live IN the conversation thread so they
-      // feel like part of the assistant's first move, not a tray pinned
-      // above the input. Format consumed by ChatWindow's INLINE_CHIPS sentinel.
-      { role: "assistant", content: "__INLINE_CHIPS__:Fix my resume|What's going on?" },
+      // Quick-launch chips — same set as the empty-hero so the surface
+      // feels consistent. Each chip is a real next move, not a vague
+      // 'What's going on?' which has no obvious answer.
+      { role: "assistant", content: "__INLINE_CHIPS__:Fix my resume|Tailor for a JD|Interview prep|Foundations" },
     ];
     setChatMessages(greetMsgs);
 
@@ -822,6 +941,7 @@ export default function Page() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, resumeExtraction, resumeAnalysis, isAnalyzingResume, chatMessages.length, activeChatId]);
+  */
 
   // ── Timestamp helper ──────────────────────────────────
   function now() {
@@ -1051,6 +1171,12 @@ export default function Page() {
       /* offline fallback */
     }
     resetAllState();
+    // Land on the calm chat hero, not the resume-builder shell. The
+    // builder's auto-welcome useEffect was firing the dense score
+    // recap every time the user clicked + New conversation — exactly
+    // the "huge message" complaint. Chat view shows the minimal
+    // rotating greeting instead.
+    setActiveView("chat");
     setIsSidebarOpen(false);
   }
 
@@ -1090,6 +1216,63 @@ export default function Page() {
         }
         resetAllState();
       }
+    }
+  }
+
+  // ── Resume-review source chooser ──────────────────────
+  // When the user asks to review their resume, give them an explicit
+  // choice of which resume to act on: the currently loaded one, a
+  // fresh upload, or one of their saved Drive resumes. Prevents the
+  // "wrong file got reviewed" failure mode entirely.
+  async function promptResumeSourceChoice() {
+    // No resume loaded at all → no choice to make, just open uploader.
+    if (!resumeExtraction) {
+      chatUploadInputRef.current?.click();
+      return;
+    }
+    const currentName = resumeFilename || "current resume";
+    const labels = [
+      `Use current — ${currentName}`,
+      "Upload a new one",
+      "Pick from Drive",
+    ];
+    setChatMessages((prev) => [
+      ...prev,
+      { role: "assistant", content: "Got it. Which resume should I review?", timestamp: now() },
+      { role: "assistant", content: `__INLINE_CHIPS__:${labels.join("|")}` },
+    ]);
+    setPendingResumeReviewSource(true);
+  }
+
+  async function expandDrivePicker() {
+    try {
+      const files = await loadAllDriveFiles();
+      const resumes = files.filter(
+        (f) => f.file_type === "original" || f.file_type === "version",
+      );
+      driveResumesForPickerRef.current = resumes;
+      if (resumes.length === 0) {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "No other resumes saved in Drive yet. Want to upload a new one instead?", timestamp: now() },
+          { role: "assistant", content: "__INLINE_CHIPS__:Upload a new one|Cancel resume pick" },
+        ]);
+        return;
+      }
+      const driveLabels = resumes.map((r) => `Use saved · ${r.display_name}`);
+      driveLabels.push("Cancel resume pick");
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Which one?", timestamp: now() },
+        { role: "assistant", content: `__INLINE_CHIPS__:${driveLabels.join("|")}` },
+      ]);
+    } catch (err) {
+      console.warn("[drive-picker] failed:", err);
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Couldn't load your Drive right now. Try uploading instead?", timestamp: now() },
+        { role: "assistant", content: "__INLINE_CHIPS__:Upload a new one|Cancel resume pick" },
+      ]);
     }
   }
 
@@ -1427,7 +1610,7 @@ export default function Page() {
                 location: resumeExtraction.location,
                 summary: resumeExtraction.summary,
               },
-              priorSignals: { role: orchFocus ? null : chosenTargetRole, seniority: orchSeniority, focus: orchFocus },
+              priorSignals: { role: orchFocus ? null : chosenTargetRole, seniority: orchSeniority, focus: orchFocus, careerGoal },
             }),
           });
           if (!oRes.ok) throw new Error("orchestrator http error");
@@ -1436,13 +1619,19 @@ export default function Page() {
               managerKey: string;
               narration: string;
               chips: string[];
-              extractedSignals: { role: string | null; seniority: string | null; focus: string | null };
+              extractedSignals: { role: string | null; seniority: string | null; focus: string | null; careerGoal: string | null };
             };
           };
           const r = data.route;
           // Persist orchestrator-extracted signals so we can act across turns.
           if (r.extractedSignals?.focus) setOrchFocus(r.extractedSignals.focus as FocusKey);
           if (r.extractedSignals?.seniority) setOrchSeniority(r.extractedSignals.seniority);
+          // Persist conversationally-captured target role + career goal
+          // so subsequent turns / managers can use them. The orchestrator
+          // echoes whatever it captured on every turn — we only write
+          // when there's a non-empty value so we never null-out state.
+          if (r.extractedSignals?.role && !chosenTargetRole) setChosenTargetRole(r.extractedSignals.role);
+          if (r.extractedSignals?.careerGoal && !careerGoal) setCareerGoal(r.extractedSignals.careerGoal);
 
           const reply: ChatMessage[] = [
             ...updatedMessages,
@@ -1488,6 +1677,8 @@ export default function Page() {
           } else if (r.managerKey === "interview") {
             // Defer view switch to next tick so this turn's chat persists first.
             setTimeout(() => setActiveView("interview"), 200);
+          } else if (r.managerKey === "learn") {
+            setTimeout(() => setActiveView("learn"), 200);
           }
 
           setMessages(reply);
@@ -1941,31 +2132,32 @@ export default function Page() {
     icon: typeof FileText;
     view: ActiveView | null;
     locked: boolean;
+    // Optional route to navigate to instead of switching activeView.
+    // Used for surfaces that live at their own URL (e.g. /learn).
+    href?: string;
   };
   type NavGroup = { label: string; items: NavChild[] };
+  // Only ship surfaces that actually work. "Coming Soon" placeholders
+  // (Cover Letter, Job Match, Published, Versions, Profile, Settings)
+  // are stripped — they re-enter the nav when they're real.
   const NAV_GROUPS: NavGroup[] = [
     {
       label: "Workspace",
       items: [
-        { key: "resume-builder", label: "Resume Builder", icon: FileText,      view: "resume-builder", locked: false },
-        { key: "cover-letter",   label: "Cover Letter",   icon: Mail,          view: null,             locked: true },
-        { key: "interview-prep", label: "Interview Prep", icon: MessagesSquare, view: "interview",      locked: false },
-        { key: "job-match",      label: "Job Match",      icon: Target,        view: null,             locked: true },
+        // FileEdit reads as "edit a document" — clearer than a generic
+        // FileText for the resume editor.
+        { key: "resume-builder", label: "Resume Builder", icon: FileEdit, view: "resume-builder", locked: false },
+        // Mic for interview prep — universal "speaking practice" cue.
+        { key: "interview-prep", label: "Interview Prep", icon: Mic,      view: "interview",      locked: false },
       ],
     },
     {
       label: "Library",
       items: [
-        { key: "drive",     label: "Drive",     icon: FolderOpen, view: "drive", locked: false },
-        { key: "published", label: "Published", icon: Globe,      view: null,    locked: true },
-        { key: "versions",  label: "Versions",  icon: GitBranch,  view: null,    locked: true },
-      ],
-    },
-    {
-      label: "You",
-      items: [
-        { key: "profile",  label: "Profile",  icon: UserIcon,     view: null, locked: true },
-        { key: "settings", label: "Settings", icon: SettingsIcon, view: null, locked: true },
+        { key: "drive",       label: "Drive",       icon: FolderOpen,    view: "drive", locked: false },
+        // GraduationCap for Foundations — learning vibe is stronger
+        // than a generic book.
+        { key: "foundations", label: "Foundations", icon: GraduationCap, view: "learn", locked: false },
       ],
     },
   ];
@@ -2005,25 +2197,35 @@ export default function Page() {
           a small gap between groups, no labels. */}
       <div className={`${expanded ? "px-2" : "px-1.5"} mb-3`}>
         {NAV_GROUPS.map((group, gi) => (
-          <div key={group.label} className={gi > 0 ? "mt-4" : ""}>
+          // When expanded the group label needs breathing room; when
+          // collapsed (icon rail) the gap looks like an accidental break.
+          // Collapse the inter-group space to a tiny 4px in that mode.
+          <div key={group.label} className={gi > 0 ? (expanded ? "mt-4" : "mt-1") : ""}>
             {expanded && (
               <p className="text-[10px] font-medium tracking-[0.05em] uppercase text-gray-400 px-2 mb-1">
                 {group.label}
               </p>
             )}
-            <div className="space-y-0.5">
+            <div className={expanded ? "space-y-0.5" : "space-y-0"}>
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = !item.locked && item.view !== null && activeView === item.view;
-                const baseClasses = `flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors`;
+                const baseClasses = `flex items-center ${expanded ? "gap-2.5 px-2 w-full py-2" : "justify-center w-full px-0 py-1.5"} rounded-md font-medium transition-colors`;
                 const stateClasses = item.locked
                   ? "text-gray-400 cursor-default opacity-60"
                   : isActive
                     ? "text-gray-900 bg-gray-100"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50";
+                    : "text-gray-800 hover:text-gray-900 hover:bg-gray-100";
                 const handleClick = () => {
                   if (item.locked) {
                     showNavToast(item.label);
+                    return;
+                  }
+                  // External-route entries (e.g. /learn) navigate via
+                  // window.location so they get a full page transition
+                  // out of the SPA shell.
+                  if (item.href) {
+                    window.location.href = item.href;
                     return;
                   }
                   if (item.view) {
@@ -2037,7 +2239,7 @@ export default function Page() {
                       onClick={handleClick}
                       className={`${baseClasses} ${stateClasses}`}
                     >
-                      <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={1.75} />
+                      <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={2} />
                       {expanded && (
                         <>
                           <span className="text-sm truncate flex-1 text-left">{item.label}</span>
@@ -2087,12 +2289,25 @@ export default function Page() {
         </div>
       )}
 
-      {/* Chat history — only when expanded */}
-      {expanded && chatList.length > 0 && (
+      {/* Chat history — only when expanded. Filters out empty chats
+          (no user messages yet) so the sidebar isn't a graveyard of
+          "New conversation" rows that the user clicked but never used.
+          The currently-active chat is exempted from the filter so it
+          stays visible while you're composing your first message. */}
+      {expanded && (() => {
+        const userTouchedChats = chatList.filter((c) => {
+          if (c.id === activeChatId) return true;
+          const realMessages = (c.messages ?? []).filter(
+            (m) => m.role === "user" && !m.content.startsWith("__"),
+          );
+          return realMessages.length > 0;
+        });
+        if (userTouchedChats.length === 0) return null;
+        return (
         <div className="flex-1 overflow-y-auto px-2">
           <p className="text-[10px] text-gray-600 uppercase tracking-wider px-1 mb-1.5">Recent</p>
           <div className="space-y-0.5">
-            {chatList.map((chat) => (
+            {userTouchedChats.map((chat) => (
               <div
                 key={chat.id}
                 className="group relative"
@@ -2121,7 +2336,8 @@ export default function Page() {
             ))}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Drive version history removed from sidebar — accessible via the
           Drive nav item instead. The compact Resumes/Reports list felt
@@ -2157,7 +2373,38 @@ export default function Page() {
     );
   }
 
+  // ── Unauth landing ────────────────────────────────────
+  // Auth-init runs on mount. While it's resolving, render a tiny
+  // spinner so we don't flash the marketing page for already-authed
+  // users. Once resolved, branch: unauth → marketing landing, authed
+  // → app shell.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafaf7]">
+        <div className="w-5 h-5 rounded-full border-2 border-gray-300 border-t-gray-800 animate-spin" />
+      </div>
+    );
+  }
+  if (!user) {
+    return <MarketingLanding />;
+  }
+
   // ── Onboarding ────────────────────────────────────────
+  // Boot guard: while we're still checking whether the user has a
+  // saved resume in Drive (returning user), show a minimal loading
+  // state instead of flashing OnboardingFlow. Without this, returning
+  // users see "Upload your resume" for a beat before being rehydrated
+  // — looks like the sign-in failed.
+  if (bootChecking && user && !onboardingCompleted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafaf7]">
+        <div className="flex items-center gap-2.5 text-gray-500">
+          <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-700 animate-spin" />
+          <span className="text-sm">Loading your session…</span>
+        </div>
+      </div>
+    );
+  }
   if (!onboardingCompleted) {
     return (
       <>
@@ -2202,6 +2449,34 @@ export default function Page() {
   // ── Main app ──────────────────────────────────────────
   return (
     <div className="flex h-screen bg-[#fafaf7] text-gray-900 overflow-hidden">
+      {/* Always-mounted hidden file input for the in-chat "Upload a
+          new one" flow (resume-review source chooser). Independent of
+          the Home-view homeFileInputRef which only exists while that
+          view is mounted. */}
+      <input
+        ref={chatUploadInputRef}
+        type="file"
+        accept={ACCEPTED_EXTENSIONS}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          setResumeFileUrl(URL.createObjectURL(file));
+          parseFile(file)
+            .then((result) => {
+              if (result.html) setResumeDocHtml(result.html);
+              handleResumeUpload(result.text, file.name);
+              // After upload completes, hand off to the review flow.
+              setChatMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: `Got it — using **${file.name}**. Running the review now.`, timestamp: now() },
+              ]);
+              sendMessage("Proceed with the resume review.");
+            })
+            .catch(() => {});
+          e.target.value = "";
+        }}
+      />
       {/* Desktop sidebar */}
       <aside
         className="flex-shrink-0 bg-gray-50 flex-col hidden md:flex transition-all duration-200 relative overflow-visible"
@@ -2294,75 +2569,236 @@ export default function Page() {
           /* Chat view */
           <div className="flex flex-col flex-1 min-h-0">
             {chatMessages.length === 0 && !isLoading ? (
-              /* Landing hero — shown before first message */
-              <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-16">
-                {/* Logo mark */}
-                <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-black text-sm font-bold mb-6"
-                  style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
-                >
-                  S
-                </div>
+              /* Empty state — Claude/ChatGPT-style. Greeting + input
+                 stacked together, vertically centered in the viewport.
+                 No second input at the bottom; the input lives here
+                 with the greeting until the first message lands. */
+              <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
+                <div className="w-full max-w-2xl flex flex-col items-center">
+                  {/* Resume status pill — only when a resume is loaded.
+                      Keeps the user oriented (which file is active) and
+                      gives a one-click swap via the source chooser. */}
+                  {resumeExtraction && (
+                    <button
+                      type="button"
+                      onClick={() => promptResumeSourceChoice()}
+                      className="mb-4 inline-flex items-center gap-2 text-[12px] text-gray-600 hover:text-gray-900 bg-white border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1 transition-colors"
+                      title="Switch which resume Stackle uses"
+                    >
+                      <FileText className="w-3 h-3" strokeWidth={2} />
+                      <span className="truncate max-w-[280px]">
+                        Resume loaded · <strong className="font-medium text-gray-800">{resumeFilename || "your resume"}</strong>
+                      </span>
+                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-500">Change</span>
+                    </button>
+                  )}
+                  {/* Greeting with sparkle. The sparkle softens the tone
+                      and gives the line a focal point (Claude does the
+                      same thing with a small star glyph). */}
+                  <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight mb-8 inline-flex items-center gap-2.5 self-center">
+                    <Sparkles className="w-6 h-6 text-amber-500 flex-shrink-0" strokeWidth={1.75} aria-hidden />
+                    <span>{pickHeroGreeting({ chatId: activeChatId, firstName: resumeExtraction?.name?.split(" ")[0] ?? null })}</span>
+                  </h1>
+                  <div className="w-full">
+                    <ChatInput
+                      value={chatInput}
+                      onChange={setChatInput}
+                      onSend={() => sendMessage(chatInput)}
+                      onFileUpload={handleResumeUpload}
+                      disabled={isLoading}
+                      busy={isLoading}
+                      onStop={() => {
+                        agentAbortRef.current?.abort();
+                        agentAbortRef.current = null;
+                        setIsLoading(false);
+                      }}
+                      placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
+                    />
+                  </div>
+                  {/* Quick-start chips — each fires a chat message so the
+                      orchestrator picks up the intent and routes. No
+                      pre-baked view switches; the brain decides what
+                      surface to open based on context. */}
+                  <div className="flex flex-wrap gap-2 mt-4 justify-center">
+                    {[
+                      // Review my resume short-circuits to the source
+                      // chooser instead of going straight to orchestrator,
+                      // so the user explicitly confirms which file to review.
+                      { label: "Review my resume", icon: FileText,       action: () => promptResumeSourceChoice() },
+                      { label: "Tailor for a JD",  icon: Target,         action: () => sendMessage("I want to tailor my resume for a specific job description.") },
+                      { label: "Interview prep",   icon: MessagesSquare, action: () => sendMessage("I'd like to prep for an interview.") },
+                      { label: "Foundations",      icon: BookOpen,       action: () => sendMessage("I want to learn data-engineering fundamentals.") },
+                    ].map(({ label, icon: Icon, action }) => (
+                      <button
+                        key={label}
+                        onClick={action}
+                        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1.5 transition-all shadow-sm hover:shadow"
+                      >
+                        <Icon className="w-3.5 h-3.5 text-gray-500" strokeWidth={1.75} />
+                        {label}
+                      </button>
+                    ))}
+                  </div>
 
-                {/* Headline */}
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight text-center mb-3">
-                  Career advice for<br />data & AI roles.
-                </h1>
-                <p className="text-sm text-gray-500 text-center max-w-xs leading-relaxed">
-                  Ask me anything — roles, skills, salaries, interviews, or how to break in. For resume help, use the Resume Builder.
-                </p>
+                  {/* Example prompts — small italic suggestions that
+                      drop into the input on click. Three rotated per
+                      chat id from lib/heroExamples.ts. */}
+                  <div className="flex flex-col items-center gap-1 mt-8 text-[13px] text-gray-500">
+                    <span className="text-[11px] uppercase tracking-[0.1em] text-gray-400 mb-1">Or try</span>
+                    {pickHeroExamples({ chatId: activeChatId }).map((ex) => (
+                      <button
+                        key={ex}
+                        type="button"
+                        onClick={() => setChatInput(ex)}
+                        className="italic text-gray-500 hover:text-gray-800 transition-colors"
+                      >
+                        &ldquo;{ex}&rdquo;
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Recent chats strip — only when there's history. The
+                      sidebar already lists everything; this gives a quick
+                      jump-back affordance in the empty hero. */}
+                  {(() => {
+                    const recents = chatList
+                      .filter((c) => c.id !== activeChatId)
+                      .filter((c) => (c.messages ?? []).some((m) => m.role === "user" && !m.content.startsWith("__")))
+                      .slice(0, 3);
+                    if (recents.length === 0) return null;
+                    return (
+                      <div className="w-full mt-10">
+                        <p className="text-[11px] uppercase tracking-[0.1em] text-gray-400 text-center mb-3">Recently</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {recents.map((chat) => {
+                            const firstUserMsg = (chat.messages ?? []).find(
+                              (m) => m.role === "user" && !m.content.startsWith("__"),
+                            );
+                            const preview = firstUserMsg?.content.slice(0, 60) ?? chat.title ?? "Untitled chat";
+                            return (
+                              <button
+                                key={chat.id}
+                                type="button"
+                                onClick={() => handleSwitchChat(chat.id)}
+                                className="text-left bg-white border border-gray-200 hover:border-gray-300 rounded-xl px-3 py-2.5 transition-colors"
+                              >
+                                <p className="text-[13px] text-gray-900 line-clamp-2 leading-snug">{preview}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             ) : (
-              <ChatWindow
-                messages={chatMessages}
-                isLoading={isLoading}
-                resumeAnalysis={null}
-                marketAnalysis={null}
-                resumePreview={null}
-                resumeExtraction={null}
-                interviewPrepPlan={null}
-                onSend={sendMessage}
-                resumeText={resumeText}
-                onApplyInBuilder={(instruction) => {
-                  if (!resumeExtraction) {
-                    alert("Upload your resume first so I can apply this rewrite.");
-                    return;
-                  }
-                  setPendingBuilderInstruction(instruction);
-                  setActiveView("resume-builder");
-                }}
-                onEditUserMessage={handleEditUserMessage}
-                onChatEditPrompt={(prompt) => {
-                  // Inline chips clicked — route the special "Fix my resume"
-                  // pill to the resume builder view; everything else gets
-                  // sent through the chat as a normal user message.
-                  if (prompt === "Fix my resume") {
+              <>
+                <ChatWindow
+                  messages={chatMessages}
+                  isLoading={isLoading}
+                  resumeAnalysis={null}
+                  marketAnalysis={null}
+                  resumePreview={null}
+                  resumeExtraction={null}
+                  interviewPrepPlan={null}
+                  onSend={sendMessage}
+                  resumeText={resumeText}
+                  onApplyInBuilder={(instruction) => {
+                    if (!resumeExtraction) {
+                      alert("Upload your resume first so I can apply this rewrite.");
+                      return;
+                    }
+                    setPendingBuilderInstruction(instruction);
                     setActiveView("resume-builder");
-                    return;
-                  }
-                  sendMessage(prompt);
-                }}
-              />
+                  }}
+                  onEditUserMessage={handleEditUserMessage}
+                  onChatEditPrompt={(prompt) => {
+                    const t = prompt.trim().toLowerCase();
+
+                    // Resume-review entry points — intercept BEFORE the
+                    // orchestrator so the user explicitly confirms which
+                    // resume to act on.
+                    if (
+                      t === "review my resume" ||
+                      t === "can you review my resume?" ||
+                      t === "resume review" ||
+                      t === "fix my resume"
+                    ) {
+                      promptResumeSourceChoice();
+                      return;
+                    }
+
+                    // Chooser responses
+                    if (t.startsWith("use current")) {
+                      setPendingResumeReviewSource(false);
+                      sendMessage("Proceed with the current resume review.");
+                      return;
+                    }
+                    if (t === "upload a new one") {
+                      setPendingResumeReviewSource(false);
+                      chatUploadInputRef.current?.click();
+                      return;
+                    }
+                    if (t === "pick from drive") {
+                      expandDrivePicker();
+                      return;
+                    }
+                    if (t.startsWith("use saved · ")) {
+                      const displayName = prompt.slice("Use saved · ".length).trim();
+                      const file = driveResumesForPickerRef.current.find(
+                        (f) => f.display_name === displayName,
+                      );
+                      if (file?.extraction_json) {
+                        setResumeExtraction(file.extraction_json);
+                        setResumeFilename(file.display_name);
+                        if (file.analysis_json) setResumeAnalysis(file.analysis_json);
+                        setPendingResumeReviewSource(false);
+                        setChatMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: `Loaded **${file.display_name}**. Running the review now.`, timestamp: now() },
+                        ]);
+                        sendMessage("Proceed with the resume review.");
+                      }
+                      return;
+                    }
+                    if (t === "cancel resume pick") {
+                      setPendingResumeReviewSource(false);
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "No worries — what would you like to do instead?", timestamp: now() },
+                      ]);
+                      return;
+                    }
+
+                    // All other chips → orchestrator decides.
+                    sendMessage(prompt);
+                  }}
+                />
+                <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-white">
+                  <ChatInput
+                    value={chatInput}
+                    onChange={setChatInput}
+                    onSend={() => sendMessage(chatInput)}
+                    onFileUpload={handleResumeUpload}
+                    disabled={isLoading}
+                    busy={isLoading}
+                    onStop={() => {
+                      agentAbortRef.current?.abort();
+                      agentAbortRef.current = null;
+                      setIsLoading(false);
+                    }}
+                    placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
+                  />
+                </div>
+              </>
             )}
-            <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-white">
-              <ChatInput
-                value={chatInput}
-                onChange={setChatInput}
-                onSend={() => sendMessage(chatInput)}
-                onFileUpload={handleResumeUpload}
-                disabled={isLoading}
-                busy={isLoading}
-                onStop={() => {
-                  agentAbortRef.current?.abort();
-                  agentAbortRef.current = null;
-                  setIsLoading(false);
-                }}
-                placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
-              />
-            </div>
           </div>
         ) : activeView === "interview" ? (
           <InterviewView candidateName={resumeExtraction?.name ?? null} />
+        ) : activeView === "learn" ? (
+          <LearnView />
         ) : activeView === "drive" ? (
           /* Drive view — Dropbox-style */
           <div className="flex-1 overflow-y-auto bg-white">

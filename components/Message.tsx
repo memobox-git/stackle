@@ -2,6 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageSquare, Pencil, Check, X } from "lucide-react";
+import { useTypewriter } from "@/lib/useTypewriter";
+
+// Module-level "already typed" registry. Keyed by the message's content
+// hash so re-renders / chat-list rebuilds don't re-trigger the
+// animation for already-revealed messages. Cleared only on page reload.
+const TYPED_REGISTRY = new Set<string>();
+function messageKey(role: string, content: string, ts?: string): string {
+  // Content is enough on its own for uniqueness in practice; role + ts
+  // disambiguate the rare case where the assistant echoes a user line.
+  return `${role}::${ts ?? ""}::${content.length}::${content.slice(0, 80)}`;
+}
 
 export type MessageRole = "user" | "assistant";
 
@@ -9,6 +20,9 @@ export interface ChatMessage {
   role: MessageRole;
   content: string;
   timestamp?: string; // "HH:MM am/pm" — optional, shown on hover
+  // Set transiently by ChatWindow when this message just arrived in
+  // the current session. Drives the typewriter reveal. Never persisted.
+  __isFresh?: boolean;
 }
 
 interface MessageProps {
@@ -60,7 +74,13 @@ function inlineFormat(text: string): React.ReactNode {
 }
 
 function renderContent(content: string) {
-  const lines = content.split("\n");
+  // Defensive scrub: the orchestrator's narration occasionally leaks a
+  // literal "__INLINE_CHIPS__:..." line inside the prose instead of
+  // emitting it as its own sentinel message. Strip those lines so they
+  // never reach the reader as raw text.
+  const lines = content
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("__INLINE_CHIPS__:") && !l.trim().startsWith("__ANALYSIS_PROGRESS__") && !l.trim().startsWith("__FIX_PROGRESS_CARD__"));
   const elements: React.ReactNode[] = [];
   let i = 0;
 
@@ -95,7 +115,7 @@ function renderContent(content: string) {
     // H1
     if (line.startsWith("# ")) {
       elements.push(
-        <h1 key={`h1-${i}`} className="text-xl font-bold text-gray-900 mt-4 mb-2 leading-snug">
+        <h1 key={`h1-${i}`} className="text-[20px] font-semibold text-gray-900 mt-5 mb-2 leading-snug tracking-tight">
           {inlineFormat(line.slice(2))}
         </h1>
       );
@@ -106,7 +126,7 @@ function renderContent(content: string) {
     // H2
     if (line.startsWith("## ")) {
       elements.push(
-        <h2 key={`h2-${i}`} className="text-lg font-semibold text-gray-900 mt-4 mb-1.5 leading-snug">
+        <h2 key={`h2-${i}`} className="text-[17px] font-semibold text-gray-900 mt-5 mb-2 leading-snug tracking-tight">
           {inlineFormat(line.slice(3))}
         </h2>
       );
@@ -117,7 +137,7 @@ function renderContent(content: string) {
     // H3
     if (line.startsWith("### ")) {
       elements.push(
-        <h3 key={`h3-${i}`} className="text-base font-semibold text-gray-900 mt-3 mb-1 leading-snug">
+        <h3 key={`h3-${i}`} className="text-[15px] font-semibold text-gray-900 mt-4 mb-1.5 leading-snug">
           {inlineFormat(line.slice(4))}
         </h3>
       );
@@ -168,10 +188,10 @@ function renderContent(content: string) {
         }
       }
       elements.push(
-        <ul key={`ul-${i}`} className="space-y-2 my-3">
+        <ul key={`ul-${i}`} className="space-y-1.5 my-2.5">
           {items.map((item, idx) => (
-            <li key={idx} className="flex gap-2.5 text-[15px] leading-6 text-gray-700">
-              <span className="text-gray-600 flex-shrink-0 mt-1">•</span>
+            <li key={idx} className="flex gap-2 text-[15px] leading-[1.65] text-gray-900">
+              <span className="text-gray-400 flex-shrink-0 select-none">•</span>
               <span>{inlineFormat(item)}</span>
             </li>
           ))}
@@ -200,10 +220,10 @@ function renderContent(content: string) {
         }
       }
       elements.push(
-        <ol key={`ol-${i}`} className="space-y-2 my-3">
+        <ol key={`ol-${i}`} className="space-y-1.5 my-2.5">
           {items.map((item, idx) => (
-            <li key={idx} className="flex gap-3 text-[15px] leading-6 text-gray-700">
-              <span className="text-gray-600 flex-shrink-0 font-medium tabular-nums">{item.num}.</span>
+            <li key={idx} className="flex gap-2.5 text-[15px] leading-[1.65] text-gray-900">
+              <span className="text-gray-500 flex-shrink-0 tabular-nums">{item.num}.</span>
               <span>{inlineFormat(item.content)}</span>
             </li>
           ))}
@@ -212,9 +232,11 @@ function renderContent(content: string) {
       continue;
     }
 
-    // Empty line → spacer
+    // Empty line → small spacer. With proper mb-3 on paragraphs the
+    // visual rhythm already exists; the spacer is just a tie-breaker
+    // for two consecutive blank lines.
     if (line.trim() === "") {
-      elements.push(<div key={`sp-${i}`} className="h-2" />);
+      elements.push(<div key={`sp-${i}`} className="h-1" />);
       i++;
       continue;
     }
@@ -222,7 +244,7 @@ function renderContent(content: string) {
     // Emoji-prefixed chip-style line that wasn't parsed as a chip — render as styled hint
     if (/^[\p{Emoji}]\s/u.test(line.trim())) {
       elements.push(
-        <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-500 italic">
+        <p key={`p-${i}`} className="text-[15px] leading-[1.65] text-gray-500 italic mb-3 last:mb-0">
           {inlineFormat(line)}
         </p>
       );
@@ -230,9 +252,12 @@ function renderContent(content: string) {
       continue;
     }
 
-    // Regular paragraph
+    // Regular paragraph. Body type matches Claude/ChatGPT rhythm:
+    // 15px × 1.65 line-height × 12px bottom-margin. Darker text color
+    // (gray-900) than before — Stackle was reading lighter than the
+    // reference apps. `last:mb-0` keeps the chip row tight.
     elements.push(
-      <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-700">
+      <p key={`p-${i}`} className="text-[15px] leading-[1.65] text-gray-900 mb-3 last:mb-0">
         {inlineFormat(line)}
       </p>
     );
@@ -281,7 +306,7 @@ export default function Message({ message, onEdit }: MessageProps) {
 
   if (isUser) {
     return (
-      <div className="group flex flex-col items-end mb-6 w-full max-w-3xl mx-auto px-4">
+      <div className="group flex flex-col items-end mb-5 w-full max-w-3xl mx-auto px-4">
         {/* Hover-only meta row — timestamp + edit. Removed the redundant
             "You" label + "U" avatar circle; the right-aligned bubble shape
             already signals user authorship. */}
@@ -353,10 +378,34 @@ export default function Message({ message, onEdit }: MessageProps) {
     );
   }
 
+  // Assistant body. Only NEWLY-arrived messages animate. The
+  // `isFresh` flag is computed by the parent (ChatWindow) — it knows
+  // which message just appeared. Sentinels never animate.
+  const isSentinel = message.content.startsWith("__");
+  return <AssistantBody message={message} ts={ts} isSentinel={isSentinel} isFresh={!!message.__isFresh} />;
+}
+
+function AssistantBody({ message, ts, isSentinel, isFresh }: { message: ChatMessage; ts?: string; isSentinel: boolean; isFresh: boolean }) {
+  const key = messageKey(message.role, message.content, ts);
+  // Animate only when the parent flagged this as a freshly-arrived
+  // message AND we haven't already typed it. Old history renders
+  // instantly even on first mount (page reload, chat switch, etc).
+  const alreadyTyped = TYPED_REGISTRY.has(key);
+  const shouldAnimate = isFresh && !alreadyTyped && !isSentinel;
+  const { displayed, done } = useTypewriter(shouldAnimate ? message.content : "", 14);
+  useEffect(() => {
+    if (done && shouldAnimate) TYPED_REGISTRY.add(key);
+  }, [done, shouldAnimate, key]);
+
+  const visible = shouldAnimate ? displayed : message.content;
+
   return (
-    <div className="group flex mb-3 w-full max-w-3xl mx-auto px-4">
+    <div className="group flex mb-5 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
-        {renderContent(message.content)}
+        {renderContent(visible)}
+        {shouldAnimate && !done && (
+          <span className="inline-block w-[2px] h-4 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />
+        )}
         {ts && (
           <span className="text-[10px] text-gray-600 mt-1 block opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             {ts}

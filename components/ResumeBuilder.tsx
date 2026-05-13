@@ -154,6 +154,41 @@ export default function ResumeBuilder({
   // changes) flow through this stack instead of the chat thread.
   const toasts = useToasts();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
+
+  // Chat-panel width (% of the container). Default 25, clamped 18-55.
+  // Persisted across reloads so the user only sets it once. The divider
+  // sits between chat and workspace and is draggable horizontally.
+  const [chatPanelPct, setChatPanelPct] = useState<number>(25);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const saved = localStorage.getItem("stackle_chat_panel_pct");
+    const n = saved ? Number(saved) : NaN;
+    if (Number.isFinite(n) && n >= 18 && n <= 55) setChatPanelPct(n);
+  }, []);
+  const layoutRef = useRef<HTMLDivElement | null>(null);
+  const draggingRef = useRef(false);
+  useEffect(() => {
+    function onMove(e: MouseEvent) {
+      if (!draggingRef.current || !layoutRef.current) return;
+      const rect = layoutRef.current.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      const clamped = Math.max(18, Math.min(55, pct));
+      setChatPanelPct(clamped);
+    }
+    function onUp() {
+      if (!draggingRef.current) return;
+      draggingRef.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      try { localStorage.setItem("stackle_chat_panel_pct", String(chatPanelPct)); } catch { /* ignore */ }
+    }
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [chatPanelPct]);
   // Initial tab: if the analysis is already present at mount time (user just
   // finished onboarding and lands here), open the Report tab. The useEffect
   // below stays as a safety net in case analysis arrives after first render.
@@ -1313,7 +1348,12 @@ export default function ResumeBuilder({
         skipped++;
         newCompletedActions.add(i);
         if (onPushAssistantMessage) {
-          onPushAssistantMessage(`Skipped fix ${i + 1} of ${allActions.length} — couldn't improve without more context.`);
+          // Surface the action label so the user sees what we skipped
+          // rather than an opaque number — e.g. "Skipped: Move Education
+          // section below Work Experience — needs structural changes I
+          // can't do without your call."
+          const shortAction = allActions[i].replace(/^(HIGH|MEDIUM|LOW):\s*/i, "").slice(0, 90);
+          onPushAssistantMessage(`Skipped (${i + 1}/${allActions.length}): ${shortAction}${shortAction.length === 90 ? "…" : ""} — needs more context or a manual call.`);
         }
         continue;
       }
@@ -1665,6 +1705,8 @@ export default function ResumeBuilder({
     const isUrl = /^https?:\/\/\S+/i.test(raw);
     if (isUrl) {
       setJdIntakeFor(null);
+      setIsPanelOpen(true);
+      setActiveTab("resume");
       onPushAssistantMessage?.("Fetching the JD…");
       tailorForJDUrl(raw).catch((err) => {
         console.error("[jd-intake-url]", err);
@@ -1675,6 +1717,8 @@ export default function ResumeBuilder({
     // Plain JD text — needs at least 100 chars to be plausible.
     if (raw.length >= 100) {
       setJdIntakeFor(null);
+      setIsPanelOpen(true);
+      setActiveTab("resume");
       onPushAssistantMessage?.("Reading the JD…");
       tailorForJD(raw).catch((err) => {
         console.error("[jd-intake-text]", err);
@@ -2046,9 +2090,11 @@ export default function ResumeBuilder({
     <div
       className={`flex flex-col min-h-0 rb-chat-panel ${isPanelOpen ? "rb-chat-panel-open" : ""} ${mobileView === "panel" ? "hidden md:flex" : "flex"}`}
       style={{
-        // 25/75 split — narrow chat rail, wide workspace canvas.
-        width: isPanelOpen ? "25%" : "100%",
-        transition: "width 300ms ease",
+        // User-adjustable split — default 25/75. Disable the CSS
+        // transition while dragging so the panel tracks the cursor 1:1
+        // (without it the resize feels laggy/rubber-banded).
+        width: isPanelOpen ? `${chatPanelPct}%` : "100%",
+        transition: draggingRef.current ? "none" : "width 300ms ease",
         minWidth: 0,
       }}
     >
@@ -2081,7 +2127,7 @@ export default function ResumeBuilder({
         </div>
       )}
 
-      {messages.length === 0 && !resumeText ? (
+      {messages.length === 0 && !resumeText && !resumeExtraction ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16 gap-6 select-none">
           {/* Logo mark */}
           <div
@@ -2146,6 +2192,15 @@ export default function ResumeBuilder({
           onStarterPromptClick={onInputChange}
           onChatEditPrompt={(text) => {
             const t = text.trim().toLowerCase();
+            // Any chip that triggers a rewrite needs the right panel
+            // open — otherwise the user can't see the typewriter, the
+            // accept/reject buttons, or the live document changes. The
+            // panel was kept closed during calibration chat by design;
+            // explicit action chips override that.
+            const openPanelForAction = () => {
+              setIsPanelOpen(true);
+              setActiveTab("resume");
+            };
             // Apply all fixes → first ask for a target JD. With a JD we
             // can tailor the rewrite (much higher quality). Without one,
             // we run the generic accept-all chain.
@@ -2160,6 +2215,7 @@ export default function ResumeBuilder({
             }
             if (t === "skip — generic rewrite" || t === "skip - generic rewrite") {
               setJdIntakeFor(null);
+              openPanelForAction();
               handleAcceptAll();
               return;
             }
@@ -2170,6 +2226,7 @@ export default function ResumeBuilder({
               return;
             }
             if (t === "walk me through fixes" || t === "guide me through fixes") {
+              openPanelForAction();
               handleFixAll();
               return;
             }
@@ -2395,10 +2452,11 @@ export default function ResumeBuilder({
       className={`flex-col min-h-0 bg-white overflow-hidden rb-workspace-panel ${isPanelOpen ? "rb-workspace-panel-open" : ""}
         ${mobileView === "panel" ? "flex flex-1" : "hidden md:flex"}`}
       style={{
-        // 25/75 split.
-        width: isPanelOpen ? "75%" : "0",
+        // Pairs with chatPanelPct — sums to 100. Skip transition while
+        // dragging for the same 1:1 tracking behaviour.
+        width: isPanelOpen ? `${100 - chatPanelPct}%` : "0",
         minWidth: isPanelOpen ? "0" : "0",
-        transition: "width 300ms ease",
+        transition: draggingRef.current ? "none" : "width 300ms ease",
         flexShrink: 0,
         boxShadow: isPanelOpen ? "inset 1px 0 0 rgba(0, 0, 0, 0.04)" : "none",
       }}
@@ -2925,8 +2983,37 @@ export default function ResumeBuilder({
         }
       `}</style>
 
-      <div className="flex flex-1 min-h-0 relative overflow-hidden">
+      <div ref={layoutRef} className="flex flex-1 min-h-0 relative overflow-hidden">
         {chatPanel}
+        {/* Drag handle — only meaningful when the workspace panel is
+            open. 6px hot zone, 1px visible line, cursor-col-resize. */}
+        {isPanelOpen && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize chat panel"
+            onMouseDown={(e) => {
+              e.preventDefault();
+              draggingRef.current = true;
+              document.body.style.cursor = "col-resize";
+              document.body.style.userSelect = "none";
+            }}
+            onDoubleClick={() => setChatPanelPct(25)}
+            className="hidden md:block flex-shrink-0 w-px cursor-col-resize relative group"
+            title="Drag to resize · double-click to reset"
+            style={{ background: "rgb(229, 231, 235)" /* gray-200 — single visible line */ }}
+          >
+            {/* Wide invisible hit zone — 9px around the visible line so
+                it's easy to grab without the divider itself being thick. */}
+            <span className="absolute inset-y-0 -left-1 -right-1" />
+            {/* Hover handle — small grip pill, only visible when the
+                cursor is near the divider. Matches the Claude split. */}
+            <span
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[3px] h-8 rounded-full bg-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+              aria-hidden
+            />
+          </div>
+        )}
         {workspacePanel}
       </div>
 

@@ -422,6 +422,96 @@ function AnalysisProgress() {
   );
 }
 
+// Animated analysis-progress card for the INLINE chat sentinel. The
+// other AnalysisProgress (above) is the standalone loading-screen
+// component used when the resume builder doesn't have a chat yet.
+// This one renders when "__ANALYSIS_PROGRESS__" appears in the chat
+// stream — paces through 4 stages over ~28s so the user sees movement
+// instead of one static dot. Real analysis lands when it lands and
+// the landed watcher replaces the sentinel in-place.
+function InlineAnalysisProgress() {
+  const STAGES = [
+    "Reading your resume",
+    "Comparing to target-role benchmarks",
+    "Scoring across 5 dimensions",
+    "Identifying biggest gains",
+  ];
+  // Tail messages shown after the 4 stages complete — keeps the panel
+  // alive while the API is still working past the optimistic 28s
+  // estimate. Rotates every 4s so the user sees text actually changing.
+  const FINAL_MSGS = [
+    "Wrapping up the report",
+    "Cross-checking ATS rules",
+    "Polishing the recommendations",
+    "Almost there",
+  ];
+  const STAGE_MS = 7000;
+  // Advance through stages then rotate final messages indefinitely.
+  const [tick, setTick] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), STAGE_MS);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const stage = Math.min(tick, STAGES.length - 1);
+  const allDone = tick >= STAGES.length;
+  const finalIdx = (tick - STAGES.length) % FINAL_MSGS.length;
+  const stuck = elapsed > 75; // ~75s past expected — surface "longer than usual" hint
+  return (
+    <div className="flex mb-6 w-full max-w-3xl mx-auto px-4">
+      <div className="flex-1 min-w-0 text-[15px] text-gray-900">
+        <ul className="space-y-1.5">
+          {STAGES.map((label, idx) => {
+            const state =
+              allDone || idx < stage ? "done"
+                : idx === stage ? "active"
+                  : "pending";
+            return (
+              <li key={idx} className="flex items-center gap-2 text-[13px]">
+                {state === "done" && (
+                  <span className="inline-flex w-3.5 h-3.5 rounded-full bg-emerald-500 text-white text-[9px] font-bold items-center justify-center flex-shrink-0">✓</span>
+                )}
+                {state === "active" && (
+                  <span className="relative flex h-3.5 w-3.5 items-center justify-center flex-shrink-0">
+                    <span className="absolute inline-flex h-2 w-2 rounded-full bg-gray-400 opacity-75 animate-ping" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-gray-800" />
+                  </span>
+                )}
+                {state === "pending" && (
+                  <span className="inline-flex w-3.5 h-3.5 rounded-full border border-gray-300 flex-shrink-0" />
+                )}
+                <span className={state === "done" ? "text-gray-500 line-through decoration-gray-300" : state === "active" ? "text-gray-900 font-medium" : "text-gray-400"}>
+                  {label}{state === "active" ? "…" : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+        {allDone && (
+          <div className="flex items-center gap-2 mt-2 text-[13px] text-gray-700">
+            <span className="relative flex h-3.5 w-3.5 items-center justify-center flex-shrink-0">
+              <span className="absolute inline-flex h-2 w-2 rounded-full bg-gray-400 opacity-75 animate-ping" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-gray-800" />
+            </span>
+            <span key={finalIdx} className="font-medium" style={{ animation: "fadeIn 400ms ease" }}>
+              {FINAL_MSGS[finalIdx]}…
+            </span>
+          </div>
+        )}
+        <p className="text-[12px] text-gray-500 mt-3">
+          {stuck
+            ? `Taking a bit longer than usual (${elapsed}s) — still working. If nothing lands in another minute, refresh and try again.`
+            : `${elapsed}s elapsed. I'll drop the full report here when it's ready.`}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatWindow({
   messages,
   isLoading,
@@ -452,7 +542,39 @@ export default function ChatWindow({
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  // Track which assistant messages arrived in this session (vs being
+  // there at mount time). Only the freshly-arrived ones get the
+  // typewriter reveal.
+  //
+  // Seeding is LAZY — we wait for the first non-empty messages render
+  // before treating the list as 'history'. Otherwise: ChatWindow often
+  // mounts with messages=[] (loadChats hasn't returned yet), seeds the
+  // set as empty, then when the actual history populates a tick later,
+  // every old message looks 'fresh' and animates. That was the bug.
+  const seenAssistantKeys = useRef<Set<string>>(new Set());
+  const seededRef = useRef(false);
+  const freshKeysThisRender = new Set<string>();
+  const keyOf = (m: { content: string; timestamp?: string }) =>
+    `${m.content.length}::${m.content.slice(0, 80)}::${m.timestamp ?? ""}`;
+  if (!seededRef.current && messages.length > 0) {
+    // First time we see real content — treat the whole list as history.
+    messages.forEach((m) => {
+      if (m.role === "assistant") seenAssistantKeys.current.add(keyOf(m));
+    });
+    seededRef.current = true;
+  } else if (seededRef.current) {
+    // Subsequent renders: anything new is fresh.
+    messages.forEach((m) => {
+      if (m.role !== "assistant") return;
+      const k = keyOf(m);
+      if (!seenAssistantKeys.current.has(k)) {
+        freshKeysThisRender.add(k);
+        seenAssistantKeys.current.add(k);
+      }
+    });
+  }
   // Claude-style scroll anchoring: when a new user message is sent, we
   // scroll IT to the top of the viewport so the user immediately sees
   // their question + the assistant response forming underneath. Replaces
@@ -499,7 +621,12 @@ export default function ChatWindow({
     // stop auto-scrolling — the assistant text fills downward naturally
     // and the user reads top-to-bottom (or scrolls manually).
     if (userJustSent && lastUserMsgAnchorRef.current) {
-      lastUserMsgAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      // requestAnimationFrame gives the new message a render frame to
+      // commit its size before we scroll — otherwise the browser
+      // sometimes scrolls to a stale offset.
+      requestAnimationFrame(() => {
+        lastUserMsgAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
       return;
     }
     // For non-user-send updates (e.g. streaming chunk arriving), only
@@ -556,8 +683,19 @@ export default function ChatWindow({
         scoring lives in the Report tab — one source of truth. */}
     <div
       ref={scrollContainerRef}
-      onScroll={checkNearBottom}
-      className="flex-1 overflow-y-auto pt-8 pb-4 relative"
+      onScroll={(e) => {
+        checkNearBottom();
+        // Toggle .is-scrolling so the auto-hide scrollbar CSS turns the
+        // thumb visible. A 1.2s timer wipes the class once the user has
+        // gone idle — matches macOS / Claude behaviour.
+        const el = e.currentTarget;
+        el.classList.add("is-scrolling");
+        if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+        scrollIdleTimerRef.current = setTimeout(() => {
+          el.classList.remove("is-scrolling");
+        }, 1200);
+      }}
+      className="flex-1 overflow-y-auto pt-8 pb-4 relative auto-hide-scroll"
     >
       {messages.map((msg, i) => {
         // File upload chip — user side
@@ -688,28 +826,7 @@ export default function ChatWindow({
         // "resume review" before the background analysis lands. Replaced
         // in-place by the analysis-landed watcher when results arrive.
         if (msg.content === "__ANALYSIS_PROGRESS__") {
-          // Inline progress — same visual treatment as a regular assistant
-          // message (avatar + plain text). No coloured box; reads as part
-          // of the conversation, not a separate UI artifact.
-          return (
-            <div key={`analysis-progress-${i}`} className="flex mb-6 w-full max-w-3xl mx-auto px-4">
-              <div className="flex-1 min-w-0 text-[15px] text-gray-900 leading-6">
-                <div className="flex items-center gap-2 mb-1.5">
-                  <span className="relative flex h-1.5 w-1.5">
-                    <span className="absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75 animate-ping" />
-                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-gray-700" />
-                  </span>
-                  <span className="text-[13px] text-gray-700">Reading your resume…</span>
-                </div>
-                <ul className="text-[13px] text-gray-500 space-y-0.5 ml-3.5">
-                  <li>Comparing to target-role benchmarks</li>
-                  <li>Scoring across 5 dimensions</li>
-                  <li>Identifying biggest gains</li>
-                </ul>
-                <p className="text-[12px] text-gray-500 mt-2">About 30 seconds. I'll drop the full report here when it's ready.</p>
-              </div>
-            </div>
-          );
+          return <InlineAnalysisProgress key={`analysis-progress-${i}`} />;
         }
 
         if (msg.content === "__FIX_PROGRESS_CARD__") {
@@ -734,7 +851,7 @@ export default function ChatWindow({
           const labels = msg.content.slice(INLINE_CHIPS_PREFIX.length).split("|").map((s) => s.trim()).filter(Boolean);
           if (labels.length === 0) return null;
           return (
-            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-1 mb-6">
+            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-2 mb-6">
               <div className="flex flex-wrap gap-2">
                 {labels.map((label, j) => (
                   <button
@@ -743,7 +860,7 @@ export default function ChatWindow({
                       if (onChatEditPrompt) onChatEditPrompt(label);
                       else onStarterPromptClick?.(label);
                     }}
-                    className="text-[13px] font-medium text-gray-900 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full px-3.5 py-1.5 transition-all shadow-sm hover:shadow"
+                    className="text-[12px] font-medium text-gray-800 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full px-2.5 py-1 transition-all shadow-sm hover:shadow"
                   >
                     {label}
                   </button>
@@ -783,7 +900,11 @@ export default function ChatWindow({
             style={{ scrollMarginTop: "16px" }}
           >
             <Message
-              message={displayMsg}
+              message={(() => {
+                if (msg.role !== "assistant") return displayMsg;
+                const isFresh = freshKeysThisRender.has(keyOf(msg));
+                return { ...displayMsg, __isFresh: isFresh };
+              })()}
               onEdit={
                 onEditUserMessage && msg.role === "user" && !msg.content.startsWith("__FILE_UPLOAD__:")
                   ? (newContent) => onEditUserMessage(i, newContent)
@@ -834,6 +955,11 @@ export default function ChatWindow({
           </div>
         )
       )}
+      {/* Bottom spacer — gives the scroll container enough room to
+          actually push the user's just-sent message to the top of the
+          viewport. Without it, the browser can't scroll past the
+          natural content height and short replies stay mid-screen. */}
+      <div style={{ minHeight: "60vh" }} aria-hidden />
       <div ref={bottomRef} />
 
       {/* Scroll-to-bottom button */}

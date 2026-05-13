@@ -17,15 +17,20 @@ export type ManagerKey =
   | "interview"
   | "cover_letter"
   | "career_strategy"
+  | "learn"
   | "more_info_needed";
 
 export type SeniorityLevel = "entry" | "mid" | "senior" | "lead" | null;
-export type FocusKey = "resume" | "interview" | "tailor_jd" | "cover_letter" | "career_strategy" | null;
+export type FocusKey = "resume" | "interview" | "tailor_jd" | "cover_letter" | "career_strategy" | "learn" | null;
 
 export interface ExtractedSignals {
   role: string | null;
   seniority: SeniorityLevel;
   focus: FocusKey;
+  // Free-text 'what are you trying to do' captured conversationally —
+  // e.g. 'find a senior DE role', 'pivot from BI to DE', 'prep for
+  // Stripe interview'. Persists across turns once captured.
+  careerGoal: string | null;
 }
 
 export interface OrchestratorRoute {
@@ -36,10 +41,10 @@ export interface OrchestratorRoute {
 }
 
 const VALID_KEYS: ManagerKey[] = [
-  "resume", "interview", "cover_letter", "career_strategy", "more_info_needed",
+  "resume", "interview", "cover_letter", "career_strategy", "learn", "more_info_needed",
 ];
 const VALID_SENIORITY = ["entry", "mid", "senior", "lead"] as const;
-const VALID_FOCUS = ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy"] as const;
+const VALID_FOCUS = ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", "learn"] as const;
 
 export interface OrchestratorInput {
   messages: { role: "user" | "assistant"; content: string }[];
@@ -95,6 +100,7 @@ function buildSmartFallback(input: OrchestratorInput): OrchestratorRoute {
       role: input.priorSignals?.role ?? null,
       seniority: (input.priorSignals?.seniority ?? null) as SeniorityLevel,
       focus: (input.priorSignals?.focus ?? null) as FocusKey,
+      careerGoal: input.priorSignals?.careerGoal ?? null,
     },
   };
 }
@@ -197,6 +203,9 @@ export async function runStackleOrchestrator(input: OrchestratorInput): Promise<
       focus: (VALID_FOCUS as readonly string[]).includes(focusRaw)
         ? (focusRaw as FocusKey)
         : (priorSignals?.focus ?? null),
+      careerGoal: typeof sigParsed.careerGoal === "string" && sigParsed.careerGoal.trim().length > 0
+        ? sigParsed.careerGoal.trim()
+        : (priorSignals?.careerGoal ?? null),
     };
 
     return { managerKey, narration, chips, extractedSignals };
