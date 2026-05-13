@@ -10,6 +10,309 @@
 // imports the moment we cross ~30 written lessons.
 
 export const LESSONS: Record<string, string> = {
+  "de-fundamentals/why-de-matters": `
+# Why data engineering matters
+
+Almost every company today is sitting on more data than it knows what to do with. The leadership team wants dashboards. The product team wants experimentation. Marketing wants attribution. Finance wants forecasts. The ML team wants training data.
+
+Without data engineering, *none of that works*. With it, all of it does. The investment in pipelines and platforms is the difference between a company that runs on instinct and a company that runs on evidence.
+
+> [!KEY] The business case in one sentence
+> Data engineering is the layer that turns raw data exhaust into a strategic asset — and the layer that decides whether the rest of the data org is fast and trusted or slow and second-guessed.
+
+## The data problem every company faces
+
+Imagine a mid-stage SaaS company. They have:
+
+\`\`\`
+   Postgres        Stripe API       Mixpanel        Salesforce
+   (orders)        (payments)       (clicks)        (CRM)
+       │               │                │               │
+       └───────────────┼────────────────┼───────────────┘
+                       │                │
+                       ▼                ▼
+                 ???  somewhere  ???
+\`\`\`
+
+Each source holds part of the truth. None of them holds the whole truth. The CFO asks "what's monthly revenue by acquisition channel?" — and the answer is buried across all four systems with no automatic way to join them.
+
+Multiply this by 30 sources at a real company. **This is the problem data engineering exists to solve.**
+
+## What it unlocks (the five business dimensions)
+
+### 1. Reliable decision-making
+
+Executives stop running on gut. The board meeting deck is built from the same numbers the product team sees, which is the same number marketing sees. One source of truth — *because* a pipeline made it so.
+
+Without DE: every team has its own SQL, its own definition of "active user", its own slightly-wrong number. Arguments at meetings are about whose number is right, not about what to do.
+
+### 2. Speed at scale
+
+A new question comes up Monday morning ("did the iOS update hurt conversion?"). A good data layer answers it Monday afternoon. A bad data layer answers it Friday — or never, because by then someone has already made the call without the data.
+
+> [!CONTEXT] The latency multiplier
+> A 6-hour delay between "question asked" and "answer found" effectively means most questions never get asked. People learn the system is slow and stop using it. That's invisible but huge.
+
+### 3. Real-time operations
+
+Some products *require* real-time data to function:
+
+- Uber matching a driver to a rider in 200ms — needs current driver locations, traffic, surge pricing, ETAs.
+- A fraud system blocking a credit-card transaction — needs to score against the cardholder's last 30 days in under 100ms.
+- A recommendation feed refreshing as you scroll — needs your current session events flowing into the ranking model.
+
+Without a real-time data layer, those products simply don't exist.
+
+### 4. Data quality and trust
+
+This is the one most easily underestimated. When a CFO catches the dashboard miscounting "monthly recurring revenue" by 8% three weeks in a row, *they stop trusting the dashboard entirely*. From that point on, every number from the data team has an asterisk in their head.
+
+Data engineering puts quality checks into the pipeline — null guards, row-count assertions, distribution monitoring, schema validation. The dashboard never ships a number it can't defend.
+
+### 5. Cost efficiency
+
+Cloud warehouses make compute cheap and accessible — which means it's also easy to spend $200k/month on Snowflake because nobody noticed the same query was being run by 30 dashboards every 5 minutes.
+
+Good data engineering means cost is *engineered*, not accidental. Materialised views replace repeated scans. Clustering keys speed up filters. Partitioning shrinks query cost by 10x.
+
+\`\`\`
+                          Business value unlocked
+                         ┌─────────────────────────┐
+                         │ Reliable decisions      │
+                         │ Speed at scale          │
+   Raw data ──── DE ────▶│ Real-time operations    │
+                         │ Trustworthy metrics     │
+                         │ Cost-controlled         │
+                         └─────────────────────────┘
+\`\`\`
+
+## Why now?
+
+Three forces made data engineering a board-level concern in the last five years:
+
+**Data volume crossed a threshold.** A modern app generates more event data per *day* than a 2010 enterprise generated per *year*. Excel-and-CSV workflows don't scale to terabytes.
+
+**Cloud warehouses removed the cost ceiling.** Snowflake and BigQuery made it economically rational to land *all* your data centrally and ask questions later. Before that, you had to know your question in advance to justify the storage. Curiosity got cheap.
+
+**AI/ML moved from research to product.** Recommendation, fraud, churn prediction, lead scoring — all of these are *data products* before they're ML products. Without clean, modelled features delivered reliably, the model is useless.
+
+## The human cost of getting this wrong
+
+What does it look like when a company *doesn't* invest in data engineering?
+
+- **Analysts spend 70% of their time prepping data**, 30% analysing. Their actual training and instinct goes underused while they wrangle CSVs.
+- **Data scientists are bottlenecked** — they can't train a model on data that isn't there or isn't trustworthy.
+- **Executives lose trust** in metrics, fall back on intuition, and the data team becomes "the team that runs dashboards" instead of a strategic function.
+- **The cloud bill bloats** because nobody owns optimisation.
+- **Compliance gaps open up** — GDPR right-to-be-forgotten requests can't be honoured because nobody knows where a user's data lives.
+
+The role doesn't always get the spotlight. But when it's done well, *everything downstream gets faster, cheaper, and more trusted*. When it's done badly, the rest of the data org doesn't work.
+
+> [!TRY] Audit your own org
+> Pick the company you currently work at (or your last one). For each of the five business dimensions above — decisions, speed, real-time, trust, cost — ask: "Are we good, mediocre, or bad here?" The mediocre and bad answers are exactly where DE investment pays off the fastest.
+
+## The role of DEs in business growth
+
+When data engineering is healthy, the *whole org* moves faster:
+
+\`\`\`
+                          ┌─────────────┐
+                  ┌──────▶│  Analyst    │── faster reports
+                  │       └─────────────┘
+                  │       ┌─────────────┐
+   Data Engineer ─┼──────▶│  Data       │── shipping models
+                  │       │  Scientist  │
+                  │       └─────────────┘
+                  │       ┌─────────────┐
+                  └──────▶│  PM /       │── self-serve
+                          │  Exec       │   dashboards
+                          └─────────────┘
+\`\`\`
+
+One DE who builds the right foundations multiplies the output of five analysts, three data scientists, and a dozen PMs. That's why senior DE compensation has climbed sharply — the leverage is real and visible.
+
+> [!INTERVIEW] What hiring managers are listening for
+> When they ask "why are you interested in data engineering?", the worst answer is "I like data." Better: speak about the *leverage* — that you can build foundations the whole org runs on. Better still: cite a specific story from your past where bad data caused a bad decision and you saw the gap.
+
+[quiz]
+Q: Your CEO says "I don't see why we need to hire another data engineer — our dashboards already work fine." Which of these is the strongest case for the hire?
+A: Modern companies hire data engineers because it's an industry standard.
+B: The current dashboards are fine, but soon we'll need ML, so we'll need DE then.
+C: Our analysts spend 70% of their time wrangling data instead of analysing it; a DE removes that bottleneck and frees real headcount.
+D: Data engineers know advanced SQL that analysts don't.
+correct: C
+explain: Connect the hire to a concrete business cost the CEO already cares about — wasted analyst time. Frames DE as multiplier, not overhead. The other answers are weak (A is "everyone else does it", B postpones the decision, D undersells the role).
+[/quiz]
+
+## What comes next
+
+We've covered *why* DE matters in business terms. Next: the **specific problems** DE solves day to day — data quality, integration, latency, governance, cost. The concrete pain points hiring managers describe when they pitch the role to you.
+`,
+
+  "de-fundamentals/problems-de-solves": `
+# What problems does DE solve?
+
+The previous lesson made the business case. This one makes it concrete: the actual *problems* a data engineer is hired to make go away. If you've read job descriptions and wondered which words actually mean something — these are the eight you'll see repeatedly.
+
+> [!KEY] The pattern underneath
+> Every DE problem is one of two shapes: (a) data exists but you can't get to it cleanly, or (b) data exists but you can't trust it. Everything below is a flavour of one of those.
+
+## 1. Data quality and correctness
+
+The dashboard says monthly revenue is $4.2M. Finance says it's $3.8M. Who's right? Almost always: neither, exactly, and the gap is a data engineering bug.
+
+Common failure modes:
+
+- **Nulls treated as zero.** \`SUM(amount)\` quietly ignores nulls. \`AVG(amount)\` quietly skews. The downstream metric is off and nobody knows.
+- **Timezone drift.** Events logged in UTC, joined to a calendar that's PT. Yesterday's data starts at 5pm.
+- **Late-arriving events.** A mobile event from 30 minutes ago arrives 6 hours later because the device was offline. It lands in *today's* partition, not yesterday's.
+- **Schema changes.** An upstream API renames \`user_id\` → \`uid\`. The pipeline keeps running. Joins start failing silently.
+
+The DE fix: tests in the pipeline. \`expect not null\`. \`expect uniqueness\`. \`expect row count > yesterday * 0.95\`. The pipeline fails loudly when something breaks, *before* the dashboard ships the bad number.
+
+> [!WARN] The silent-failure trap
+> The worst data bugs don't crash the pipeline — they produce a *plausible but wrong* number. Loud failures are easy. Silent ones poison trust for months.
+
+## 2. Integration across disparate sources
+
+A real mid-size company has data in:
+
+\`\`\`
+  Salesforce (CRM)     Stripe (payments)    Mixpanel (analytics)
+        │                    │                     │
+        └──┬─────────────────┼─────────────────────┘
+           │                 │
+   Zendesk (support)   PostgreSQL (app DB)
+\`\`\`
+
+The CFO wants a "monthly revenue by customer segment" report. Customer segment lives in Salesforce. Revenue lives in Stripe. They have to be joined. Doing this in a one-off CSV merge is fine *once* — but quarterly close needs it repeatable, and ad-hoc curiosity needs it on-demand.
+
+DE builds the integration layer: each source replicated into a central warehouse, joined to a common customer key, modelled into a single \`fct_revenue\` table. After that, *every* future question that touches both Stripe and Salesforce is one SQL query away.
+
+## 3. Volume and velocity
+
+A consumer app sends 10 terabytes a day. A trading platform processes a million events per second. Your laptop can't even \`SELECT\` that much, let alone aggregate it.
+
+DE solves this with **distributed compute** (Spark, BigQuery, Snowflake) and **streaming engines** (Kafka, Flink). The DE doesn't necessarily write the engine — they pick which engine for which problem and tune it.
+
+Example trade-off:
+
+| Approach | Good for | Bad at |
+|---|---|---|
+| Snowflake batch | Analytical queries, ad-hoc SQL | Sub-minute freshness |
+| Spark on S3 | Large daily transforms, ML training | Real-time |
+| Kafka + Flink | Sub-second events | Complex joins, batch reprocessing |
+| ClickHouse | Real-time analytics dashboards | Heavy joins |
+
+## 4. Latency and real-time
+
+A product manager wants to see "did the feature flag we flipped at 2pm change conversion?" — at 3pm. If the data layer refreshes every 24 hours, the answer is tomorrow. By tomorrow the PM has rolled back or moved on.
+
+\`\`\`
+Question asked ──────────────────────▶ Answer arrives
+  2:30 pm                                 (when?)
+
+  Batch nightly:        24 h  →  *useless*
+  Hourly micro-batch:    1 h  →  marginal
+  Continuous (CDC):      5 min →  useful
+  Streaming:             <1s   →  product-grade
+\`\`\`
+
+Each tier costs roughly 3-5x more than the one above it. DE's job is to pick the *cheapest* tier that actually meets the use case — not to default to streaming because it sounds cool.
+
+## 5. Governance and compliance
+
+GDPR Article 17: a European user has the right to be forgotten. They submit a request. The company has 30 days to delete every trace of them.
+
+Where does that user's data live?
+
+- Postgres production DB
+- The 6 months of warehouse snapshots
+- The Looker dashboards' cached query results
+- The ML team's training datasets
+- The S3 archive of yesterday's events
+- The backup of the warehouse, somewhere
+
+Without DE: nobody knows the full list. The company gets fined.
+
+With DE: there's a **data catalog** that knows where every PII column lives. Deletion is a parameterised pipeline. Compliance is engineered, not heroic.
+
+## 6. Cost efficiency
+
+A common pattern:
+
+- Day 1: Snowflake bill is $1,000/month. Fine.
+- Day 90: $20,000/month. Manageable.
+- Day 365: $200,000/month. Panic.
+
+Where did the money go? Three usual suspects:
+
+1. **Dashboards that re-run the same massive query every 5 minutes** because someone set the refresh interval and forgot.
+2. **Models that scan a full year's data** when they only needed the last 30 days (no partition filter).
+3. **The same data joined 12 different ways in 12 different dashboards** instead of once into a shared marts table.
+
+DE owns cost optimisation. Materialised intermediate tables, partitioning, clustering keys, query-result caching — all of it. Annual savings frequently outpace the DE's salary 5-10x.
+
+> [!CONTEXT] Why DE owns cost (and not finance)
+> Finance can see the bill, but only DE can see *why* the bill is high. The expensive queries are usually invisible at the finance level — they're 30 queries that each cost $5 each, run 1000 times a day, by someone who didn't know.
+
+## 7. Reproducibility and debugging
+
+The analyst posts on Slack: "the conversion rate for the iOS cohort dropped 12% last week." Two days later you investigate and… can't reproduce. The number is now down 3%, not 12%. What changed?
+
+If the warehouse can't tell you the *state of the data as of last Tuesday*, you can't debug last Tuesday's bug. DE builds the reproducibility layer:
+
+- Time-travel queries (\`AS OF\` in Snowflake, BigQuery snapshots)
+- Versioned dbt models (rebuild any historical state)
+- Immutable raw landing zones (the raw is never updated, only appended)
+
+This isn't bureaucracy — it's the difference between "we'll never know" and "let's check yesterday's exact data."
+
+## 8. Self-service and scaling
+
+When the data team is 3 people, every request goes through them. That works.
+
+When the company is 200 people, dozens of teams want data simultaneously. The data team becomes a ticket queue. People work around it by exporting CSVs and running their own analyses — and within a year there are 50 different definitions of "monthly active user."
+
+\`\`\`
+Without DE platform           With DE platform
+─────────────────────         ────────────────────
+  PM → ticket queue            PM → self-serve
+  Marketing → ticket           Marketing → self-serve
+  Sales → ticket               Sales → self-serve
+       │                              │
+       ▼                              ▼
+   2 DEs drowning              DEs build platform
+   in requests                  + curated marts
+\`\`\`
+
+DE's late-stage job is to build a **platform** that lets others self-serve safely — with shared definitions, curated marts, and access controls — instead of being the bottleneck themselves.
+
+## The common thread
+
+Eight problems, one pattern: **DE turns chaos into a reliable substrate.** Whatever the company does on top — analytics, ML, real-time products, compliance — sits on the foundation a DE builds.
+
+> [!TRY] Match the JD to the problem
+> Pull up any data-engineering job posting on LinkedIn. Read the "responsibilities" section. Bet you'll find 4-6 of the 8 problems above listed almost verbatim — "build reliable pipelines" (quality), "integrate disparate sources" (integration), "optimise warehouse cost" (cost), and so on. The framing is universal.
+
+> [!INTERVIEW] How this comes up
+> Interviewers love asking "what's the hardest data-engineering problem you've solved?" The strong answer connects the *specific bug* to one of these eight buckets. Bad answer: "I built a pipeline." Good answer: "I solved a data-quality problem where late-arriving events were skewing our daily revenue numbers; I fixed it with a watermark + reprocess job."
+
+[quiz]
+Q: A PM complains that the company's "monthly active users" number is different in three different dashboards. Which DE problem category does this best fit?
+A: Cost efficiency
+B: Data quality
+C: Self-service and scaling (different teams defined the metric differently)
+D: Latency
+correct: C
+explain: This is the classic 'no shared definition' symptom — each team built their own MAU query because there was no curated marts table for them to share. The fix is a platform-level fix: one definitive \`mart_user_activity\` table that every dashboard reads from. Data-quality (B) is close, but the *root cause* is missing platform infrastructure, not a buggy pipeline.
+[/quiz]
+
+## What comes next
+
+You now know *why* DE matters and *what* it solves. The next two lessons trace the day-to-day: where DE sits relative to analysts and scientists, and what a Tuesday actually looks like.
+`,
+
   "de-fundamentals/de-vs-analyst-vs-scientist": `
 # DE vs Analyst vs Scientist
 

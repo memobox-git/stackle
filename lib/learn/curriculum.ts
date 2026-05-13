@@ -35,7 +35,9 @@ export const CURRICULUM: { track: string; modules: Module[] }[] = [
         title: "What is Data Engineering?",
         blurb: "Get oriented. Where DE sits, what DEs actually do, and how the role differs from analytics and ML.",
         lessons: [
-          { slug: "what-is-data-engineering",    title: "What is Data Engineering?",                  minutes: 5, free: true, status: "ready" },
+          { slug: "what-is-data-engineering",    title: "What is Data Engineering?",                  minutes: 9, free: true, status: "ready" },
+          { slug: "why-de-matters",              title: "Why data engineering matters",               minutes: 7, free: true, status: "ready" },
+          { slug: "problems-de-solves",          title: "What problems does DE solve?",               minutes: 8, free: true, status: "ready" },
           { slug: "de-vs-analyst-vs-scientist",  title: "DE vs Analyst vs Scientist",                 minutes: 4, free: true, status: "ready" },
           { slug: "a-day-in-the-life",           title: "A day in the life of a DE",                  minutes: 5, free: true, status: "ready" },
           { slug: "the-modern-data-stack",       title: "The modern data stack — the 60-second tour", minutes: 6, free: true, status: "ready" },
