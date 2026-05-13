@@ -103,6 +103,11 @@ export default function Page() {
   const [authSent, setAuthSent] = useState(false);
   const [authError, setAuthError] = useState("");
   const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  // True while we're still figuring out whether this is a returning
+  // user (loadChats + Drive check in flight). Prevents the upload
+  // screen from briefly flashing for users who'll be rehydrated from
+  // Drive a second later.
+  const [bootChecking, setBootChecking] = useState(true);
 
   // ── Career goal (from onboarding step 3) ──────────────
   // Hoisted to component scope so synthesis prompt + Career Profile
@@ -361,12 +366,15 @@ export default function Page() {
   // We wait until authLoading is false so we know whether we're auth'd.
   useEffect(() => {
     if (authLoading) return;
+    setBootChecking(true);
+    console.log("[boot] starting check", { authed: !!user, userId: user?.id });
     loadChats()
       .then(async (chats) => {
-        console.log("[loadChats]", {
+        console.log("[boot] loadChats →", {
           count: chats.length,
           firstChatMessages: chats[0]?.messages?.length ?? 0,
           firstChatMode: chats[0]?.mode,
+          firstChatHasExtraction: !!chats[0]?.resume_extraction,
         });
         if (chats.length === 0) {
           // No chat rows. For an AUTH'D user this can still be a
@@ -376,15 +384,28 @@ export default function Page() {
           if (user) {
             try {
               const driveFiles = await loadAllDriveFiles();
+              console.log("[boot] Drive scan →", {
+                totalFiles: driveFiles.length,
+                originals: driveFiles.filter((f) => f.file_type === "original").length,
+                typesPresent: [...new Set(driveFiles.map((f) => f.file_type))],
+              });
               const original = driveFiles.find((f) => f.file_type === "original");
               if (original) {
-                console.log("[loadChats] no chats but Drive original found — skipping onboarding, rehydrating from Drive");
+                console.log("[boot] ✓ Drive original found — skipping onboarding", {
+                  id: original.id,
+                  displayName: original.display_name,
+                  hasExtraction: !!original.extraction_json,
+                  hasAnalysis: !!original.analysis_json,
+                });
                 const ext = original.extraction_json;
                 if (ext) {
                   setResumeExtraction(ext);
                   setResumeText("");
                   setResumeFilename(original.display_name ?? "resume.pdf");
+                  if (original.analysis_json) setResumeAnalysis(original.analysis_json);
                   setOnboardingCompleted(true);
+                } else {
+                  console.warn("[boot] Drive original has no extraction_json — staying on upload");
                 }
                 // Seed a fresh chat tied to this restored resume so
                 // future messages have somewhere to persist to.
@@ -392,14 +413,16 @@ export default function Page() {
                   resumeText: "",
                   resumeFilename: original.display_name ?? null,
                   resumeExtraction: ext,
-                  resumeAnalysis: null,
+                  resumeAnalysis: original.analysis_json,
                 });
                 setChatList([newChat]);
                 setActiveChatId(newChat.id);
                 return;
+              } else {
+                console.log("[boot] no Drive original — treating as new user");
               }
             } catch (err) {
-              console.warn("[loadChats] Drive check failed:", err);
+              console.warn("[boot] Drive check failed:", err);
             }
           }
           // Genuine empty state: new user or unauth without localStorage.
@@ -447,7 +470,13 @@ export default function Page() {
           }
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        console.warn("[boot] loadChats failed:", err);
+      })
+      .finally(() => {
+        setBootChecking(false);
+        console.log("[boot] check complete");
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]);
 
@@ -2230,6 +2259,21 @@ export default function Page() {
   }
 
   // ── Onboarding ────────────────────────────────────────
+  // Boot guard: while we're still checking whether the user has a
+  // saved resume in Drive (returning user), show a minimal loading
+  // state instead of flashing OnboardingFlow. Without this, returning
+  // users see "Upload your resume" for a beat before being rehydrated
+  // — looks like the sign-in failed.
+  if (bootChecking && user && !onboardingCompleted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafaf7]">
+        <div className="flex items-center gap-2.5 text-gray-500">
+          <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-700 animate-spin" />
+          <span className="text-sm">Loading your session…</span>
+        </div>
+      </div>
+    );
+  }
   if (!onboardingCompleted) {
     return (
       <>
