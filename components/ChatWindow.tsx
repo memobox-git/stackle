@@ -542,7 +542,24 @@ export default function ChatWindow({
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isNearBottom, setIsNearBottom] = useState(true);
+  // Track which assistant messages arrived in this session (vs being
+  // there at mount time). Only the freshly-arrived ones get the
+  // typewriter reveal. Keyed by content+ts to survive list rebuilds.
+  const seenAssistantKeys = useRef<Set<string>>(new Set());
+  const seedAssistantKeysOnceRef = useRef(false);
+  if (!seedAssistantKeysOnceRef.current) {
+    // Seed with everything currently in the list BEFORE any render —
+    // these are "already there", not fresh. Subsequent appends won't
+    // be in the set → flagged fresh → typewriter fires.
+    messages.forEach((m) => {
+      if (m.role === "assistant") {
+        seenAssistantKeys.current.add(`${m.content.length}::${m.content.slice(0, 80)}::${m.timestamp ?? ""}`);
+      }
+    });
+    seedAssistantKeysOnceRef.current = true;
+  }
   // Claude-style scroll anchoring: when a new user message is sent, we
   // scroll IT to the top of the viewport so the user immediately sees
   // their question + the assistant response forming underneath. Replaces
@@ -589,7 +606,12 @@ export default function ChatWindow({
     // stop auto-scrolling — the assistant text fills downward naturally
     // and the user reads top-to-bottom (or scrolls manually).
     if (userJustSent && lastUserMsgAnchorRef.current) {
-      lastUserMsgAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      // requestAnimationFrame gives the new message a render frame to
+      // commit its size before we scroll — otherwise the browser
+      // sometimes scrolls to a stale offset.
+      requestAnimationFrame(() => {
+        lastUserMsgAnchorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
       return;
     }
     // For non-user-send updates (e.g. streaming chunk arriving), only
@@ -646,8 +668,19 @@ export default function ChatWindow({
         scoring lives in the Report tab — one source of truth. */}
     <div
       ref={scrollContainerRef}
-      onScroll={checkNearBottom}
-      className="flex-1 overflow-y-auto pt-8 pb-4 relative"
+      onScroll={(e) => {
+        checkNearBottom();
+        // Toggle .is-scrolling so the auto-hide scrollbar CSS turns the
+        // thumb visible. A 1.2s timer wipes the class once the user has
+        // gone idle — matches macOS / Claude behaviour.
+        const el = e.currentTarget;
+        el.classList.add("is-scrolling");
+        if (scrollIdleTimerRef.current) clearTimeout(scrollIdleTimerRef.current);
+        scrollIdleTimerRef.current = setTimeout(() => {
+          el.classList.remove("is-scrolling");
+        }, 1200);
+      }}
+      className="flex-1 overflow-y-auto pt-8 pb-4 relative auto-hide-scroll"
     >
       {messages.map((msg, i) => {
         // File upload chip — user side
@@ -852,7 +885,13 @@ export default function ChatWindow({
             style={{ scrollMarginTop: "16px" }}
           >
             <Message
-              message={displayMsg}
+              message={(() => {
+                if (msg.role !== "assistant") return displayMsg;
+                const key = `${msg.content.length}::${msg.content.slice(0, 80)}::${msg.timestamp ?? ""}`;
+                const isFresh = !seenAssistantKeys.current.has(key);
+                if (isFresh) seenAssistantKeys.current.add(key);
+                return { ...displayMsg, __isFresh: isFresh };
+              })()}
               onEdit={
                 onEditUserMessage && msg.role === "user" && !msg.content.startsWith("__FILE_UPLOAD__:")
                   ? (newContent) => onEditUserMessage(i, newContent)
@@ -903,6 +942,11 @@ export default function ChatWindow({
           </div>
         )
       )}
+      {/* Bottom spacer — gives the scroll container enough room to
+          actually push the user's just-sent message to the top of the
+          viewport. Without it, the browser can't scroll past the
+          natural content height and short replies stay mid-screen. */}
+      <div style={{ minHeight: "60vh" }} aria-hidden />
       <div ref={bottomRef} />
 
       {/* Scroll-to-bottom button */}

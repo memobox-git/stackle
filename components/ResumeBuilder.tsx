@@ -2999,10 +2999,19 @@ export default function ResumeBuilder({
               document.body.style.userSelect = "none";
             }}
             onDoubleClick={() => setChatPanelPct(25)}
-            className="hidden md:flex flex-shrink-0 w-1.5 cursor-col-resize group items-center justify-center hover:bg-gray-100 transition-colors"
+            className="hidden md:block flex-shrink-0 w-px cursor-col-resize relative group"
             title="Drag to resize · double-click to reset"
+            style={{ background: "rgb(229, 231, 235)" /* gray-200 — single visible line */ }}
           >
-            <span className="block w-px h-full bg-gray-200 group-hover:bg-gray-300 transition-colors" />
+            {/* Wide invisible hit zone — 9px around the visible line so
+                it's easy to grab without the divider itself being thick. */}
+            <span className="absolute inset-y-0 -left-1 -right-1" />
+            {/* Hover handle — small grip pill, only visible when the
+                cursor is near the divider. Matches the Claude split. */}
+            <span
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[3px] h-8 rounded-full bg-gray-300 opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+              aria-hidden
+            />
           </div>
         )}
         {workspacePanel}

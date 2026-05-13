@@ -20,6 +20,9 @@ export interface ChatMessage {
   role: MessageRole;
   content: string;
   timestamp?: string; // "HH:MM am/pm" — optional, shown on hover
+  // Set transiently by ChatWindow when this message just arrived in
+  // the current session. Drives the typewriter reveal. Never persisted.
+  __isFresh?: boolean;
 }
 
 interface MessageProps {
@@ -369,35 +372,32 @@ export default function Message({ message, onEdit }: MessageProps) {
     );
   }
 
-  // Assistant body with optional typewriter reveal. Sentinels (any
-  // content starting with "__") render instantly — those are state
-  // tokens, not prose. Once a message has finished typing it lands in
-  // the TYPED_REGISTRY so subsequent re-renders (e.g. on chat-list
-  // rebuild or window resize) render the full content instantly.
+  // Assistant body. Only NEWLY-arrived messages animate. The
+  // `isFresh` flag is computed by the parent (ChatWindow) — it knows
+  // which message just appeared. Sentinels never animate.
   const isSentinel = message.content.startsWith("__");
-  return <AssistantBody message={message} ts={ts} isSentinel={isSentinel} />;
+  return <AssistantBody message={message} ts={ts} isSentinel={isSentinel} isFresh={!!message.__isFresh} />;
 }
 
-function AssistantBody({ message, ts, isSentinel }: { message: ChatMessage; ts?: string; isSentinel: boolean }) {
+function AssistantBody({ message, ts, isSentinel, isFresh }: { message: ChatMessage; ts?: string; isSentinel: boolean; isFresh: boolean }) {
   const key = messageKey(message.role, message.content, ts);
-  // If we've animated this message before in this page session, render
-  // immediately. Otherwise animate once, then register.
+  // Animate only when the parent flagged this as a freshly-arrived
+  // message AND we haven't already typed it. Old history renders
+  // instantly even on first mount (page reload, chat switch, etc).
   const alreadyTyped = TYPED_REGISTRY.has(key);
-  const { displayed, done } = useTypewriter(
-    alreadyTyped || isSentinel ? "" : message.content,
-    14, // a touch faster than the onboarding typer; still readable
-  );
+  const shouldAnimate = isFresh && !alreadyTyped && !isSentinel;
+  const { displayed, done } = useTypewriter(shouldAnimate ? message.content : "", 14);
   useEffect(() => {
-    if (done && !alreadyTyped && !isSentinel) TYPED_REGISTRY.add(key);
-  }, [done, alreadyTyped, isSentinel, key]);
+    if (done && shouldAnimate) TYPED_REGISTRY.add(key);
+  }, [done, shouldAnimate, key]);
 
-  const visible = alreadyTyped || isSentinel ? message.content : displayed;
+  const visible = shouldAnimate ? displayed : message.content;
 
   return (
     <div className="group flex mb-5 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
         {renderContent(visible)}
-        {!alreadyTyped && !isSentinel && !done && (
+        {shouldAnimate && !done && (
           <span className="inline-block w-[2px] h-4 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />
         )}
         {ts && (
