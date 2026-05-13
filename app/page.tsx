@@ -275,6 +275,19 @@ export default function Page() {
   const [interviewPrepPlan, setInterviewPrepPlan] = useState<InterviewPrepPlan | null>(null);
   const resumePreview = null;
   const homeFileInputRef = useRef<HTMLInputElement>(null);
+  // Always-mounted hidden file input for the in-chat "Upload a new one"
+  // chip from the resume-review chooser. The homeFileInputRef above is
+  // only rendered when the Home view is active, so a separate input is
+  // needed for chat-driven uploads.
+  const chatUploadInputRef = useRef<HTMLInputElement>(null);
+  // True after the user clicked "Review my resume" — the next chip click
+  // is interpreted as their choice of source. Cleared when they pick or
+  // cancel.
+  const [pendingResumeReviewSource, setPendingResumeReviewSource] = useState(false);
+  // Snapshot of Drive files at the moment the user opened "Pick from
+  // Drive" so the chip labels and the click handler agree on the same
+  // list (avoids a race if Drive refreshes mid-pick).
+  const driveResumesForPickerRef = useRef<DriveFile[]>([]);
 
   // ── Derived ───────────────────────────────────────────
   const isSignedUp = user !== null;
@@ -1191,6 +1204,63 @@ export default function Page() {
         }
         resetAllState();
       }
+    }
+  }
+
+  // ── Resume-review source chooser ──────────────────────
+  // When the user asks to review their resume, give them an explicit
+  // choice of which resume to act on: the currently loaded one, a
+  // fresh upload, or one of their saved Drive resumes. Prevents the
+  // "wrong file got reviewed" failure mode entirely.
+  async function promptResumeSourceChoice() {
+    // No resume loaded at all → no choice to make, just open uploader.
+    if (!resumeExtraction) {
+      chatUploadInputRef.current?.click();
+      return;
+    }
+    const currentName = resumeFilename || "current resume";
+    const labels = [
+      `Use current — ${currentName}`,
+      "Upload a new one",
+      "Pick from Drive",
+    ];
+    setChatMessages((prev) => [
+      ...prev,
+      { role: "assistant", content: "Got it. Which resume should I review?", timestamp: now() },
+      { role: "assistant", content: `__INLINE_CHIPS__:${labels.join("|")}` },
+    ]);
+    setPendingResumeReviewSource(true);
+  }
+
+  async function expandDrivePicker() {
+    try {
+      const files = await loadAllDriveFiles();
+      const resumes = files.filter(
+        (f) => f.file_type === "original" || f.file_type === "version",
+      );
+      driveResumesForPickerRef.current = resumes;
+      if (resumes.length === 0) {
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "No other resumes saved in Drive yet. Want to upload a new one instead?", timestamp: now() },
+          { role: "assistant", content: "__INLINE_CHIPS__:Upload a new one|Cancel resume pick" },
+        ]);
+        return;
+      }
+      const driveLabels = resumes.map((r) => `Use saved · ${r.display_name}`);
+      driveLabels.push("Cancel resume pick");
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Which one?", timestamp: now() },
+        { role: "assistant", content: `__INLINE_CHIPS__:${driveLabels.join("|")}` },
+      ]);
+    } catch (err) {
+      console.warn("[drive-picker] failed:", err);
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: "Couldn't load your Drive right now. Try uploading instead?", timestamp: now() },
+        { role: "assistant", content: "__INLINE_CHIPS__:Upload a new one|Cancel resume pick" },
+      ]);
     }
   }
 
@@ -2345,6 +2415,34 @@ export default function Page() {
   // ── Main app ──────────────────────────────────────────
   return (
     <div className="flex h-screen bg-[#fafaf7] text-gray-900 overflow-hidden">
+      {/* Always-mounted hidden file input for the in-chat "Upload a
+          new one" flow (resume-review source chooser). Independent of
+          the Home-view homeFileInputRef which only exists while that
+          view is mounted. */}
+      <input
+        ref={chatUploadInputRef}
+        type="file"
+        accept={ACCEPTED_EXTENSIONS}
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          setResumeFileUrl(URL.createObjectURL(file));
+          parseFile(file)
+            .then((result) => {
+              if (result.html) setResumeDocHtml(result.html);
+              handleResumeUpload(result.text, file.name);
+              // After upload completes, hand off to the review flow.
+              setChatMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: `Got it — using **${file.name}**. Running the review now.`, timestamp: now() },
+              ]);
+              sendMessage("Proceed with the resume review.");
+            })
+            .catch(() => {});
+          e.target.value = "";
+        }}
+      />
       {/* Desktop sidebar */}
       <aside
         className="flex-shrink-0 bg-gray-50 flex-col hidden md:flex transition-all duration-200 relative overflow-visible"
@@ -2472,14 +2570,17 @@ export default function Page() {
                       surface to open based on context. */}
                   <div className="flex flex-wrap gap-2 mt-4 justify-center">
                     {[
-                      { label: "Review my resume", icon: FileText,       prompt: "Can you review my resume?" },
-                      { label: "Tailor for a JD",  icon: Target,         prompt: "I want to tailor my resume for a specific job description." },
-                      { label: "Interview prep",   icon: MessagesSquare, prompt: "I'd like to prep for an interview." },
-                      { label: "Foundations",      icon: BookOpen,       prompt: "I want to learn data-engineering fundamentals." },
-                    ].map(({ label, icon: Icon, prompt }) => (
+                      // Review my resume short-circuits to the source
+                      // chooser instead of going straight to orchestrator,
+                      // so the user explicitly confirms which file to review.
+                      { label: "Review my resume", icon: FileText,       action: () => promptResumeSourceChoice() },
+                      { label: "Tailor for a JD",  icon: Target,         action: () => sendMessage("I want to tailor my resume for a specific job description.") },
+                      { label: "Interview prep",   icon: MessagesSquare, action: () => sendMessage("I'd like to prep for an interview.") },
+                      { label: "Foundations",      icon: BookOpen,       action: () => sendMessage("I want to learn data-engineering fundamentals.") },
+                    ].map(({ label, icon: Icon, action }) => (
                       <button
                         key={label}
-                        onClick={() => sendMessage(prompt)}
+                        onClick={action}
                         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1.5 transition-all shadow-sm hover:shadow"
                       >
                         <Icon className="w-3.5 h-3.5 text-gray-500" strokeWidth={1.75} />
@@ -2511,12 +2612,64 @@ export default function Page() {
                   }}
                   onEditUserMessage={handleEditUserMessage}
                   onChatEditPrompt={(prompt) => {
-                    // All chip clicks route through chat → orchestrator.
-                    // The orchestrator reads context, narrates, and emits
-                    // a managerKey that triggers the view switch when
-                    // appropriate (handled in the sendMessage pipeline).
-                    // No pre-baked shortcuts — keeps the routing brain
-                    // in one place.
+                    const t = prompt.trim().toLowerCase();
+
+                    // Resume-review entry points — intercept BEFORE the
+                    // orchestrator so the user explicitly confirms which
+                    // resume to act on.
+                    if (
+                      t === "review my resume" ||
+                      t === "can you review my resume?" ||
+                      t === "resume review" ||
+                      t === "fix my resume"
+                    ) {
+                      promptResumeSourceChoice();
+                      return;
+                    }
+
+                    // Chooser responses
+                    if (t.startsWith("use current")) {
+                      setPendingResumeReviewSource(false);
+                      sendMessage("Proceed with the current resume review.");
+                      return;
+                    }
+                    if (t === "upload a new one") {
+                      setPendingResumeReviewSource(false);
+                      chatUploadInputRef.current?.click();
+                      return;
+                    }
+                    if (t === "pick from drive") {
+                      expandDrivePicker();
+                      return;
+                    }
+                    if (t.startsWith("use saved · ")) {
+                      const displayName = prompt.slice("Use saved · ".length).trim();
+                      const file = driveResumesForPickerRef.current.find(
+                        (f) => f.display_name === displayName,
+                      );
+                      if (file?.extraction_json) {
+                        setResumeExtraction(file.extraction_json);
+                        setResumeFilename(file.display_name);
+                        if (file.analysis_json) setResumeAnalysis(file.analysis_json);
+                        setPendingResumeReviewSource(false);
+                        setChatMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: `Loaded **${file.display_name}**. Running the review now.`, timestamp: now() },
+                        ]);
+                        sendMessage("Proceed with the resume review.");
+                      }
+                      return;
+                    }
+                    if (t === "cancel resume pick") {
+                      setPendingResumeReviewSource(false);
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "No worries — what would you like to do instead?", timestamp: now() },
+                      ]);
+                      return;
+                    }
+
+                    // All other chips → orchestrator decides.
                     sendMessage(prompt);
                   }}
                 />
