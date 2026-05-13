@@ -10,6 +10,7 @@ import HomeInput from "@/components/HomeInput";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import InterviewView from "@/components/interview/InterviewView";
 import LearnView from "@/components/LearnView";
+import MarketingLanding from "@/components/marketing/LandingPage";
 import { pickHeroGreeting } from "@/lib/heroGreetings";
 import { ChatMessage } from "@/components/Message";
 import {
@@ -42,7 +43,6 @@ import { IntakeData } from "@/components/IntakeForm";
 import type { User } from "@supabase/supabase-js";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import AuthModal from "@/components/AuthModal";
-import LandingPage from "@/components/LandingPage";
 
 type ActiveView = "chat" | "resume-builder" | "drive" | "interview" | "learn";
 
@@ -2358,6 +2358,22 @@ export default function Page() {
         </div>
       </div>
     );
+  }
+
+  // ── Unauth landing ────────────────────────────────────
+  // Auth-init runs on mount. While it's resolving, render a tiny
+  // spinner so we don't flash the marketing page for already-authed
+  // users. Once resolved, branch: unauth → marketing landing, authed
+  // → app shell.
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafaf7]">
+        <div className="w-5 h-5 rounded-full border-2 border-gray-300 border-t-gray-800 animate-spin" />
+      </div>
+    );
+  }
+  if (!user) {
+    return <MarketingLanding />;
   }
 
   // ── Onboarding ────────────────────────────────────────
