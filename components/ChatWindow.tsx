@@ -546,19 +546,34 @@ export default function ChatWindow({
   const [isNearBottom, setIsNearBottom] = useState(true);
   // Track which assistant messages arrived in this session (vs being
   // there at mount time). Only the freshly-arrived ones get the
-  // typewriter reveal. Keyed by content+ts to survive list rebuilds.
+  // typewriter reveal.
+  //
+  // Seeding is LAZY — we wait for the first non-empty messages render
+  // before treating the list as 'history'. Otherwise: ChatWindow often
+  // mounts with messages=[] (loadChats hasn't returned yet), seeds the
+  // set as empty, then when the actual history populates a tick later,
+  // every old message looks 'fresh' and animates. That was the bug.
   const seenAssistantKeys = useRef<Set<string>>(new Set());
-  const seedAssistantKeysOnceRef = useRef(false);
-  if (!seedAssistantKeysOnceRef.current) {
-    // Seed with everything currently in the list BEFORE any render —
-    // these are "already there", not fresh. Subsequent appends won't
-    // be in the set → flagged fresh → typewriter fires.
+  const seededRef = useRef(false);
+  const freshKeysThisRender = new Set<string>();
+  const keyOf = (m: { content: string; timestamp?: string }) =>
+    `${m.content.length}::${m.content.slice(0, 80)}::${m.timestamp ?? ""}`;
+  if (!seededRef.current && messages.length > 0) {
+    // First time we see real content — treat the whole list as history.
     messages.forEach((m) => {
-      if (m.role === "assistant") {
-        seenAssistantKeys.current.add(`${m.content.length}::${m.content.slice(0, 80)}::${m.timestamp ?? ""}`);
+      if (m.role === "assistant") seenAssistantKeys.current.add(keyOf(m));
+    });
+    seededRef.current = true;
+  } else if (seededRef.current) {
+    // Subsequent renders: anything new is fresh.
+    messages.forEach((m) => {
+      if (m.role !== "assistant") return;
+      const k = keyOf(m);
+      if (!seenAssistantKeys.current.has(k)) {
+        freshKeysThisRender.add(k);
+        seenAssistantKeys.current.add(k);
       }
     });
-    seedAssistantKeysOnceRef.current = true;
   }
   // Claude-style scroll anchoring: when a new user message is sent, we
   // scroll IT to the top of the viewport so the user immediately sees
@@ -887,9 +902,7 @@ export default function ChatWindow({
             <Message
               message={(() => {
                 if (msg.role !== "assistant") return displayMsg;
-                const key = `${msg.content.length}::${msg.content.slice(0, 80)}::${msg.timestamp ?? ""}`;
-                const isFresh = !seenAssistantKeys.current.has(key);
-                if (isFresh) seenAssistantKeys.current.add(key);
+                const isFresh = freshKeysThisRender.has(keyOf(msg));
                 return { ...displayMsg, __isFresh: isFresh };
               })()}
               onEdit={

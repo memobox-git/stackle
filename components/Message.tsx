@@ -74,7 +74,13 @@ function inlineFormat(text: string): React.ReactNode {
 }
 
 function renderContent(content: string) {
-  const lines = content.split("\n");
+  // Defensive scrub: the orchestrator's narration occasionally leaks a
+  // literal "__INLINE_CHIPS__:..." line inside the prose instead of
+  // emitting it as its own sentinel message. Strip those lines so they
+  // never reach the reader as raw text.
+  const lines = content
+    .split("\n")
+    .filter((l) => !l.trim().startsWith("__INLINE_CHIPS__:") && !l.trim().startsWith("__ANALYSIS_PROGRESS__") && !l.trim().startsWith("__FIX_PROGRESS_CARD__"));
   const elements: React.ReactNode[] = [];
   let i = 0;
 
