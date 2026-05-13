@@ -2522,7 +2522,11 @@ export default function Page() {
           </div>
 
           <div className="text-sm font-medium text-gray-500">
-            {isSignedUp && activeView === "resume-builder" ? "Resume Builder" : ""}
+            {/* Header title intentionally blank. Chat-as-chassis principle:
+                no top-level "Resume Builder" label, because Resume Builder
+                is not a separate destination — it's the workspace pane
+                inside the same chat. */}
+            {""}
           </div>
 
           <div className="flex items-center gap-2">
