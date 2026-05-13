@@ -2602,19 +2602,17 @@ export default function Page() {
                 {MODE_LABELS[activeMode] ?? activeMode}
               </span>
             )}
-            {/* User pill — reachable from anywhere, including mobile and
-                collapsed-sidebar layouts. Hover/click reveals sign out. */}
+            {/* Account button — circular avatar only (initial). Email
+                still surfaces in the dropdown on click. */}
             {isSignedUp && (
               <div className="relative group">
                 <button
                   onClick={() => setUserMenuOpen((v) => !v)}
                   title={user?.email ?? "Account"}
-                  className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full border border-gray-200 bg-gray-100 text-gray-700 hover:bg-gray-200 hover:text-gray-900 transition-colors max-w-[180px]"
+                  aria-label="Account menu"
+                  className="w-9 h-9 rounded-full border border-gray-200 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition-colors flex items-center justify-center text-sm font-semibold"
                 >
-                  <span className="w-5 h-5 rounded-full bg-white text-black text-[10px] font-bold flex items-center justify-center flex-shrink-0">
-                    {(user?.email ?? "?").slice(0, 1).toUpperCase()}
-                  </span>
-                  <span className="truncate">{user?.email ?? "Account"}</span>
+                  {(user?.email ?? "?").slice(0, 1).toUpperCase()}
                 </button>
                 {userMenuOpen && (
                   <>
