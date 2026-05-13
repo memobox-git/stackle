@@ -12,6 +12,7 @@ import InterviewView from "@/components/interview/InterviewView";
 import LearnView from "@/components/LearnView";
 import MarketingLanding from "@/components/marketing/LandingPage";
 import { pickHeroGreeting } from "@/lib/heroGreetings";
+import { pickHeroExamples } from "@/lib/heroExamples";
 import { ChatMessage } from "@/components/Message";
 import {
   OrchestratorDecision,
@@ -2562,6 +2563,24 @@ export default function Page() {
                  with the greeting until the first message lands. */
               <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
                 <div className="w-full max-w-2xl flex flex-col items-center">
+                  {/* Resume status pill — only when a resume is loaded.
+                      Keeps the user oriented (which file is active) and
+                      gives a one-click swap via the source chooser. */}
+                  {resumeExtraction && (
+                    <button
+                      type="button"
+                      onClick={() => promptResumeSourceChoice()}
+                      className="mb-4 inline-flex items-center gap-2 text-[12px] text-gray-600 hover:text-gray-900 bg-white border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1 transition-colors"
+                      title="Switch which resume Stackle uses"
+                    >
+                      <FileText className="w-3 h-3" strokeWidth={2} />
+                      <span className="truncate max-w-[280px]">
+                        Resume loaded · <strong className="font-medium text-gray-800">{resumeFilename || "your resume"}</strong>
+                      </span>
+                      <span className="text-gray-400">·</span>
+                      <span className="text-gray-500">Change</span>
+                    </button>
+                  )}
                   {/* Greeting with sparkle. The sparkle softens the tone
                       and gives the line a focal point (Claude does the
                       same thing with a small star glyph). */}
@@ -2609,6 +2628,57 @@ export default function Page() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Example prompts — small italic suggestions that
+                      drop into the input on click. Three rotated per
+                      chat id from lib/heroExamples.ts. */}
+                  <div className="flex flex-col items-center gap-1 mt-8 text-[13px] text-gray-500">
+                    <span className="text-[11px] uppercase tracking-[0.1em] text-gray-400 mb-1">Or try</span>
+                    {pickHeroExamples({ chatId: activeChatId }).map((ex) => (
+                      <button
+                        key={ex}
+                        type="button"
+                        onClick={() => setChatInput(ex)}
+                        className="italic text-gray-500 hover:text-gray-800 transition-colors"
+                      >
+                        &ldquo;{ex}&rdquo;
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Recent chats strip — only when there's history. The
+                      sidebar already lists everything; this gives a quick
+                      jump-back affordance in the empty hero. */}
+                  {(() => {
+                    const recents = chatList
+                      .filter((c) => c.id !== activeChatId)
+                      .filter((c) => (c.messages ?? []).some((m) => m.role === "user" && !m.content.startsWith("__")))
+                      .slice(0, 3);
+                    if (recents.length === 0) return null;
+                    return (
+                      <div className="w-full mt-10">
+                        <p className="text-[11px] uppercase tracking-[0.1em] text-gray-400 text-center mb-3">Recently</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          {recents.map((chat) => {
+                            const firstUserMsg = (chat.messages ?? []).find(
+                              (m) => m.role === "user" && !m.content.startsWith("__"),
+                            );
+                            const preview = firstUserMsg?.content.slice(0, 60) ?? chat.title ?? "Untitled chat";
+                            return (
+                              <button
+                                key={chat.id}
+                                type="button"
+                                onClick={() => handleSwitchChat(chat.id)}
+                                className="text-left bg-white border border-gray-200 hover:border-gray-300 rounded-xl px-3 py-2.5 transition-colors"
+                              >
+                                <p className="text-[13px] text-gray-900 line-clamp-2 leading-snug">{preview}</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
             ) : (
