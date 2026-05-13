@@ -301,6 +301,16 @@ export default function Page() {
   // (e.g. for sidebar styling, persistChat's mode arg). Crucially: it does
   // NOT gate which messages are in scope — there's one shared thread.
   const isResumeMode = activeView === "resume-builder";
+
+  // Guard: if the user navigates to Resume Builder without a parsed
+  // resume in state, bounce them back to the chat view. The chat hero
+  // + source chooser handle 'no resume → upload' end-to-end; the
+  // Resume Builder shell has nothing to show until a resume exists.
+  useEffect(() => {
+    if (activeView === "resume-builder" && !resumeExtraction) {
+      setActiveView("chat");
+    }
+  }, [activeView, resumeExtraction]);
   const messages = chatMessages;
   const setMessages = setChatMessages;
   const input = isResumeMode ? resumeInput : chatInput;
