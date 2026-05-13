@@ -17,10 +17,11 @@ import { getSupabaseClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
 
-const PROVIDERS: { key: "google" | "github" | "linkedin_oidc"; label: string }[] = [
-  { key: "google",        label: "Continue with Google" },
-  { key: "linkedin_oidc", label: "Continue with LinkedIn" },
-  { key: "github",        label: "Continue with GitHub" },
+// LinkedIn + GitHub stripped from the OAuth row — Google only for now.
+// They can come back as separate entries once the post-signup intake
+// gracefully handles each provider's identity payload.
+const PROVIDERS: { key: "google"; label: string }[] = [
+  { key: "google", label: "Continue with Google" },
 ];
 
 export default function AuthForm({ mode }: { mode: Mode }) {
@@ -31,7 +32,7 @@ export default function AuthForm({ mode }: { mode: Mode }) {
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
 
-  async function handleOAuth(provider: "google" | "github" | "linkedin_oidc") {
+  async function handleOAuth(provider: "google") {
     setError("");
     setBusy(true);
     try {
