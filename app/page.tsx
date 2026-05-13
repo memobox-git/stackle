@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
-import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen, Sparkles, ScrollText, BookMarked, Briefcase } from "lucide-react";
+import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen, Sparkles, ScrollText, BookMarked, Briefcase, Mic, FileEdit, GraduationCap } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
@@ -2056,15 +2056,20 @@ export default function Page() {
     {
       label: "Workspace",
       items: [
-        { key: "resume-builder", label: "Resume Builder", icon: FileText,       view: "resume-builder", locked: false },
-        { key: "interview-prep", label: "Interview Prep", icon: MessagesSquare, view: "interview",      locked: false },
+        // FileEdit reads as "edit a document" — clearer than a generic
+        // FileText for the resume editor.
+        { key: "resume-builder", label: "Resume Builder", icon: FileEdit, view: "resume-builder", locked: false },
+        // Mic for interview prep — universal "speaking practice" cue.
+        { key: "interview-prep", label: "Interview Prep", icon: Mic,      view: "interview",      locked: false },
       ],
     },
     {
       label: "Library",
       items: [
-        { key: "drive",       label: "Drive",       icon: FolderOpen, view: "drive", locked: false },
-        { key: "foundations", label: "Foundations", icon: BookOpen,   view: "learn", locked: false },
+        { key: "drive",       label: "Drive",       icon: FolderOpen,    view: "drive", locked: false },
+        // GraduationCap for Foundations — learning vibe is stronger
+        // than a generic book.
+        { key: "foundations", label: "Foundations", icon: GraduationCap, view: "learn", locked: false },
       ],
     },
   ];
@@ -2104,22 +2109,25 @@ export default function Page() {
           a small gap between groups, no labels. */}
       <div className={`${expanded ? "px-2" : "px-1.5"} mb-3`}>
         {NAV_GROUPS.map((group, gi) => (
-          <div key={group.label} className={gi > 0 ? "mt-4" : ""}>
+          // When expanded the group label needs breathing room; when
+          // collapsed (icon rail) the gap looks like an accidental break.
+          // Collapse the inter-group space to a tiny 4px in that mode.
+          <div key={group.label} className={gi > 0 ? (expanded ? "mt-4" : "mt-1") : ""}>
             {expanded && (
               <p className="text-[10px] font-medium tracking-[0.05em] uppercase text-gray-400 px-2 mb-1">
                 {group.label}
               </p>
             )}
-            <div className="space-y-0.5">
+            <div className={expanded ? "space-y-0.5" : "space-y-0"}>
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const isActive = !item.locked && item.view !== null && activeView === item.view;
-                const baseClasses = `flex items-center ${expanded ? "gap-2.5 px-2 w-full" : "justify-center w-full px-0"} py-2 rounded-md font-medium transition-colors`;
+                const baseClasses = `flex items-center ${expanded ? "gap-2.5 px-2 w-full py-2" : "justify-center w-full px-0 py-1.5"} rounded-md font-medium transition-colors`;
                 const stateClasses = item.locked
                   ? "text-gray-400 cursor-default opacity-60"
                   : isActive
                     ? "text-gray-900 bg-gray-100"
-                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50";
+                    : "text-gray-800 hover:text-gray-900 hover:bg-gray-100";
                 const handleClick = () => {
                   if (item.locked) {
                     showNavToast(item.label);
@@ -2143,7 +2151,7 @@ export default function Page() {
                       onClick={handleClick}
                       className={`${baseClasses} ${stateClasses}`}
                     >
-                      <Icon className="w-5 h-5 flex-shrink-0" strokeWidth={1.75} />
+                      <Icon className="w-[18px] h-[18px] flex-shrink-0" strokeWidth={2} />
                       {expanded && (
                         <>
                           <span className="text-sm truncate flex-1 text-left">{item.label}</span>
