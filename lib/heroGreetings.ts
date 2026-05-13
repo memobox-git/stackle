@@ -9,27 +9,27 @@
 // without {name} render verbatim even when we have a name (so the
 // rotation feels human, not robotic).
 
+// Forward-looking greetings only — no 'pick up where you left off' or
+// 'back at it' style lines that confuse users on a fresh session.
+// Mix of name-based warmth and general 'what would you like to do'
+// openers, every one of them inviting the next action.
 const GREETINGS: string[] = [
   "Hey there, {name}",
   "Hi {name}",
-  "{name} returns",
-  "How's it going, {name}?",
-  "Welcome back, {name}",
   "What's up, {name}?",
+  "How can I help, {name}?",
+  "Good to see you, {name}",
+  "Hey {name}",
   "What's on the agenda today?",
   "How can I help today?",
   "What are we working on?",
   "Ready when you are",
   "Let's get into it",
   "What's next?",
-  "Pick up where you left off?",
   "Where would you like to start?",
-  "What's the play today?",
-  "Good to see you, {name}",
-  "Back at it, {name}?",
   "What can I help with?",
-  "Hello again, {name}",
   "Tell me what you need",
+  "What's the goal today?",
 ];
 
 // Deterministic hash → keeps the same greeting for the same chat id

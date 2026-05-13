@@ -795,6 +795,13 @@ export default function Page() {
   // parsed resume and no chat messages yet, push a short personal greeting
   // instead of the generic "Career advice for data & AI roles" hero. Makes
   // it feel like Stackle knows who they are from the moment they arrive.
+  // Auto-firing a 'Hey {name} — read through your resume…' message on
+  // every new chat made new conversations look identical to old ones and
+  // triggered a 'why is the same old chat back?' reaction. Removed in
+  // favour of the rotating empty-hero greeting + launcher chips, which
+  // invite the user without claiming any prior context. The orchestrator
+  // surfaces resume context the moment it's relevant to what they ask.
+  /* DISABLED — keep the empty hero clean.
   useEffect(() => {
     if (activeView !== "chat") return;
     if (!resumeExtraction) return;
@@ -814,9 +821,6 @@ export default function Page() {
       console.log("[welcome:chat] skip — messages present", decision);
       return;
     }
-    // Wait for analysis if it's actively loading — the rich welcome
-    // depends on bestFitRoles / strengths / weaknesses. If analysis isn't
-    // running anymore (failed or never started), proceed with header-only.
     if (isAnalyzingResume && !resumeAnalysis) {
       console.log("[welcome:chat] skip — analysis still loading", decision);
       return;
@@ -912,6 +916,7 @@ export default function Page() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, resumeExtraction, resumeAnalysis, isAnalyzingResume, chatMessages.length, activeChatId]);
+  */
 
   // ── Timestamp helper ──────────────────────────────────
   function now() {

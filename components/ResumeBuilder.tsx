@@ -2090,7 +2090,7 @@ export default function ResumeBuilder({
         </div>
       )}
 
-      {messages.length === 0 && !resumeText ? (
+      {messages.length === 0 && !resumeText && !resumeExtraction ? (
         <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16 gap-6 select-none">
           {/* Logo mark */}
           <div
