@@ -125,12 +125,17 @@ export async function setUsername(input: {
   // The legacy profiles table has a NOT NULL `email` column, so we
   // always pass the auth user's email — harmless if the row already
   // exists, required if we're inserting fresh.
+  // Upsert. The legacy profiles table has two NOT NULL columns we
+  // must satisfy on insert: email and role. Server-side default for
+  // role is 'learner' (set in migration); we pass it explicitly here
+  // as belt-and-braces against future supabase-js quirks.
   const { error } = await supabase
     .from("profiles")
     .upsert(
       {
         user_id: user.id,
         email: user.email ?? "",
+        role: "learner",
         username,
         first_name: input.firstName ?? null,
         last_name: input.lastName ?? null,
@@ -175,8 +180,9 @@ export async function buildProfileFromResume(input: {
     .upsert(
       {
         user_id: user.id,
-        // email is NOT NULL on the legacy table — always include it.
+        // email + role are NOT NULL on the legacy table.
         email: user.email ?? "",
+        role: "learner",
         // Only seed first/last if we have a real value; the username
         // intake fills these for email signups, Google for OAuth.
         ...(first ? { first_name: first } : {}),
