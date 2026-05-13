@@ -664,11 +664,11 @@ export default function Page() {
             location: resumeExtraction.location,
             summary: resumeExtraction.summary,
           },
-          priorSignals: { role: chosenTargetRole, seniority: null, focus: null },
+          priorSignals: { role: chosenTargetRole, seniority: null, focus: null, careerGoal },
         }),
       })
         .then((r) => r.ok ? r.json() : null)
-        .then((data: { route?: { narration: string; chips: string[]; extractedSignals?: { role?: string | null; seniority?: string | null; focus?: string | null } } } | null) => {
+        .then((data: { route?: { narration: string; chips: string[]; extractedSignals?: { role?: string | null; seniority?: string | null; focus?: string | null; careerGoal?: string | null } } } | null) => {
           if (!data?.route) {
             // True API failure (rate limit, model down). Honest fallback
             // that uses their first name at minimum.
@@ -682,6 +682,12 @@ export default function Page() {
           const r = data.route;
           if (r.extractedSignals?.focus) setOrchFocus(r.extractedSignals.focus as FocusKey);
           if (r.extractedSignals?.seniority) setOrchSeniority(r.extractedSignals.seniority);
+          // Persist conversationally-captured target role + career goal
+          // so subsequent turns / managers can use them. The orchestrator
+          // echoes whatever it captured on every turn — we only write
+          // when there's a non-empty value so we never null-out state.
+          if (r.extractedSignals?.role && !chosenTargetRole) setChosenTargetRole(r.extractedSignals.role);
+          if (r.extractedSignals?.careerGoal && !careerGoal) setCareerGoal(r.extractedSignals.careerGoal);
 
           const msgs: ChatMessage[] = [
             { role: "assistant", content: r.narration, timestamp: now() },
@@ -1604,7 +1610,7 @@ export default function Page() {
                 location: resumeExtraction.location,
                 summary: resumeExtraction.summary,
               },
-              priorSignals: { role: orchFocus ? null : chosenTargetRole, seniority: orchSeniority, focus: orchFocus },
+              priorSignals: { role: orchFocus ? null : chosenTargetRole, seniority: orchSeniority, focus: orchFocus, careerGoal },
             }),
           });
           if (!oRes.ok) throw new Error("orchestrator http error");
@@ -1613,13 +1619,19 @@ export default function Page() {
               managerKey: string;
               narration: string;
               chips: string[];
-              extractedSignals: { role: string | null; seniority: string | null; focus: string | null };
+              extractedSignals: { role: string | null; seniority: string | null; focus: string | null; careerGoal: string | null };
             };
           };
           const r = data.route;
           // Persist orchestrator-extracted signals so we can act across turns.
           if (r.extractedSignals?.focus) setOrchFocus(r.extractedSignals.focus as FocusKey);
           if (r.extractedSignals?.seniority) setOrchSeniority(r.extractedSignals.seniority);
+          // Persist conversationally-captured target role + career goal
+          // so subsequent turns / managers can use them. The orchestrator
+          // echoes whatever it captured on every turn — we only write
+          // when there's a non-empty value so we never null-out state.
+          if (r.extractedSignals?.role && !chosenTargetRole) setChosenTargetRole(r.extractedSignals.role);
+          if (r.extractedSignals?.careerGoal && !careerGoal) setCareerGoal(r.extractedSignals.careerGoal);
 
           const reply: ChatMessage[] = [
             ...updatedMessages,
