@@ -2,6 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MessageSquare, Pencil, Check, X } from "lucide-react";
+import { useTypewriter } from "@/lib/useTypewriter";
+
+// Module-level "already typed" registry. Keyed by the message's content
+// hash so re-renders / chat-list rebuilds don't re-trigger the
+// animation for already-revealed messages. Cleared only on page reload.
+const TYPED_REGISTRY = new Set<string>();
+function messageKey(role: string, content: string, ts?: string): string {
+  // Content is enough on its own for uniqueness in practice; role + ts
+  // disambiguate the rare case where the assistant echoes a user line.
+  return `${role}::${ts ?? ""}::${content.length}::${content.slice(0, 80)}`;
+}
 
 export type MessageRole = "user" | "assistant";
 
@@ -358,10 +369,37 @@ export default function Message({ message, onEdit }: MessageProps) {
     );
   }
 
+  // Assistant body with optional typewriter reveal. Sentinels (any
+  // content starting with "__") render instantly — those are state
+  // tokens, not prose. Once a message has finished typing it lands in
+  // the TYPED_REGISTRY so subsequent re-renders (e.g. on chat-list
+  // rebuild or window resize) render the full content instantly.
+  const isSentinel = message.content.startsWith("__");
+  return <AssistantBody message={message} ts={ts} isSentinel={isSentinel} />;
+}
+
+function AssistantBody({ message, ts, isSentinel }: { message: ChatMessage; ts?: string; isSentinel: boolean }) {
+  const key = messageKey(message.role, message.content, ts);
+  // If we've animated this message before in this page session, render
+  // immediately. Otherwise animate once, then register.
+  const alreadyTyped = TYPED_REGISTRY.has(key);
+  const { displayed, done } = useTypewriter(
+    alreadyTyped || isSentinel ? "" : message.content,
+    14, // a touch faster than the onboarding typer; still readable
+  );
+  useEffect(() => {
+    if (done && !alreadyTyped && !isSentinel) TYPED_REGISTRY.add(key);
+  }, [done, alreadyTyped, isSentinel, key]);
+
+  const visible = alreadyTyped || isSentinel ? message.content : displayed;
+
   return (
     <div className="group flex mb-5 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
-        {renderContent(message.content)}
+        {renderContent(visible)}
+        {!alreadyTyped && !isSentinel && !done && (
+          <span className="inline-block w-[2px] h-4 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />
+        )}
         {ts && (
           <span className="text-[10px] text-gray-600 mt-1 block opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             {ts}
