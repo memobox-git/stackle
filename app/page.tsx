@@ -11,6 +11,7 @@ import ResumeBuilder from "@/components/ResumeBuilder";
 import InterviewView from "@/components/interview/InterviewView";
 import LearnView from "@/components/LearnView";
 import MarketingLanding from "@/components/marketing/LandingPage";
+import { getCurrentProfile, buildProfileFromResume } from "@/lib/supabase/profiles";
 import { pickHeroGreeting } from "@/lib/heroGreetings";
 import { ChatMessage } from "@/components/Message";
 import {
@@ -99,6 +100,9 @@ export default function Page() {
   // ── Auth ──────────────────────────────────────────────
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  // null = check pending, true = needs to set up username, false = ready.
+  // Auth-init effect resolves this once the user is known.
+  const [needsProfileSetup, setNeedsProfileSetup] = useState<null | boolean>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [authSent, setAuthSent] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -384,6 +388,31 @@ export default function Page() {
     return () => subscription.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── Profile setup gate ──────────────────────────────────
+  // Every authed user needs a username before they reach the chat
+  // hero. This effect fires once auth resolves: if no profile row OR
+  // username is null, route to /profile/setup. Otherwise mark ready.
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) { setNeedsProfileSetup(false); return; }
+    (async () => {
+      try {
+        const profile = await getCurrentProfile();
+        const needs = !profile?.username;
+        setNeedsProfileSetup(needs);
+        if (needs) {
+          if (typeof window !== "undefined" && window.location.pathname !== "/profile/setup") {
+            window.location.href = "/profile/setup";
+          }
+        }
+      } catch (err) {
+        console.warn("[profile-gate] failed:", err);
+        // Fail open — let them into the app rather than block on a network blip.
+        setNeedsProfileSetup(false);
+      }
+    })();
+  }, [user, authLoading]);
 
   // ── Load chats (works for authed AND unauth users) ──────
   // Authed: pulls rows from Supabase. Unauth: pulls from localStorage via
@@ -1342,11 +1371,23 @@ export default function Page() {
           });
           // Save original to Drive (Supabase if authed, localStorage otherwise)
           if (extraction) {
-            saveOriginalResume({ chatId: id, extraction, rawText: safeText, filename })
+            const ext: ResumeExtraction = extraction;
+            saveOriginalResume({ chatId: id, extraction: ext, rawText: safeText, filename })
               .then((file) => {
                 if (file) {
                   setOriginalDriveFileId(file.id);
                   loadDriveFiles(id).then(setDriveFiles).catch(() => {});
+                  // Auto-build the user's profile from this resume.
+                  // Populates display_name, headline, summary, location,
+                  // years_experience, top_skills + records source_resume_id.
+                  // Username intake (post-signup) is the only thing the
+                  // user ever has to type — everything else comes from
+                  // the resume.
+                  buildProfileFromResume({ extraction: ext, sourceResumeId: file.id }).catch(() => {});
+                } else {
+                  // Drive save failed (unauth or transient); still build
+                  // the profile so the next sign-in surfaces correct data.
+                  buildProfileFromResume({ extraction: ext, sourceResumeId: null }).catch(() => {});
                 }
               })
               .catch(() => {});
@@ -2397,6 +2438,26 @@ export default function Page() {
   }
   if (!user) {
     return <MarketingLanding />;
+  }
+  // First-time profile setup: every authed user must pick a username
+  // before they reach the chat hero. Check is async; the effect below
+  // routes to /profile/setup when needed. Render the boot spinner
+  // while the check is in flight.
+  if (needsProfileSetup === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafaf7]">
+        <div className="w-5 h-5 rounded-full border-2 border-gray-300 border-t-gray-800 animate-spin" />
+      </div>
+    );
+  }
+  // needsProfileSetup === true → useEffect below has already pushed
+  // router to /profile/setup. Show the spinner during the transition.
+  if (needsProfileSetup === true) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fafaf7]">
+        <div className="w-5 h-5 rounded-full border-2 border-gray-300 border-t-gray-800 animate-spin" />
+      </div>
+    );
   }
 
   // ── Onboarding ────────────────────────────────────────
