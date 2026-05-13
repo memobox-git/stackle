@@ -12,7 +12,6 @@ import InterviewView from "@/components/interview/InterviewView";
 import LearnView from "@/components/LearnView";
 import MarketingLanding from "@/components/marketing/LandingPage";
 import { pickHeroGreeting } from "@/lib/heroGreetings";
-import { pickHeroExamples } from "@/lib/heroExamples";
 import { ChatMessage } from "@/components/Message";
 import {
   OrchestratorDecision,
@@ -2652,23 +2651,6 @@ export default function Page() {
                       >
                         <Icon className="w-3.5 h-3.5 text-gray-500" strokeWidth={1.75} />
                         {label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Example prompts — small italic suggestions that
-                      drop into the input on click. Three rotated per
-                      chat id from lib/heroExamples.ts. */}
-                  <div className="flex flex-col items-center gap-1 mt-8 text-[13px] text-gray-500">
-                    <span className="text-[11px] uppercase tracking-[0.1em] text-gray-400 mb-1">Or try</span>
-                    {pickHeroExamples({ chatId: activeChatId }).map((ex) => (
-                      <button
-                        key={ex}
-                        type="button"
-                        onClick={() => setChatInput(ex)}
-                        className="italic text-gray-500 hover:text-gray-800 transition-colors"
-                      >
-                        &ldquo;{ex}&rdquo;
                       </button>
                     ))}
                   </div>
