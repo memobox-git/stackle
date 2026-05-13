@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
-import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen } from "lucide-react";
+import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen, Sparkles, ScrollText, BookMarked, Briefcase } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
@@ -2416,8 +2416,12 @@ export default function Page() {
                  with the greeting until the first message lands. */
               <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
                 <div className="w-full max-w-2xl flex flex-col items-center">
-                  <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight text-center mb-8">
-                    {pickHeroGreeting({ chatId: activeChatId, firstName: resumeExtraction?.name?.split(" ")[0] ?? null })}
+                  {/* Greeting with sparkle. The sparkle softens the tone
+                      and gives the line a focal point (Claude does the
+                      same thing with a small star glyph). */}
+                  <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight text-center mb-8 flex items-center gap-2.5">
+                    <Sparkles className="w-6 h-6 text-amber-500" strokeWidth={1.75} aria-hidden />
+                    <span>{pickHeroGreeting({ chatId: activeChatId, firstName: resumeExtraction?.name?.split(" ")[0] ?? null })}</span>
                   </h1>
                   <div className="w-full">
                     <ChatInput
@@ -2434,6 +2438,27 @@ export default function Page() {
                       }}
                       placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
                     />
+                  </div>
+                  {/* Quick-start chips — same row position as Claude's
+                      Write / Learn / From Drive chips, but mapped to
+                      Stackle's actual surfaces. Each chip routes
+                      directly into the relevant feature. */}
+                  <div className="flex flex-wrap gap-2 mt-4 justify-center">
+                    {[
+                      { label: "Review my resume", icon: FileText,       action: () => setActiveView("resume-builder") },
+                      { label: "Tailor for a JD",  icon: Target,         action: () => sendMessage("I want to tailor my resume for a specific job description.") },
+                      { label: "Interview prep",   icon: MessagesSquare, action: () => setActiveView("interview") },
+                      { label: "Foundations",      icon: BookOpen,       action: () => setActiveView("learn") },
+                    ].map(({ label, icon: Icon, action }) => (
+                      <button
+                        key={label}
+                        onClick={action}
+                        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1.5 transition-all shadow-sm hover:shadow"
+                      >
+                        <Icon className="w-3.5 h-3.5 text-gray-500" strokeWidth={1.75} />
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
