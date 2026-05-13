@@ -25,10 +25,6 @@ const PUBLIC_PREFIXES = [
   "/share/",       // future: shared resume / report public links
   "/shared-resume",
   "/report/",
-  "/learn",        // Learn content is browseable without auth. Free
-                   // lessons should be open by design; premium gating
-                   // happens at the paywall layer once it ships, not
-                   // at the route layer.
 ];
 
 function isPublic(pathname: string): boolean {

@@ -9,6 +9,7 @@ import ChatInput from "@/components/ChatInput";
 import HomeInput from "@/components/HomeInput";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import InterviewView from "@/components/interview/InterviewView";
+import LearnView from "@/components/LearnView";
 import { ChatMessage } from "@/components/Message";
 import {
   OrchestratorDecision,
@@ -42,7 +43,7 @@ import OnboardingFlow from "@/components/OnboardingFlow";
 import AuthModal from "@/components/AuthModal";
 import LandingPage from "@/components/LandingPage";
 
-type ActiveView = "chat" | "resume-builder" | "drive" | "interview";
+type ActiveView = "chat" | "resume-builder" | "drive" | "interview" | "learn";
 
 // Instant dark tooltip shown to the right of a collapsed sidebar icon.
 // Uses Tailwind's group-hover; must live inside a parent with `relative group`.
@@ -1959,10 +1960,10 @@ export default function Page() {
     {
       label: "Library",
       items: [
-        { key: "drive",     label: "Drive",     icon: FolderOpen, view: "drive", locked: false },
-        { key: "learn",     label: "Learn",     icon: BookOpen,   view: null,    locked: false, href: "/learn" },
-        { key: "published", label: "Published", icon: Globe,      view: null,    locked: true },
-        { key: "versions",  label: "Versions",  icon: GitBranch,  view: null,    locked: true },
+        { key: "drive",       label: "Drive",       icon: FolderOpen, view: "drive", locked: false },
+        { key: "foundations", label: "Foundations", icon: BookOpen,   view: "learn", locked: false },
+        { key: "published",   label: "Published",   icon: Globe,      view: null,    locked: true },
+        { key: "versions",    label: "Versions",    icon: GitBranch,  view: null,    locked: true },
       ],
     },
     {
@@ -2374,6 +2375,8 @@ export default function Page() {
           </div>
         ) : activeView === "interview" ? (
           <InterviewView candidateName={resumeExtraction?.name ?? null} />
+        ) : activeView === "learn" ? (
+          <LearnView />
         ) : activeView === "drive" ? (
           /* Drive view — Dropbox-style */
           <div className="flex-1 overflow-y-auto bg-white">
