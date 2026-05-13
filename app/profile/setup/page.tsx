@@ -118,7 +118,7 @@ export default function ProfileSetupPage() {
         >S</div>
         <h1 className="text-[24px] font-semibold text-gray-900 text-center mb-1">Pick a username</h1>
         <p className="text-[14px] text-gray-600 text-center mb-6">
-          You'll use this for sharing — like <span className="font-mono text-gray-800">stackle.io/u/your-name</span>.
+          You'll use this for sharing — like <span className="font-mono text-gray-800">stackle.io/profile/your-name</span>.
         </p>
 
         {needsName && (
@@ -145,7 +145,7 @@ export default function ProfileSetupPage() {
         <label className="block">
           <div className="flex items-stretch border border-gray-300 rounded-xl overflow-hidden bg-white focus-within:border-gray-900 transition-colors">
             <span className="inline-flex items-center px-3 text-[14px] text-gray-500 bg-gray-50 border-r border-gray-300">
-              stackle.io/u/
+              stackle.io/profile/
             </span>
             <input
               type="text"

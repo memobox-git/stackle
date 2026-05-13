@@ -122,11 +122,15 @@ export async function setUsername(input: {
   if ((clash ?? []).length > 0) return { ok: false, error: "Username already taken" };
 
   // Upsert. Falls through to update if a row exists, insert otherwise.
+  // The legacy profiles table has a NOT NULL `email` column, so we
+  // always pass the auth user's email — harmless if the row already
+  // exists, required if we're inserting fresh.
   const { error } = await supabase
     .from("profiles")
     .upsert(
       {
         user_id: user.id,
+        email: user.email ?? "",
         username,
         first_name: input.firstName ?? null,
         last_name: input.lastName ?? null,
@@ -171,6 +175,8 @@ export async function buildProfileFromResume(input: {
     .upsert(
       {
         user_id: user.id,
+        // email is NOT NULL on the legacy table — always include it.
+        email: user.email ?? "",
         // Only seed first/last if we have a real value; the username
         // intake fills these for email signups, Google for OAuth.
         ...(first ? { first_name: first } : {}),
