@@ -2157,6 +2157,9 @@ export default function Page() {
     {
       label: "Library",
       items: [
+        // Job Match has its own /job-match list route (href). Drive +
+        // Foundations open inside the chat shell as workspace lenses.
+        { key: "job-match",   label: "Job Match",   icon: Target,        view: null,    locked: false, href: "/job-match" },
         { key: "drive",       label: "Drive",       icon: FolderOpen,    view: "drive", locked: false },
         { key: "foundations", label: "Foundations", icon: GraduationCap, view: "learn", locked: false },
       ],
