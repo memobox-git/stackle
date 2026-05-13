@@ -95,7 +95,7 @@ function renderContent(content: string) {
     // H1
     if (line.startsWith("# ")) {
       elements.push(
-        <h1 key={`h1-${i}`} className="text-xl font-bold text-gray-900 mt-4 mb-2 leading-snug">
+        <h1 key={`h1-${i}`} className="text-[20px] font-semibold text-gray-900 mt-5 mb-2 leading-snug tracking-tight">
           {inlineFormat(line.slice(2))}
         </h1>
       );
@@ -106,7 +106,7 @@ function renderContent(content: string) {
     // H2
     if (line.startsWith("## ")) {
       elements.push(
-        <h2 key={`h2-${i}`} className="text-lg font-semibold text-gray-900 mt-4 mb-1.5 leading-snug">
+        <h2 key={`h2-${i}`} className="text-[17px] font-semibold text-gray-900 mt-5 mb-2 leading-snug tracking-tight">
           {inlineFormat(line.slice(3))}
         </h2>
       );
@@ -117,7 +117,7 @@ function renderContent(content: string) {
     // H3
     if (line.startsWith("### ")) {
       elements.push(
-        <h3 key={`h3-${i}`} className="text-base font-semibold text-gray-900 mt-3 mb-1 leading-snug">
+        <h3 key={`h3-${i}`} className="text-[15px] font-semibold text-gray-900 mt-4 mb-1.5 leading-snug">
           {inlineFormat(line.slice(4))}
         </h3>
       );
@@ -168,10 +168,10 @@ function renderContent(content: string) {
         }
       }
       elements.push(
-        <ul key={`ul-${i}`} className="space-y-2 my-3">
+        <ul key={`ul-${i}`} className="space-y-1.5 my-2.5">
           {items.map((item, idx) => (
-            <li key={idx} className="flex gap-2.5 text-[15px] leading-6 text-gray-700">
-              <span className="text-gray-600 flex-shrink-0 mt-1">•</span>
+            <li key={idx} className="flex gap-2 text-[15px] leading-[1.65] text-gray-900">
+              <span className="text-gray-400 flex-shrink-0 select-none">•</span>
               <span>{inlineFormat(item)}</span>
             </li>
           ))}
@@ -200,10 +200,10 @@ function renderContent(content: string) {
         }
       }
       elements.push(
-        <ol key={`ol-${i}`} className="space-y-2 my-3">
+        <ol key={`ol-${i}`} className="space-y-1.5 my-2.5">
           {items.map((item, idx) => (
-            <li key={idx} className="flex gap-3 text-[15px] leading-6 text-gray-700">
-              <span className="text-gray-600 flex-shrink-0 font-medium tabular-nums">{item.num}.</span>
+            <li key={idx} className="flex gap-2.5 text-[15px] leading-[1.65] text-gray-900">
+              <span className="text-gray-500 flex-shrink-0 tabular-nums">{item.num}.</span>
               <span>{inlineFormat(item.content)}</span>
             </li>
           ))}
@@ -212,9 +212,11 @@ function renderContent(content: string) {
       continue;
     }
 
-    // Empty line → spacer
+    // Empty line → small spacer. With proper mb-3 on paragraphs the
+    // visual rhythm already exists; the spacer is just a tie-breaker
+    // for two consecutive blank lines.
     if (line.trim() === "") {
-      elements.push(<div key={`sp-${i}`} className="h-2" />);
+      elements.push(<div key={`sp-${i}`} className="h-1" />);
       i++;
       continue;
     }
@@ -222,7 +224,7 @@ function renderContent(content: string) {
     // Emoji-prefixed chip-style line that wasn't parsed as a chip — render as styled hint
     if (/^[\p{Emoji}]\s/u.test(line.trim())) {
       elements.push(
-        <p key={`p-${i}`} className="text-[15px] leading-6 text-gray-500 italic m-0">
+        <p key={`p-${i}`} className="text-[15px] leading-[1.65] text-gray-500 italic mb-3 last:mb-0">
           {inlineFormat(line)}
         </p>
       );
@@ -230,12 +232,12 @@ function renderContent(content: string) {
       continue;
     }
 
-    // Regular paragraph. m-0 kills the user-agent <p> margin and
-    // leading-snug (1.375) trims the descender space under the last
-    // line — without that, the visual gap to chips reads as bigger
-    // than the actual pixel margin.
+    // Regular paragraph. Body type matches Claude/ChatGPT rhythm:
+    // 15px × 1.65 line-height × 12px bottom-margin. Darker text color
+    // (gray-900) than before — Stackle was reading lighter than the
+    // reference apps. `last:mb-0` keeps the chip row tight.
     elements.push(
-      <p key={`p-${i}`} className="text-[15px] leading-snug text-gray-700 m-0">
+      <p key={`p-${i}`} className="text-[15px] leading-[1.65] text-gray-900 mb-3 last:mb-0">
         {inlineFormat(line)}
       </p>
     );
@@ -284,7 +286,7 @@ export default function Message({ message, onEdit }: MessageProps) {
 
   if (isUser) {
     return (
-      <div className="group flex flex-col items-end mb-6 w-full max-w-3xl mx-auto px-4">
+      <div className="group flex flex-col items-end mb-5 w-full max-w-3xl mx-auto px-4">
         {/* Hover-only meta row — timestamp + edit. Removed the redundant
             "You" label + "U" avatar circle; the right-aligned bubble shape
             already signals user authorship. */}
@@ -357,7 +359,7 @@ export default function Message({ message, onEdit }: MessageProps) {
   }
 
   return (
-    <div className="group flex mb-0 w-full max-w-3xl mx-auto px-4">
+    <div className="group flex mb-5 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
         {renderContent(message.content)}
         {ts && (

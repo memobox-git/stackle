@@ -803,7 +803,7 @@ export default function ChatWindow({
           const labels = msg.content.slice(INLINE_CHIPS_PREFIX.length).split("|").map((s) => s.trim()).filter(Boolean);
           if (labels.length === 0) return null;
           return (
-            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 mt-1 mb-8">
+            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-2 mb-6">
               <div className="flex flex-wrap gap-2">
                 {labels.map((label, j) => (
                   <button
