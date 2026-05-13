@@ -2044,14 +2044,15 @@ export default function Page() {
     href?: string;
   };
   type NavGroup = { label: string; items: NavChild[] };
+  // Only ship surfaces that actually work. "Coming Soon" placeholders
+  // (Cover Letter, Job Match, Published, Versions, Profile, Settings)
+  // are stripped — they re-enter the nav when they're real.
   const NAV_GROUPS: NavGroup[] = [
     {
       label: "Workspace",
       items: [
-        { key: "resume-builder", label: "Resume Builder", icon: FileText,      view: "resume-builder", locked: false },
-        { key: "cover-letter",   label: "Cover Letter",   icon: Mail,          view: null,             locked: true },
+        { key: "resume-builder", label: "Resume Builder", icon: FileText,       view: "resume-builder", locked: false },
         { key: "interview-prep", label: "Interview Prep", icon: MessagesSquare, view: "interview",      locked: false },
-        { key: "job-match",      label: "Job Match",      icon: Target,        view: null,             locked: true },
       ],
     },
     {
@@ -2059,15 +2060,6 @@ export default function Page() {
       items: [
         { key: "drive",       label: "Drive",       icon: FolderOpen, view: "drive", locked: false },
         { key: "foundations", label: "Foundations", icon: BookOpen,   view: "learn", locked: false },
-        { key: "published",   label: "Published",   icon: Globe,      view: null,    locked: true },
-        { key: "versions",    label: "Versions",    icon: GitBranch,  view: null,    locked: true },
-      ],
-    },
-    {
-      label: "You",
-      items: [
-        { key: "profile",  label: "Profile",  icon: UserIcon,     view: null, locked: true },
-        { key: "settings", label: "Settings", icon: SettingsIcon, view: null, locked: true },
       ],
     },
   ];
@@ -2196,12 +2188,25 @@ export default function Page() {
         </div>
       )}
 
-      {/* Chat history — only when expanded */}
-      {expanded && chatList.length > 0 && (
+      {/* Chat history — only when expanded. Filters out empty chats
+          (no user messages yet) so the sidebar isn't a graveyard of
+          "New conversation" rows that the user clicked but never used.
+          The currently-active chat is exempted from the filter so it
+          stays visible while you're composing your first message. */}
+      {expanded && (() => {
+        const userTouchedChats = chatList.filter((c) => {
+          if (c.id === activeChatId) return true;
+          const realMessages = (c.messages ?? []).filter(
+            (m) => m.role === "user" && !m.content.startsWith("__"),
+          );
+          return realMessages.length > 0;
+        });
+        if (userTouchedChats.length === 0) return null;
+        return (
         <div className="flex-1 overflow-y-auto px-2">
           <p className="text-[10px] text-gray-600 uppercase tracking-wider px-1 mb-1.5">Recent</p>
           <div className="space-y-0.5">
-            {chatList.map((chat) => (
+            {userTouchedChats.map((chat) => (
               <div
                 key={chat.id}
                 className="group relative"
@@ -2230,7 +2235,8 @@ export default function Page() {
             ))}
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Drive version history removed from sidebar — accessible via the
           Drive nav item instead. The compact Resumes/Reports list felt
@@ -2427,8 +2433,8 @@ export default function Page() {
                   {/* Greeting with sparkle. The sparkle softens the tone
                       and gives the line a focal point (Claude does the
                       same thing with a small star glyph). */}
-                  <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight text-center mb-8 flex items-center gap-2.5">
-                    <Sparkles className="w-6 h-6 text-amber-500" strokeWidth={1.75} aria-hidden />
+                  <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight mb-8 inline-flex items-center gap-2.5 self-center">
+                    <Sparkles className="w-6 h-6 text-amber-500 flex-shrink-0" strokeWidth={1.75} aria-hidden />
                     <span>{pickHeroGreeting({ chatId: activeChatId, firstName: resumeExtraction?.name?.split(" ")[0] ?? null })}</span>
                   </h1>
                   <div className="w-full">
