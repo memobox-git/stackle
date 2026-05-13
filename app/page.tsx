@@ -369,10 +369,43 @@ export default function Page() {
           firstChatMode: chats[0]?.mode,
         });
         if (chats.length === 0) {
-          // No existing chat (auth'd: empty Supabase, unauth: no localStorage).
-          // Seed one with the profile resume so welcome + future messages
-          // have a chat to attach to.
-          console.log("[createChat] from loadChats — no existing chats");
+          // No chat rows. For an AUTH'D user this can still be a
+          // returning user — they might have a saved resume in Drive
+          // from a previous session (chats sometimes get wiped while
+          // Drive files survive). Check Drive before deciding.
+          if (user) {
+            try {
+              const driveFiles = await loadAllDriveFiles();
+              const original = driveFiles.find((f) => f.file_type === "original");
+              if (original) {
+                console.log("[loadChats] no chats but Drive original found — skipping onboarding, rehydrating from Drive");
+                const ext = original.extraction_json;
+                if (ext) {
+                  setResumeExtraction(ext);
+                  setResumeText("");
+                  setResumeFilename(original.display_name ?? "resume.pdf");
+                  setOnboardingCompleted(true);
+                }
+                // Seed a fresh chat tied to this restored resume so
+                // future messages have somewhere to persist to.
+                const newChat = await createChat("chat", {
+                  resumeText: "",
+                  resumeFilename: original.display_name ?? null,
+                  resumeExtraction: ext,
+                  resumeAnalysis: null,
+                });
+                setChatList([newChat]);
+                setActiveChatId(newChat.id);
+                return;
+              }
+            } catch (err) {
+              console.warn("[loadChats] Drive check failed:", err);
+            }
+          }
+          // Genuine empty state: new user or unauth without localStorage.
+          // Seed a placeholder chat so future messages have somewhere to
+          // attach. Onboarding flow stays gated until they upload.
+          console.log("[createChat] from loadChats — no existing chats, no Drive original");
           const prof = getProfileResume();
           const newChat = await createChat("chat", {
             resumeText: prof.resumeText,
@@ -392,6 +425,26 @@ export default function Page() {
             ?? chats[0];
           setActiveChatId(chatWithResume.id);
           restoreChatState(chatWithResume);
+
+          // Fallback: even if the chosen chat has no extraction, the
+          // user may still have one saved in Drive from earlier (e.g.
+          // they signed in fresh-device and we picked an old chat row
+          // that pre-dates the resume). Try Drive before falling back
+          // to onboarding.
+          if (user && !chatWithResume.resume_extraction) {
+            try {
+              const driveFiles = await loadAllDriveFiles();
+              const original = driveFiles.find((f) => f.file_type === "original");
+              if (original?.extraction_json) {
+                setResumeExtraction(original.extraction_json!);
+                setResumeText("");
+                setResumeFilename(original.display_name ?? "resume.pdf");
+                setOnboardingCompleted(true);
+              }
+            } catch (err) {
+              console.warn("[loadChats] Drive fallback check failed:", err);
+            }
+          }
         }
       })
       .catch(() => {});
