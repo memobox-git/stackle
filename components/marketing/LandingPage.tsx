@@ -46,11 +46,7 @@ export default function LandingPage() {
         <h1 className="text-[40px] md:text-[56px] leading-[1.05] font-semibold tracking-tight mb-5">
           Your next career move<br />starts here.
         </h1>
-        <p className="text-[17px] md:text-[18px] text-gray-700 leading-7 max-w-xl mb-8">
-          Drop your resume and Stackle reads it like a senior data engineer would —
-          honest score, the bullets that work, the gaps that don&apos;t. Then helps you fix them.
-        </p>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mt-8">
           <Link
             href="/signup"
             className="inline-flex items-center gap-2 text-sm font-semibold text-black px-5 py-3 rounded-full hover:opacity-90 transition-opacity"
