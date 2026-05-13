@@ -10,6 +10,7 @@ import HomeInput from "@/components/HomeInput";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import InterviewView from "@/components/interview/InterviewView";
 import LearnView from "@/components/LearnView";
+import { pickHeroGreeting } from "@/lib/heroGreetings";
 import { ChatMessage } from "@/components/Message";
 import {
   OrchestratorDecision,
@@ -1052,6 +1053,12 @@ export default function Page() {
       /* offline fallback */
     }
     resetAllState();
+    // Land on the calm chat hero, not the resume-builder shell. The
+    // builder's auto-welcome useEffect was firing the dense score
+    // recap every time the user clicked + New conversation — exactly
+    // the "huge message" complaint. Chat view shows the minimal
+    // rotating greeting instead.
+    setActiveView("chat");
     setIsSidebarOpen(false);
   }
 
@@ -2306,23 +2313,19 @@ export default function Page() {
           /* Chat view */
           <div className="flex flex-col flex-1 min-h-0">
             {chatMessages.length === 0 && !isLoading ? (
-              /* Landing hero — shown before first message */
-              <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-16">
-                {/* Logo mark */}
+              /* Minimal hero — Claude/ChatGPT-style. Just a short
+                 greeting (rotating per chat) above the input. No
+                 marketing copy, no logo block. Matches the calmer
+                 empty states the user referenced. */
+              <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-24">
                 <div
-                  className="w-10 h-10 rounded-2xl flex items-center justify-center text-black text-sm font-bold mb-6"
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-black text-[11px] font-bold mb-4 opacity-80"
                   style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
-                >
-                  S
-                </div>
-
-                {/* Headline */}
-                <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight text-center mb-3">
-                  Career advice for<br />data & AI roles.
+                  aria-hidden
+                >S</div>
+                <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight text-center">
+                  {pickHeroGreeting({ chatId: activeChatId, firstName: resumeExtraction?.name?.split(" ")[0] ?? null })}
                 </h1>
-                <p className="text-sm text-gray-500 text-center max-w-xs leading-relaxed">
-                  Ask me anything — roles, skills, salaries, interviews, or how to break in. For resume help, use the Resume Builder.
-                </p>
               </div>
             ) : (
               <ChatWindow
