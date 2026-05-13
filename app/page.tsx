@@ -2147,26 +2147,17 @@ export default function Page() {
     href?: string;
   };
   type NavGroup = { label: string; items: NavChild[] };
-  // Only ship surfaces that actually work. "Coming Soon" placeholders
-  // (Cover Letter, Job Match, Published, Versions, Profile, Settings)
-  // are stripped — they re-enter the nav when they're real.
+  // Chat-as-chassis model: Resume Builder + Interview Prep are no longer
+  // top-level destinations. They're workspaces that open inside the chat
+  // shell when the orchestrator routes there. Drive + Foundations stay
+  // visible in the sidebar because they're useful as direct launchpads
+  // (file browse / curriculum browse), but they open inside the same
+  // chat shell too — as the right-pane workspace, not a separate page.
   const NAV_GROUPS: NavGroup[] = [
-    {
-      label: "Workspace",
-      items: [
-        // FileEdit reads as "edit a document" — clearer than a generic
-        // FileText for the resume editor.
-        { key: "resume-builder", label: "Resume Builder", icon: FileEdit, view: "resume-builder", locked: false },
-        // Mic for interview prep — universal "speaking practice" cue.
-        { key: "interview-prep", label: "Interview Prep", icon: Mic,      view: "interview",      locked: false },
-      ],
-    },
     {
       label: "Library",
       items: [
         { key: "drive",       label: "Drive",       icon: FolderOpen,    view: "drive", locked: false },
-        // GraduationCap for Foundations — learning vibe is stronger
-        // than a generic book.
         { key: "foundations", label: "Foundations", icon: GraduationCap, view: "learn", locked: false },
       ],
     },
