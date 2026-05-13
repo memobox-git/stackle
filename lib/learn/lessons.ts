@@ -285,46 +285,158 @@ Wrong answer: starting with normalised 3NF and "joining as needed". That's an OL
   "de-fundamentals/what-is-data-engineering": `
 # What is Data Engineering?
 
-Data engineers build and maintain the systems that move data from where it's *generated* to where it's *useful*. Application databases, event streams, third-party APIs, log files — all of that has to land in a warehouse or lake in a shape someone can query.
+Every time you open Netflix and it recommends a show, every time Uber calculates your ETA, every time your bank flags a suspicious transaction — there's data engineering underneath. Not algorithms. Not ML magic. **Plumbing**.
 
-That's it. That's the job.
+Data engineers build and maintain the systems that move data from where it's *generated* to where it's *useful*. Application databases, event streams, third-party APIs, log files — all of that has to land somewhere it can be queried, joined, modelled, and acted on. That's the job.
 
-## The three jobs underneath
+> [!KEY] The one-line definition
+> Data engineering is the practice of designing, building, and operating the systems that turn raw data into reliable data — at the scale and speed a business actually needs.
 
-Strip the title and you'll find a DE doing some mix of:
+## Why this role exists at all
 
-1. **Ingestion** — pulling raw data from N sources into one place. Postgres → Snowflake. Kafka → S3. Stripe API → BigQuery.
-2. **Transformation** — turning raw rows into modelled tables an analyst or ML team can actually use. \`raw_stripe_charges\` → \`fct_payments\`.
-3. **Orchestration** — making sure all of that runs on a schedule, retries on failure, and tells someone when it breaks.
+Twenty years ago, "data" meant the transactional database behind your application. One Postgres, one ETL job overnight, one Crystal Reports dashboard. A DBA could handle it.
 
-Different companies emphasise different pieces. At a startup you do all three plus the infra. At a FAANG you might own just one slice (e.g. "I run the streaming ingestion for ads.").
+Three things broke that world:
 
-## How DE is different from adjacent roles
+**Volume.** A single mobile app today generates more events in an hour than a 2005 enterprise generated in a year. Click events, view durations, A/B exposures, error traces — billions of rows.
 
-| Role | What they own |
-|---|---|
-| **Data Engineer** | Pipelines, models, reliability of the data layer |
-| **Analytics Engineer** | SQL transformations on top of clean data (dbt-style) |
-| **Data Analyst** | Querying clean data → dashboards + answers |
-| **Data Scientist** | Statistical models, experiments, ML training data |
-| **ML Engineer** | Productionising ML models — feature stores, serving infra |
+**Source multiplication.** Your data lives in Stripe, Salesforce, Segment, Mixpanel, your Postgres, your Mongo, your S3 logs, three different SaaS tools the marketing team bought without telling you. Each of those is its own schema with its own API and its own way of breaking.
 
-The lines blur, especially at small companies where one person wears all five hats.
+**Competitive advantage.** Companies that can answer "what just happened?" in five minutes outcompete companies that take a week. Whether the answer powers a dashboard or an ML model, the *pipeline* is the bottleneck.
 
-## What you actually need to be good at
+Data engineers exist because someone has to make all of that work, reliably, every night, while the rest of the company sleeps.
 
-- **SQL** — non-negotiable. Window functions, CTEs, performance tuning.
-- **Python** — for everything that isn't SQL.
-- **One warehouse** — pick Snowflake, BigQuery, or Redshift and go deep.
-- **One orchestrator** — Airflow is still the default; Dagster and Prefect are gaining.
-- **One transformation tool** — dbt is the standard.
-- **Cloud basics** — S3/GCS, IAM, VPCs, at least one of AWS/GCP/Azure.
+## The five-stage lifecycle
 
-That's the floor. Above the floor you specialise: streaming, real-time, governance, ML platforms, etc.
+Every piece of data you'll ever work with passes through roughly these stages:
+
+\`\`\`
+┌───────────┐     ┌─────────────┐     ┌──────────────┐
+│ Generation│ ──▶ │  Ingestion  │ ──▶ │ Transformation│
+│  (source) │     │   (EL)      │     │      (T)      │
+└───────────┘     └─────────────┘     └──────────────┘
+                                              │
+                                              ▼
+                       ┌──────────────┐  ┌──────────────┐
+                       │   Serving    │◀─│   Storage    │
+                       │ (BI, ML, API)│  │ (warehouse,  │
+                       └──────────────┘  │  lake)       │
+                                         └──────────────┘
+\`\`\`
+
+**1. Generation.** Your app inserts a row. A user clicks a button. Stripe processes a payment. This is where data is born — and it's almost never in the shape you'll want later.
+
+**2. Ingestion.** Pulling that data out of its source system and landing it somewhere central. \`Postgres → Snowflake\`. \`Kafka → S3\`. \`Stripe API → BigQuery\`. Tools: Fivetran, Airbyte, custom Python.
+
+**3. Storage.** Where the raw landed data lives. Warehouses (Snowflake, BigQuery, Redshift) for structured analytical queries. Lakes (S3, GCS) for everything else. Lakehouses (Databricks, Iceberg) blur the two.
+
+**4. Transformation.** Turning raw landed data into clean, modelled, business-ready tables. \`raw_stripe_charges\` becomes \`fct_payments\` becomes \`monthly_revenue_by_segment\`. This is where most DE day-to-day work lives.
+
+**5. Serving.** Where the data finally produces value. A BI dashboard, an ML training pipeline, a feature store, a reverse-ETL sync back into Salesforce. The consumer doesn't care about your pipeline — they care that the number is right.
+
+> [!CONTEXT] Why the order matters
+> Data flows one way. A bug in stage 2 (ingestion) silently corrupts every downstream stage. That's why DEs obsess over "left-shifting" data quality checks — catching problems as early in the lifecycle as possible.
+
+## How DE differs from software engineering
+
+They look similar from the outside — both write code, both deploy, both get paged at 3am — but the *failure modes* are completely different.
+
+| | Software Engineer | Data Engineer |
+|---|---|---|
+| **Hot path** | User request → DB → response (ms) | Event → pipeline → table (minutes/hours) |
+| **Failure mode** | Wrong response to one user | Wrong number across every dashboard |
+| **Testing** | Unit tests, integration tests | Data tests (null checks, row counts, distributions) |
+| **State** | Mostly stateless (DB holds state) | Stateful pipelines, idempotency matters |
+| **Debugging** | Stack trace, error log | "Why is this row missing?" (often: 4 stages back) |
+| **Bar** | Code correctness | Data correctness *plus* code correctness |
+
+A software engineer ships a bug → one feature breaks. A data engineer ships a bug → finance reports wrong revenue to the board.
+
+## The skill stack
+
+Drawn from a thousand DE job postings, the skills cluster like this:
+
+\`\`\`
+                        ┌──────────────┐
+                        │   SQL  +     │   ← non-negotiable, both.
+                        │   Python     │
+                        └──────────────┘
+                       /        |        \\
+                      /         |         \\
+              ┌──────────┐  ┌─────────┐  ┌─────────────┐
+              │Warehouse │  │Pipeline │  │ Cloud infra │
+              │(Snowflake│  │(Airflow,│  │ (AWS / GCP /│
+              │ BigQuery)│  │ Dagster)│  │  Azure)     │
+              └──────────┘  └─────────┘  └─────────────┘
+                       \\        |        /
+                        \\       |       /
+                        ┌──────────────┐
+                        │ Streaming /  │   ← specialise here later.
+                        │  ML platform │
+                        │  Governance  │
+                        └──────────────┘
+\`\`\`
+
+**Must-have:** SQL (window functions, CTEs, query optimisation), Python (pandas-level fluency, plus you can write a clean class).
+
+**Important:** One warehouse you know cold, one orchestrator, one transformation tool (dbt). Linux basics, Git, Docker.
+
+**Nice-to-have / specialisation territory:** streaming (Kafka, Flink), Spark, Kubernetes, real-time analytics (Pinot, Druid), ML platforms, data governance / catalogs.
+
+> [!WARN] Don't chase tools
+> Job postings list 14 technologies. You don't need 14. Pick ONE of each category and go deep. Three years of real Snowflake beats six months of Snowflake + six months of BigQuery + six months of Redshift.
+
+## A real-world example — your last food delivery order
+
+You opened DoorDash, ordered Pad Thai, paid, watched the dasher's icon move on the map. Here's the data-engineering trace:
+
+\`\`\`
+1. App fires "order_placed" event
+   → Kafka topic: orders.events
+2. Stream processor enriches with user history, restaurant data
+   → Materialised into orders_enriched (Flink job)
+3. Snapshot copies of orders_enriched land in the warehouse hourly
+   → fct_orders (Snowflake)
+4. dbt runs nightly transformations
+   → dim_restaurants, agg_dasher_earnings, mart_finance_revenue
+5. Two serving paths:
+   a. ML model reads fct_orders to predict delivery time → app
+   b. Looker dashboards read mart_finance_revenue → exec team
+\`\`\`
+
+Every arrow there is a data engineer's job. Build it, monitor it, fix it when it breaks (it will), make it cheaper over time.
+
+> [!TRY] Map your own day
+> Pick an app you used in the last hour — banking, music, social, ride-share. Sketch the same arrow chart for one thing you did in that app. What events were generated? Where did they land? Who consumes that data downstream? You don't need to be right — the exercise of guessing builds the right mental model.
+
+## Common misconceptions
+
+**"Data engineering is just ETL."** ETL is one slice of the lifecycle (ingestion + transformation). Modern DEs also own observability, cost, governance, platform tooling. The "E" of ETL is the smallest piece.
+
+**"You need to be a great programmer."** You need to be a *good enough* programmer. The bar is closer to "writes correct, maintainable, idempotent code" than "implements a B-tree from scratch." The harder skill is system design — picking which tool, knowing the trade-offs.
+
+**"It's just plumbing."** True in the same way that brain surgery is "just cutting." The plumbing is the product. Bad plumbing → wrong numbers → bad decisions → real money lost.
+
+**"AI will replace it."** AI helps with parts (generating SQL, drafting dbt models). It does not help with: figuring out *which* tables to build, debugging why a number is off, negotiating SLAs with the data consumers, designing a system that won't melt at 10x growth. Those are the senior-DE skills.
+
+> [!INTERVIEW] When this comes up in interviews
+> You'll get asked "what does a data engineer do?" almost certainly. The wrong answer is to list tools ("Airflow, dbt, Snowflake, Spark..."). The right answer is to talk about the **lifecycle** and **trade-offs**. Show you understand WHY each piece exists, not just that it does.
+
+[quiz]
+Q: A finance analyst tells you yesterday's revenue dashboard is showing a number 8% lower than what they expected from the daily Stripe email. Where do you look first?
+A: The BI dashboard — probably a stale cache.
+B: The warehouse model that powers the dashboard — likely a join dropping rows.
+C: The ingestion job that loads Stripe data into the warehouse.
+D: Stripe's API — it might have undercounted.
+correct: C
+explain: Always trace upstream toward the source. A discrepancy with Stripe's own number points at the boundary — most likely an ingestion job that's missing rows (failed sync, schema change, late events). The downstream stages just propagate whatever they were fed.
+[/quiz]
 
 ## What's next
 
-If this sounded familiar, skip ahead to the [Core Concepts](#) module. If parts felt fuzzy — like "what's a warehouse vs a lake" — keep going lesson by lesson; we untangle them all.
+If most of this sounded familiar and the quiz was easy, you're ready for **Core Concepts** — the vocabulary you'll need fluent (ETL vs ELT, batch vs streaming, star schemas).
+
+If parts felt fuzzy — especially "what's a warehouse vs a lake" — keep going lesson by lesson in this module. Next up: **DE vs Analyst vs Scientist** — figuring out exactly where you sit and which role to apply for.
 `,
 
   "de-fundamentals/etl-vs-elt": `
