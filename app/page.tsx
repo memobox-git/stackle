@@ -2410,68 +2410,83 @@ export default function Page() {
           /* Chat view */
           <div className="flex flex-col flex-1 min-h-0">
             {chatMessages.length === 0 && !isLoading ? (
-              /* Minimal hero — Claude/ChatGPT-style. Just a short
-                 greeting (rotating per chat) above the input. No
-                 marketing copy, no logo block. Matches the calmer
-                 empty states the user referenced. */
-              <div className="flex-1 flex flex-col items-center justify-center px-6 -mt-24">
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-black text-[11px] font-bold mb-4 opacity-80"
-                  style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
-                  aria-hidden
-                >S</div>
-                <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight text-center">
-                  {pickHeroGreeting({ chatId: activeChatId, firstName: resumeExtraction?.name?.split(" ")[0] ?? null })}
-                </h1>
+              /* Empty state — Claude/ChatGPT-style. Greeting + input
+                 stacked together, vertically centered in the viewport.
+                 No second input at the bottom; the input lives here
+                 with the greeting until the first message lands. */
+              <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
+                <div className="w-full max-w-2xl flex flex-col items-center">
+                  <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight text-center mb-8">
+                    {pickHeroGreeting({ chatId: activeChatId, firstName: resumeExtraction?.name?.split(" ")[0] ?? null })}
+                  </h1>
+                  <div className="w-full">
+                    <ChatInput
+                      value={chatInput}
+                      onChange={setChatInput}
+                      onSend={() => sendMessage(chatInput)}
+                      onFileUpload={handleResumeUpload}
+                      disabled={isLoading}
+                      busy={isLoading}
+                      onStop={() => {
+                        agentAbortRef.current?.abort();
+                        agentAbortRef.current = null;
+                        setIsLoading(false);
+                      }}
+                      placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
+                    />
+                  </div>
+                </div>
               </div>
             ) : (
-              <ChatWindow
-                messages={chatMessages}
-                isLoading={isLoading}
-                resumeAnalysis={null}
-                marketAnalysis={null}
-                resumePreview={null}
-                resumeExtraction={null}
-                interviewPrepPlan={null}
-                onSend={sendMessage}
-                resumeText={resumeText}
-                onApplyInBuilder={(instruction) => {
-                  if (!resumeExtraction) {
-                    alert("Upload your resume first so I can apply this rewrite.");
-                    return;
-                  }
-                  setPendingBuilderInstruction(instruction);
-                  setActiveView("resume-builder");
-                }}
-                onEditUserMessage={handleEditUserMessage}
-                onChatEditPrompt={(prompt) => {
-                  // Inline chips clicked — route the special "Fix my resume"
-                  // pill to the resume builder view; everything else gets
-                  // sent through the chat as a normal user message.
-                  if (prompt === "Fix my resume") {
+              <>
+                <ChatWindow
+                  messages={chatMessages}
+                  isLoading={isLoading}
+                  resumeAnalysis={null}
+                  marketAnalysis={null}
+                  resumePreview={null}
+                  resumeExtraction={null}
+                  interviewPrepPlan={null}
+                  onSend={sendMessage}
+                  resumeText={resumeText}
+                  onApplyInBuilder={(instruction) => {
+                    if (!resumeExtraction) {
+                      alert("Upload your resume first so I can apply this rewrite.");
+                      return;
+                    }
+                    setPendingBuilderInstruction(instruction);
                     setActiveView("resume-builder");
-                    return;
-                  }
-                  sendMessage(prompt);
-                }}
-              />
+                  }}
+                  onEditUserMessage={handleEditUserMessage}
+                  onChatEditPrompt={(prompt) => {
+                    // Inline chips clicked — route the special "Fix my resume"
+                    // pill to the resume builder view; everything else gets
+                    // sent through the chat as a normal user message.
+                    if (prompt === "Fix my resume") {
+                      setActiveView("resume-builder");
+                      return;
+                    }
+                    sendMessage(prompt);
+                  }}
+                />
+                <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-white">
+                  <ChatInput
+                    value={chatInput}
+                    onChange={setChatInput}
+                    onSend={() => sendMessage(chatInput)}
+                    onFileUpload={handleResumeUpload}
+                    disabled={isLoading}
+                    busy={isLoading}
+                    onStop={() => {
+                      agentAbortRef.current?.abort();
+                      agentAbortRef.current = null;
+                      setIsLoading(false);
+                    }}
+                    placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
+                  />
+                </div>
+              </>
             )}
-            <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-white">
-              <ChatInput
-                value={chatInput}
-                onChange={setChatInput}
-                onSend={() => sendMessage(chatInput)}
-                onFileUpload={handleResumeUpload}
-                disabled={isLoading}
-                busy={isLoading}
-                onStop={() => {
-                  agentAbortRef.current?.abort();
-                  agentAbortRef.current = null;
-                  setIsLoading(false);
-                }}
-                placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
-              />
-            </div>
           </div>
         ) : activeView === "interview" ? (
           <InterviewView candidateName={resumeExtraction?.name ?? null} />
