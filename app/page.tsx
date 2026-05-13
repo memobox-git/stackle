@@ -879,19 +879,25 @@ export default function Page() {
       bodyParts.push(`What's holding you back:\n${lines.join("\n")}`);
     }
 
-    const closer = careerGoal
-      ? `You said your goal is *${careerGoal}*. Want to start there, or talk about something else?`
-      : `What's going on?`;
-    bodyParts.push(closer);
+    // Only add a closer when there's actual analysis content to anchor
+    // it. Otherwise the chips below already imply 'what next?' — adding
+    // a literal 'What's going on?' question reads as the assistant
+    // floundering. The career-goal version is fine because it cites
+    // something specific.
+    if (careerGoal) {
+      bodyParts.push(`You said your goal is *${careerGoal}*. Want to start there, or pick something else?`);
+    } else if (bodyParts.length > 0) {
+      bodyParts.push(`Where do you want to start?`);
+    }
 
     const fullBody = bodyParts.length > 0 ? `\n\n${bodyParts.join("\n\n")}` : "";
 
     const greetMsgs: ChatMessage[] = [
       { role: "assistant", content: `${header}${fullBody}`, timestamp: now() },
-      // Inline chip row — chips live IN the conversation thread so they
-      // feel like part of the assistant's first move, not a tray pinned
-      // above the input. Format consumed by ChatWindow's INLINE_CHIPS sentinel.
-      { role: "assistant", content: "__INLINE_CHIPS__:Fix my resume|What's going on?" },
+      // Quick-launch chips — same set as the empty-hero so the surface
+      // feels consistent. Each chip is a real next move, not a vague
+      // 'What's going on?' which has no obvious answer.
+      { role: "assistant", content: "__INLINE_CHIPS__:Fix my resume|Tailor for a JD|Interview prep|Foundations" },
     ];
     setChatMessages(greetMsgs);
 
@@ -2484,11 +2490,24 @@ export default function Page() {
                   }}
                   onEditUserMessage={handleEditUserMessage}
                   onChatEditPrompt={(prompt) => {
-                    // Inline chips clicked — route the special "Fix my resume"
-                    // pill to the resume builder view; everything else gets
-                    // sent through the chat as a normal user message.
-                    if (prompt === "Fix my resume") {
+                    // Inline chips: route the action-launcher chips to
+                    // their surfaces directly; pass everything else
+                    // through as a normal chat message.
+                    const t = prompt.trim().toLowerCase();
+                    if (t === "fix my resume" || t === "review my resume") {
                       setActiveView("resume-builder");
+                      return;
+                    }
+                    if (t === "interview prep") {
+                      setActiveView("interview");
+                      return;
+                    }
+                    if (t === "foundations") {
+                      setActiveView("learn");
+                      return;
+                    }
+                    if (t === "tailor for a jd") {
+                      sendMessage("I want to tailor my resume for a specific job description.");
                       return;
                     }
                     sendMessage(prompt);
