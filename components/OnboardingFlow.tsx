@@ -142,7 +142,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const q1 = useTypewriter("Add a profile photo");
-  const q2 = useTypewriter(step >= 2 ? "Upload your resume" : "");
+  const q2 = useTypewriter(step >= 2 ? "Your next career move starts here." : "");
   // Step 3 — Career Goal question (NEW). Personalises later screens.
   const q3 = useTypewriter(step >= 3 ? "What are you trying to do?" : "");
   // Step 4 — Confirm extracted contact (was step 3 pre-feature).
@@ -795,7 +795,7 @@ export default function OnboardingFlow({ onComplete, onSignIn }: Props) {
               <span className={`inline-block w-0.5 h-8 bg-gray-900 ml-1 align-middle ${q2.done ? "opacity-0" : "animate-pulse"}`} />
             </h1>
             <p className="text-base text-gray-600 text-center max-w-md leading-relaxed">
-              Get an honest review and action plan from a senior data engineer. Free.
+              Drop your resume — an honest review and action plan in 30 seconds. Free.
             </p>
 
             {resumeFilename ? (
