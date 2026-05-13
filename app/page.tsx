@@ -2155,6 +2155,13 @@ export default function Page() {
   // chat shell too — as the right-pane workspace, not a separate page.
   const NAV_GROUPS: NavGroup[] = [
     {
+      label: "Workspace",
+      items: [
+        { key: "resume-builder", label: "Resume Builder", icon: FileEdit, view: "resume-builder", locked: false },
+        { key: "interview-prep", label: "Interview Prep", icon: Mic,      view: "interview",      locked: false },
+      ],
+    },
+    {
       label: "Library",
       items: [
         // Job Match has its own /job-match list route (href). Drive +
