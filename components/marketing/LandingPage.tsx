@@ -9,37 +9,7 @@
 // signup.
 
 import Link from "next/link";
-import {
-  Sparkles,
-  FileText,
-  Target,
-  MessagesSquare,
-  BookOpen,
-  ArrowRight,
-} from "lucide-react";
-
-const VALUE_PROPS = [
-  {
-    icon: FileText,
-    title: "Resume review",
-    blurb: "Honest read in 30 seconds. Score, weaknesses, the one thing to fix first.",
-  },
-  {
-    icon: Target,
-    title: "Tailor for a JD",
-    blurb: "Paste a job description. Get a version that mirrors the must-haves without faking experience.",
-  },
-  {
-    icon: MessagesSquare,
-    title: "Interview prep",
-    blurb: "Practice the question types you'll actually get. Company-specific drills, instant verdict.",
-  },
-  {
-    icon: BookOpen,
-    title: "Foundations",
-    blurb: "DE / SE / DS concepts you're expected to know. Quick lessons, real diagrams, end-of-lesson check.",
-  },
-];
+import { Sparkles, ArrowRight } from "lucide-react";
 
 export default function LandingPage() {
   return (
@@ -97,56 +67,6 @@ export default function LandingPage() {
           </Link>
         </div>
         <p className="text-[12px] text-gray-500 mt-4">No credit card. Cancel anytime — but you won&apos;t want to.</p>
-      </section>
-
-      {/* Value props */}
-      <section className="px-6 py-16 max-w-5xl mx-auto w-full">
-        <p className="text-[11px] font-semibold tracking-[0.12em] uppercase text-violet-700 text-center mb-3">
-          What you can do
-        </p>
-        <h2 className="text-[28px] md:text-[32px] font-semibold tracking-tight text-center mb-10">
-          One coach. Four surfaces. Zero busywork.
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {VALUE_PROPS.map(({ icon: Icon, title, blurb }) => (
-            <div
-              key={title}
-              className="bg-white border border-gray-200 rounded-2xl p-5 hover:border-gray-300 transition-colors"
-            >
-              <div className="flex items-center gap-2.5 mb-2">
-                <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-gray-800" strokeWidth={2} />
-                </div>
-                <h3 className="text-[16px] font-semibold">{title}</h3>
-              </div>
-              <p className="text-[14px] text-gray-700 leading-6">{blurb}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Proof strip */}
-      <section className="px-6 py-12 max-w-3xl mx-auto w-full text-center">
-        <p className="text-[14px] text-gray-700 italic leading-7">
-          &ldquo;Took me twenty minutes to find what a Stackle review surfaced in thirty seconds —
-          and the fix it suggested was the exact thing my hiring manager flagged.&rdquo;
-        </p>
-        <p className="text-[12px] text-gray-500 mt-3">— Senior Data Engineer, FAANG</p>
-      </section>
-
-      {/* CTA */}
-      <section className="px-6 py-16 text-center">
-        <h2 className="text-[24px] md:text-[28px] font-semibold tracking-tight mb-4">
-          Ready when you are.
-        </h2>
-        <Link
-          href="/signup"
-          className="inline-flex items-center gap-2 text-sm font-semibold text-black px-5 py-3 rounded-full hover:opacity-90 transition-opacity"
-          style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
-        >
-          Get started — it&apos;s free
-          <ArrowRight className="w-4 h-4" strokeWidth={2} />
-        </Link>
       </section>
 
       {/* Footer */}
