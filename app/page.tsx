@@ -1584,6 +1584,8 @@ export default function Page() {
           } else if (r.managerKey === "interview") {
             // Defer view switch to next tick so this turn's chat persists first.
             setTimeout(() => setActiveView("interview"), 200);
+          } else if (r.managerKey === "learn") {
+            setTimeout(() => setActiveView("learn"), 200);
           }
 
           setMessages(reply);
@@ -2445,20 +2447,20 @@ export default function Page() {
                       placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
                     />
                   </div>
-                  {/* Quick-start chips — same row position as Claude's
-                      Write / Learn / From Drive chips, but mapped to
-                      Stackle's actual surfaces. Each chip routes
-                      directly into the relevant feature. */}
+                  {/* Quick-start chips — each fires a chat message so the
+                      orchestrator picks up the intent and routes. No
+                      pre-baked view switches; the brain decides what
+                      surface to open based on context. */}
                   <div className="flex flex-wrap gap-2 mt-4 justify-center">
                     {[
-                      { label: "Review my resume", icon: FileText,       action: () => setActiveView("resume-builder") },
-                      { label: "Tailor for a JD",  icon: Target,         action: () => sendMessage("I want to tailor my resume for a specific job description.") },
-                      { label: "Interview prep",   icon: MessagesSquare, action: () => setActiveView("interview") },
-                      { label: "Foundations",      icon: BookOpen,       action: () => setActiveView("learn") },
-                    ].map(({ label, icon: Icon, action }) => (
+                      { label: "Review my resume", icon: FileText,       prompt: "Can you review my resume?" },
+                      { label: "Tailor for a JD",  icon: Target,         prompt: "I want to tailor my resume for a specific job description." },
+                      { label: "Interview prep",   icon: MessagesSquare, prompt: "I'd like to prep for an interview." },
+                      { label: "Foundations",      icon: BookOpen,       prompt: "I want to learn data-engineering fundamentals." },
+                    ].map(({ label, icon: Icon, prompt }) => (
                       <button
                         key={label}
-                        onClick={action}
+                        onClick={() => sendMessage(prompt)}
                         className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1.5 transition-all shadow-sm hover:shadow"
                       >
                         <Icon className="w-3.5 h-3.5 text-gray-500" strokeWidth={1.75} />
@@ -2490,26 +2492,12 @@ export default function Page() {
                   }}
                   onEditUserMessage={handleEditUserMessage}
                   onChatEditPrompt={(prompt) => {
-                    // Inline chips: route the action-launcher chips to
-                    // their surfaces directly; pass everything else
-                    // through as a normal chat message.
-                    const t = prompt.trim().toLowerCase();
-                    if (t === "fix my resume" || t === "review my resume") {
-                      setActiveView("resume-builder");
-                      return;
-                    }
-                    if (t === "interview prep") {
-                      setActiveView("interview");
-                      return;
-                    }
-                    if (t === "foundations") {
-                      setActiveView("learn");
-                      return;
-                    }
-                    if (t === "tailor for a jd") {
-                      sendMessage("I want to tailor my resume for a specific job description.");
-                      return;
-                    }
+                    // All chip clicks route through chat → orchestrator.
+                    // The orchestrator reads context, narrates, and emits
+                    // a managerKey that triggers the view switch when
+                    // appropriate (handled in the sendMessage pipeline).
+                    // No pre-baked shortcuts — keeps the routing brain
+                    // in one place.
                     sendMessage(prompt);
                   }}
                 />

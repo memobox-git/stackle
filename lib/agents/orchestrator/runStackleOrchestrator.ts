@@ -17,10 +17,11 @@ export type ManagerKey =
   | "interview"
   | "cover_letter"
   | "career_strategy"
+  | "learn"
   | "more_info_needed";
 
 export type SeniorityLevel = "entry" | "mid" | "senior" | "lead" | null;
-export type FocusKey = "resume" | "interview" | "tailor_jd" | "cover_letter" | "career_strategy" | null;
+export type FocusKey = "resume" | "interview" | "tailor_jd" | "cover_letter" | "career_strategy" | "learn" | null;
 
 export interface ExtractedSignals {
   role: string | null;
@@ -36,10 +37,10 @@ export interface OrchestratorRoute {
 }
 
 const VALID_KEYS: ManagerKey[] = [
-  "resume", "interview", "cover_letter", "career_strategy", "more_info_needed",
+  "resume", "interview", "cover_letter", "career_strategy", "learn", "more_info_needed",
 ];
 const VALID_SENIORITY = ["entry", "mid", "senior", "lead"] as const;
-const VALID_FOCUS = ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy"] as const;
+const VALID_FOCUS = ["resume", "interview", "tailor_jd", "cover_letter", "career_strategy", "learn"] as const;
 
 export interface OrchestratorInput {
   messages: { role: "user" | "assistant"; content: string }[];
