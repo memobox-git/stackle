@@ -253,7 +253,8 @@ function SessionsList({
                 <button
                   key={diff}
                   onClick={() => onNew({ skill: pickedSkill, difficulty: diff })}
-                  className="inline-flex items-center text-[13px] font-medium text-white bg-violet-700 hover:bg-violet-800 rounded-full px-3.5 py-1.5 transition-colors capitalize"
+                  className="inline-flex items-center text-[13px] font-semibold text-black rounded-full px-3.5 py-1.5 hover:opacity-90 transition-opacity capitalize"
+                  style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
                 >
                   {diff}
                 </button>
@@ -452,7 +453,15 @@ function ActiveSession({
 
   async function callSkillAgent(history: ChatMsg[]) {
     setStreaming(true);
-    const placeholderIdx = messages.length + 1; // after user push
+    // history.length IS the placeholder index after we push the empty
+    // assistant message — it's where the placeholder lands.
+    //   handleSubmit:    history = [...messages, userMsg] → length = N+1
+    //   auto-greet:      history = []                       → length = 0
+    //   post-eval:       history = messages.concat(synth)   → length = N+1
+    // The old `messages.length + 1` assumed a user push always happened
+    // and left the auto-greet path (no user push) writing to an
+    // undefined slot, so the streamed response never appeared.
+    const placeholderIdx = history.length;
     pushAssistant("");
 
     try {
