@@ -11,6 +11,7 @@ import ResumeBuilder from "@/components/ResumeBuilder";
 import InterviewView from "@/components/interview/InterviewView";
 import LearnView from "@/components/LearnView";
 import MarketingLanding from "@/components/marketing/LandingPage";
+import AppChatPanel from "@/components/AppChatPanel";
 import { getCurrentProfile, buildProfileFromResume } from "@/lib/supabase/profiles";
 import { pickHeroGreeting } from "@/lib/heroGreetings";
 import { ChatMessage } from "@/components/Message";
@@ -106,6 +107,11 @@ export default function Page() {
   // First name from the profiles row — surfaces in greetings, header,
   // and anywhere we'd otherwise default to the resume.name.
   const [profileFirstName, setProfileFirstName] = useState<string | null>(null);
+  // Persistent chat panel — open by default in Interview / Foundations /
+  // Drive views. User can close to give the workspace full width.
+  // State lives at app shell level so toggling persists across view
+  // switches within a session.
+  const [appChatPanelOpen, setAppChatPanelOpen] = useState<boolean>(true);
   const [authEmail, setAuthEmail] = useState("");
   const [authSent, setAuthSent] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -2863,16 +2869,77 @@ export default function Page() {
               </>
             )}
           </div>
-        ) : activeView === "interview" ? (
-          <InterviewView
-            candidateName={resumeExtraction?.name ?? null}
-            resumeSkills={(resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? [])}
-          />
-        ) : activeView === "learn" ? (
-          <LearnView />
+        ) : activeView === "interview" || activeView === "learn" ? (
+          // Chat-as-chassis: persistent chat panel on the left,
+          // workspace view (Interview Prep or Foundations) on the
+          // right. Chat shares the same messages state with the main
+          // chat view so the conversation is continuous across surfaces.
+          <div className="flex flex-1 min-h-0 relative overflow-hidden">
+            <AppChatPanel
+              isOpen={appChatPanelOpen}
+              onClose={() => setAppChatPanelOpen(false)}
+              messages={chatMessages}
+              isLoading={isLoading}
+              chatInput={chatInput}
+              onChatInputChange={setChatInput}
+              onSend={(text) => sendMessage(text)}
+              onStop={() => {
+                agentAbortRef.current?.abort();
+                agentAbortRef.current = null;
+                setIsLoading(false);
+              }}
+              onChatEditPrompt={(prompt) => sendMessage(prompt)}
+              onEditUserMessage={handleEditUserMessage}
+              onFileUpload={handleResumeUpload}
+              resumeText={resumeText}
+              resumeExtraction={resumeExtraction}
+            />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              {activeView === "interview" ? (
+                <InterviewView
+                  candidateName={resumeExtraction?.name ?? null}
+                  resumeSkills={(resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? [])}
+                />
+              ) : (
+                <LearnView />
+              )}
+            </div>
+            {!appChatPanelOpen && (
+              <button
+                onClick={() => setAppChatPanelOpen(true)}
+                title="Open chat"
+                className="absolute bottom-5 left-5 z-10 inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-gray-900 text-white text-[13px] font-medium hover:bg-black shadow-lg transition-colors"
+              >
+                <MessagesSquare className="w-3.5 h-3.5" strokeWidth={2} />
+                Open chat
+              </button>
+            )}
+          </div>
         ) : activeView === "drive" ? (
-          /* Drive view — Dropbox-style */
-          <div className="flex-1 overflow-y-auto bg-white">
+          /* Drive view — chat-as-chassis: persistent chat on left,
+              file browser on right. Same toggle pattern as Interview
+              and Foundations. */
+          <div className="flex flex-1 min-h-0 relative overflow-hidden">
+            <AppChatPanel
+              isOpen={appChatPanelOpen}
+              onClose={() => setAppChatPanelOpen(false)}
+              messages={chatMessages}
+              isLoading={isLoading}
+              chatInput={chatInput}
+              onChatInputChange={setChatInput}
+              onSend={(text) => sendMessage(text)}
+              onStop={() => {
+                agentAbortRef.current?.abort();
+                agentAbortRef.current = null;
+                setIsLoading(false);
+              }}
+              onChatEditPrompt={(prompt) => sendMessage(prompt)}
+              onEditUserMessage={handleEditUserMessage}
+              onFileUpload={handleResumeUpload}
+              resumeText={resumeText}
+              resumeExtraction={resumeExtraction}
+            />
+            <div className="flex-1 overflow-y-auto bg-white">
             {/* Header */}
             <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-6 py-4">
               <div className="max-w-3xl mx-auto flex items-center justify-between">
@@ -3029,6 +3096,17 @@ export default function Page() {
                 </div>
               )}
             </div>
+            </div>
+            {!appChatPanelOpen && (
+              <button
+                onClick={() => setAppChatPanelOpen(true)}
+                title="Open chat"
+                className="absolute bottom-5 left-5 z-10 inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-gray-900 text-white text-[13px] font-medium hover:bg-black shadow-lg transition-colors"
+              >
+                <MessagesSquare className="w-3.5 h-3.5" strokeWidth={2} />
+                Open chat
+              </button>
+            )}
           </div>
         ) : resumeText || chatMessages.length > 0 ? (
           /* Resume uploaded — show split view */
