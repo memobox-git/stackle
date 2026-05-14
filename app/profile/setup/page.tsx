@@ -21,7 +21,6 @@ import { Check, X as XIcon } from "lucide-react";
 export default function ProfileSetupPage() {
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
-  const [needsName, setNeedsName] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [username, setUsernameInput] = useState("");
@@ -43,14 +42,16 @@ export default function ProfileSetupPage() {
         router.replace("/signin");
         return;
       }
+      // Always show First / Last / Username — pre-fill name fields
+      // from OAuth metadata when we have it (user can still edit).
       const meta = (user.user_metadata ?? {}) as { full_name?: string; name?: string; given_name?: string; family_name?: string };
       const fullName = meta.full_name || meta.name || [meta.given_name, meta.family_name].filter(Boolean).join(" ") || "";
-      const haveName = !!fullName.trim();
-      setNeedsName(!haveName);
-      if (haveName) {
+      if (fullName.trim()) {
         const [first, ...rest] = fullName.trim().split(/\s+/);
-        setFirstName(first);
-        setLastName(rest.join(" "));
+        if (meta.given_name) setFirstName(meta.given_name);
+        else setFirstName(first);
+        if (meta.family_name) setLastName(meta.family_name);
+        else setLastName(rest.join(" "));
       }
       setUsernameInput(suggestUsernameFrom({ fullName, email: user.email ?? null }));
       setAuthChecked(true);
@@ -82,7 +83,7 @@ export default function ProfileSetupPage() {
     setError("");
     if (!validFormat) return;
     if (availability === "taken") return;
-    if (needsName && (!firstName.trim() || !lastName.trim())) {
+    if (!firstName.trim() || !lastName.trim()) {
       setError("First and last name required");
       return;
     }
@@ -116,31 +117,29 @@ export default function ProfileSetupPage() {
           className="w-10 h-10 rounded-2xl mx-auto flex items-center justify-center text-black text-sm font-bold mb-6"
           style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
         >S</div>
-        <h1 className="text-[24px] font-semibold text-gray-900 text-center mb-1">Pick a username</h1>
+        <h1 className="text-[24px] font-semibold text-gray-900 text-center mb-1">Finish setting up</h1>
         <p className="text-[14px] text-gray-600 text-center mb-6">
-          You'll use this for sharing — like <span className="font-mono text-gray-800">stackle.io/profile/your-name</span>.
+          Your username powers sharing — like <span className="font-mono text-gray-800">stackle.io/profile/your-name</span>.
         </p>
 
-        {needsName && (
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              placeholder="First name"
-              className="px-3.5 py-2.5 rounded-xl border border-gray-300 text-[15px] outline-none focus:border-gray-900 transition-colors"
-              required
-            />
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              placeholder="Last name"
-              className="px-3.5 py-2.5 rounded-xl border border-gray-300 text-[15px] outline-none focus:border-gray-900 transition-colors"
-              required
-            />
-          </div>
-        )}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <input
+            type="text"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            placeholder="First name"
+            className="px-3.5 py-2.5 rounded-xl border border-gray-300 text-[15px] outline-none focus:border-gray-900 transition-colors"
+            required
+          />
+          <input
+            type="text"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            placeholder="Last name"
+            className="px-3.5 py-2.5 rounded-xl border border-gray-300 text-[15px] outline-none focus:border-gray-900 transition-colors"
+            required
+          />
+        </div>
 
         <label className="block">
           <div className="flex items-stretch border border-gray-300 rounded-xl overflow-hidden bg-white focus-within:border-gray-900 transition-colors">
