@@ -13,6 +13,7 @@
 // provider's error message if not enabled.
 
 import { useState } from "react";
+import { useTypewriter } from "@/lib/useTypewriter";
 import { getSupabaseClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup";
@@ -90,12 +91,10 @@ export default function AuthForm({ mode }: { mode: Mode }) {
           className="inline-flex w-10 h-10 rounded-xl items-center justify-center text-black text-base font-bold mb-3"
           style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
         >S</div>
-        <h1 className="text-xl font-semibold text-gray-900 mb-1">
-          {mode === "signup" ? "Create your account" : "Sign in to Stackle"}
-        </h1>
-        <p className="text-sm text-gray-500">
-          {mode === "signup" ? "30 seconds. We'll save your work across devices." : "Pick up where you left off."}
-        </p>
+        <Headline mode={mode} />
+        {mode === "signin" && (
+          <p className="text-sm text-gray-500">Pick up where you left off.</p>
+        )}
       </div>
 
       {/* OAuth buttons */}
@@ -171,5 +170,23 @@ export default function AuthForm({ mode }: { mode: Mode }) {
         )}
       </div>
     </div>
+  );
+}
+
+
+// Typewriter headline. Only animates on the signup screen — sign-in
+// reads instantly to avoid making returning users wait to read a
+// familiar prompt.
+function Headline({ mode }: { mode: "signin" | "signup" }) {
+  const target = mode === "signup" ? "Create your account" : "Sign in to Stackle";
+  const { displayed, done } = useTypewriter(mode === "signup" ? target : "", 32);
+  const text = mode === "signup" ? displayed : target;
+  return (
+    <h1 className="text-xl font-semibold text-gray-900 mb-1">
+      {text}
+      {mode === "signup" && !done && (
+        <span className="inline-block w-[2px] h-5 bg-gray-900 align-middle ml-0.5 animate-pulse" aria-hidden />
+      )}
+    </h1>
   );
 }
