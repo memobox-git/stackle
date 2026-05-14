@@ -155,7 +155,21 @@ export default function Page() {
   useEffect(() => { activeChatIdRef.current = activeChatId; }, [activeChatId]);
 
   // ── UI ────────────────────────────────────────────────
-  const [activeView, setActiveView] = useState<ActiveView>("resume-builder");
+  // Persist activeView across reloads + tab switches via localStorage.
+  // Without this, opening the app in another tab / closing + returning
+  // dumped the user back on the chat view even if they were drilling
+  // interview prep. Initial render reads from storage; subsequent
+  // updates write through a useEffect (see below).
+  const [activeView, setActiveView] = useState<ActiveView>(() => {
+    if (typeof window === "undefined") return "chat";
+    const saved = localStorage.getItem("stackle_active_view");
+    const valid: ActiveView[] = ["chat", "resume-builder", "drive", "interview", "learn"];
+    return (valid as string[]).includes(saved ?? "") ? (saved as ActiveView) : "chat";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try { localStorage.setItem("stackle_active_view", activeView); } catch { /* ignore */ }
+  }, [activeView]);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   // Toast surfaced when the user clicks a locked nav item (Cover Letter,
