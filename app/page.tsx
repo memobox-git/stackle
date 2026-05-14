@@ -103,6 +103,9 @@ export default function Page() {
   // null = check pending, true = needs to set up username, false = ready.
   // Auth-init effect resolves this once the user is known.
   const [needsProfileSetup, setNeedsProfileSetup] = useState<null | boolean>(null);
+  // First name from the profiles row — surfaces in greetings, header,
+  // and anywhere we'd otherwise default to the resume.name.
+  const [profileFirstName, setProfileFirstName] = useState<string | null>(null);
   const [authEmail, setAuthEmail] = useState("");
   const [authSent, setAuthSent] = useState(false);
   const [authError, setAuthError] = useState("");
@@ -401,6 +404,7 @@ export default function Page() {
         const profile = await getCurrentProfile();
         const needs = !profile?.username;
         setNeedsProfileSetup(needs);
+        if (profile?.first_name) setProfileFirstName(profile.first_name);
         if (needs) {
           if (typeof window !== "undefined" && window.location.pathname !== "/profile/setup") {
             window.location.href = "/profile/setup";
@@ -2617,14 +2621,22 @@ export default function Page() {
                 {userMenuOpen && (
                   <>
                     <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 z-40 bg-gray-100 border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[200px]">
-                      <div className="px-3 py-2 border-b border-gray-200">
-                        <p className="text-[10px] uppercase tracking-widest text-gray-600">Signed in as</p>
-                        <p className="text-xs text-gray-700 truncate mt-0.5">{user?.email ?? "—"}</p>
+                    <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[220px]">
+                      <div className="px-3 py-2.5 border-b border-gray-200">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500">Signed in as</p>
+                        <p className="text-[13px] text-gray-800 truncate mt-0.5">{user?.email ?? "—"}</p>
                       </div>
+                      <a
+                        href="/settings"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[13px] text-gray-800 hover:bg-gray-100 transition-colors"
+                      >
+                        <SettingsIcon className="w-4 h-4" strokeWidth={1.75} />
+                        Settings
+                      </a>
                       <button
                         onClick={() => { setUserMenuOpen(false); handleSignOut(); }}
-                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-rose-400 hover:bg-rose-950/30 transition-colors"
+                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[13px] text-rose-700 hover:bg-rose-50 transition-colors border-t border-gray-200"
                       >
                         <LogOut className="w-4 h-4" strokeWidth={1.75} />
                         Sign out
@@ -2671,7 +2683,7 @@ export default function Page() {
                       same thing with a small star glyph). */}
                   <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight mb-8 inline-flex items-center gap-2.5 self-center">
                     <Sparkles className="w-6 h-6 text-amber-500 flex-shrink-0" strokeWidth={1.75} aria-hidden />
-                    <span>{pickHeroGreeting({ chatId: activeChatId, firstName: resumeExtraction?.name?.split(" ")[0] ?? null })}</span>
+                    <span>{pickHeroGreeting({ chatId: activeChatId, firstName: profileFirstName ?? resumeExtraction?.name?.split(" ")[0] ?? null })}</span>
                   </h1>
                   <div className="w-full">
                     <ChatInput

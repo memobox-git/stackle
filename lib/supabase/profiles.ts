@@ -147,6 +147,38 @@ export async function setUsername(input: {
   return { ok: true };
 }
 
+// Settings-page updater. Patches the user's own profile with whatever
+// fields are passed. Username changes go through setUsername (which
+// validates + checks uniqueness); this is for name + summary etc.
+export async function updateProfile(patch: {
+  firstName?: string | null;
+  lastName?: string | null;
+  summary?: string | null;
+  headline?: string | null;
+  location?: string | null;
+  isPublic?: boolean;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  const supabase = getSupabaseClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { ok: false, error: "Not signed in" };
+  // Build the patch object — only include keys the caller actually
+  // passed. Avoids accidentally null-ing out fields.
+  const update: Record<string, unknown> = {};
+  if (patch.firstName !== undefined) update.first_name = patch.firstName;
+  if (patch.lastName !== undefined) update.last_name = patch.lastName;
+  if (patch.summary !== undefined) update.professional_summary = patch.summary;
+  if (patch.headline !== undefined) update.professional_title = patch.headline;
+  if (patch.location !== undefined) update.location = patch.location;
+  if (patch.isPublic !== undefined) update.is_public = patch.isPublic;
+  if (Object.keys(update).length === 0) return { ok: true };
+  const { error } = await supabase
+    .from("profiles")
+    .update(update)
+    .eq("user_id", user.id);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
 // Auto-build profile fields from a parsed resume. Called from the
 // resume-upload handler. Reuses skillGroups → flat top skills (15),
 // summary → professional_summary, latest job → professional_title.
