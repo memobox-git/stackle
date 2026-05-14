@@ -45,7 +45,17 @@ const VERDICT_COLOURS: Record<Verdict, { fg: string; bg: string; label: string }
   no_hire:     { fg: "#A32D2D", bg: "#FBE6E6", label: "No Hire" },
 };
 
-export default function InterviewView({ candidateName }: { candidateName?: string | null }) {
+export default function InterviewView({
+  candidateName,
+  resumeSkills,
+}: {
+  candidateName?: string | null;
+  // Top skills extracted from the user's primary resume. Surfaced as
+  // quick-start chips in the lobby — click → goes straight to a drill
+  // on that skill. Empty / undefined → no chips, classic 'New Session'
+  // entry still works.
+  resumeSkills?: string[];
+}) {
   const [view, setView] = useState<View>("sessions");
   const [sessions, setSessions] = useState<SkillSession[]>([]);
   const [activeSession, setActiveSession] = useState<SkillSession | null>(null);
@@ -56,14 +66,18 @@ export default function InterviewView({ candidateName }: { candidateName?: strin
 
   function refreshSessions() { setSessions(loadSessions()); }
 
-  function startNewSession() {
+  function startNewSession(opts?: { skill?: string; difficulty?: "beginner" | "intermediate" | "advanced" | "mixed" }) {
     const id = `session-${Date.now()}`;
     const session: SkillSession = {
       id,
       agent: "skill",
       startedAt: new Date().toISOString(),
       status: "active",
-      config: { skill: "SQL", difficulty: "mixed", count: 3 },
+      config: {
+        skill: opts?.skill ?? "SQL",
+        difficulty: opts?.difficulty ?? "mixed",
+        count: 3,
+      },
       messages: [],
       questions: [],
     };
@@ -82,7 +96,8 @@ export default function InterviewView({ candidateName }: { candidateName?: strin
         <SessionsList
           sessions={sessions}
           candidateName={candidateName}
-          onNew={startNewSession}
+          resumeSkills={resumeSkills}
+          onNew={(opts) => startNewSession(opts)}
           onOpen={openReport}
           onDelete={(id) => { deleteSession(id); refreshSessions(); }}
         />
@@ -113,16 +128,39 @@ export default function InterviewView({ candidateName }: { candidateName?: strin
 // ── Sessions list (ChatGPT-style) ─────────────────────────────────────────
 
 function SessionsList({
-  sessions, candidateName, onNew, onOpen, onDelete,
+  sessions, candidateName, resumeSkills, onNew, onOpen, onDelete,
 }: {
   sessions: SkillSession[];
   candidateName?: string | null;
-  onNew: () => void;
+  resumeSkills?: string[];
+  onNew: (opts?: { skill?: string; difficulty?: "beginner" | "intermediate" | "advanced" | "mixed" }) => void;
   onOpen: (s: SkillSession) => void;
   onDelete: (id: string) => void;
 }) {
   const firstName = candidateName?.trim().split(/\s+/)[0] ?? "there";
   const forecast = useMemo(() => buildFridayForecast(sessions), [sessions]);
+  // Curate the resume skills into a tight list of interview-relevant
+  // ones. We filter to canonical tech skills (anything more than 2 chars
+  // and that looks tech-y) and cap at 8. The user can still click 'New
+  // Session' for anything else.
+  const suggestedSkills = useMemo(() => {
+    if (!resumeSkills || resumeSkills.length === 0) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const raw of resumeSkills) {
+      const s = raw.trim();
+      if (!s || s.length < 2 || s.length > 30) continue;
+      const key = s.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(s);
+      if (out.length >= 8) break;
+    }
+    return out;
+  }, [resumeSkills]);
+  // Which skill the user clicked → swaps the chip row into a 4-button
+  // difficulty picker for that skill. Click a difficulty → drill begins.
+  const [pickedSkill, setPickedSkill] = useState<string | null>(null);
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-3xl mx-auto px-6 py-10">
@@ -162,8 +200,57 @@ function SessionsList({
           </div>
         )}
 
+        {/* Suggested-from-resume skill chips. Click a skill → swaps
+            this row into a difficulty picker → click a difficulty →
+            session starts straight on that skill. */}
+        {suggestedSkills.length > 0 && !pickedSkill && (
+          <div className="mb-6">
+            <p className="text-[11px] uppercase tracking-[0.1em] text-gray-500 font-semibold mb-2">
+              Suggested for you · from your resume
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {suggestedSkills.map((skill) => (
+                <button
+                  key={skill}
+                  onClick={() => setPickedSkill(skill)}
+                  className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-800 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full px-3 py-1.5 shadow-sm transition-all"
+                >
+                  <span>{skill}</span>
+                  <span className="text-gray-400 text-[11px]">▸ Start</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {pickedSkill && (
+          <div className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[13px] text-violet-900">
+                Drill <span className="font-semibold">{pickedSkill}</span> — pick a difficulty.
+              </p>
+              <button
+                onClick={() => setPickedSkill(null)}
+                className="text-[12px] text-violet-700 hover:text-violet-900"
+              >
+                Cancel
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(["beginner", "intermediate", "advanced", "mixed"] as const).map((diff) => (
+                <button
+                  key={diff}
+                  onClick={() => onNew({ skill: pickedSkill, difficulty: diff })}
+                  className="inline-flex items-center text-[13px] font-medium text-white bg-violet-700 hover:bg-violet-800 rounded-full px-3.5 py-1.5 transition-colors capitalize"
+                >
+                  {diff}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <button
-          onClick={onNew}
+          onClick={() => onNew()}
           className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-black mb-8"
         >
           <Plus size={16} /> New Session

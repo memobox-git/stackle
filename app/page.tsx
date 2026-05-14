@@ -2864,7 +2864,10 @@ export default function Page() {
             )}
           </div>
         ) : activeView === "interview" ? (
-          <InterviewView candidateName={resumeExtraction?.name ?? null} />
+          <InterviewView
+            candidateName={resumeExtraction?.name ?? null}
+            resumeSkills={(resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? [])}
+          />
         ) : activeView === "learn" ? (
           <LearnView />
         ) : activeView === "drive" ? (
