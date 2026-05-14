@@ -2899,6 +2899,21 @@ export default function Page() {
                 <InterviewView
                   candidateName={resumeExtraction?.name ?? null}
                   resumeSkills={(resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? [])}
+                  resumeContext={
+                    resumeExtraction
+                      ? {
+                          topRole: resumeExtraction.experience?.[0]?.title ?? null,
+                          topCompany: resumeExtraction.experience?.[0]?.company ?? null,
+                          yearsExperience: resumeExtraction.totalYearsExperience ?? null,
+                          experiences: (resumeExtraction.experience ?? []).slice(0, 5).map((e) => ({
+                            title: e.title,
+                            company: e.company,
+                            bullets: (e.bullets ?? []).slice(0, 3),
+                          })),
+                          topSkills: (resumeExtraction.skillGroups ?? []).flatMap((g) => g.skills ?? []).slice(0, 12),
+                        }
+                      : null
+                  }
                 />
               ) : (
                 <LearnView />

@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
     messages: body.messages ?? [],
     sessionState: body.sessionState ?? { phase: "lens", config: {} },
     profileSeed: body.profileSeed ?? null,
+    resumeContext: body.resumeContext ?? null,
+    lastVerdict: body.lastVerdict ?? null,
   });
 
   return new Response(stream, {

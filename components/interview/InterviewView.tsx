@@ -48,6 +48,7 @@ const VERDICT_COLOURS: Record<Verdict, { fg: string; bg: string; label: string }
 export default function InterviewView({
   candidateName,
   resumeSkills,
+  resumeContext,
 }: {
   candidateName?: string | null;
   // Top skills extracted from the user's primary resume. Surfaced as
@@ -55,6 +56,17 @@ export default function InterviewView({
   // on that skill. Empty / undefined → no chips, classic 'New Session'
   // entry still works.
   resumeSkills?: string[];
+  // Compact slice of the user's resume passed through to the Skill
+  // Agent so it can ground questions in real projects (e.g. "Walk me
+  // through your Medallia event pipeline dedup strategy") instead of
+  // generic SQL.
+  resumeContext?: {
+    topRole?: string | null;
+    topCompany?: string | null;
+    yearsExperience?: number | null;
+    experiences?: Array<{ title: string; company: string; bullets: string[] }>;
+    topSkills?: string[];
+  } | null;
 }) {
   const [view, setView] = useState<View>("sessions");
   const [sessions, setSessions] = useState<SkillSession[]>([]);
@@ -107,6 +119,7 @@ export default function InterviewView({
           session={activeSession}
           allSessions={sessions}
           candidateName={candidateName}
+          resumeContext={resumeContext}
           onSessionUpdate={(s) => {
             setActiveSession(s);
             saveSession(s);
@@ -320,11 +333,20 @@ function relativeTime(iso: string): string {
 // ── Active session ────────────────────────────────────────────────────────
 
 function ActiveSession({
-  session, allSessions, candidateName, onSessionUpdate, onExit,
+  session, allSessions, candidateName, resumeContext, onSessionUpdate, onExit,
 }: {
   session: SkillSession;
   allSessions: SkillSession[];
   candidateName?: string | null;
+  // When the user has a parsed resume loaded, we pass a compact slice
+  // through so the Skill Agent can ground questions in real projects.
+  resumeContext?: {
+    topRole?: string | null;
+    topCompany?: string | null;
+    yearsExperience?: number | null;
+    experiences?: Array<{ title: string; company: string; bullets: string[] }>;
+    topSkills?: string[];
+  } | null;
   onSessionUpdate: (s: SkillSession) => void;
   onExit: () => void;
 }) {
@@ -341,6 +363,10 @@ function ActiveSession({
   const [timer, setTimer] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
+  // Adaptive difficulty: the most recent verdict drives the next
+  // question's pitch. Set after every evaluation, passed to the Skill
+  // Agent on the next call.
+  const [lastVerdict, setLastVerdict] = useState<Verdict | null>(null);
 
   // Company persona — set by the Skill Agent calling
   // set_session_config({company: ...}). Passed back into sessionState
@@ -442,6 +468,12 @@ function ActiveSession({
             companyPersona,
           },
           profileSeed,
+          // Resume context + adaptive-difficulty signal — passes the
+          // user's real projects through so the agent can ask about
+          // them, and the previous question's verdict so the agent
+          // can pitch the next question harder/easier accordingly.
+          resumeContext,
+          lastVerdict,
         }),
       });
       if (!res.ok || !res.body) throw new Error("skill-agent HTTP error");
@@ -593,6 +625,7 @@ function ActiveSession({
       const data = await res.json() as { evaluation: InterviewEvaluation };
 
       // Replace the "Evaluating..." placeholder with the verdict.
+      setLastVerdict(data.evaluation.verdict);
       const v = VERDICT_COLOURS[data.evaluation.verdict];
       const verdictText = [
         `**${v.label}** · ${data.evaluation.score}/100`,

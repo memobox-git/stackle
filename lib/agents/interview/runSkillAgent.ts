@@ -33,10 +33,37 @@ export type SkillAgentProfileSeed = {
   lastDrilledAt?: string;
 };
 
+// Resume context shape — the slice of the user's resume the Skill Agent
+// uses to ground its questions in real projects ("Walk me through the
+// dedup strategy in your Medallia pipeline" instead of generic SQL).
+// Kept loose; the agent reads what's there and adapts.
+export type SkillAgentResumeContext = {
+  topRole?: string | null;
+  topCompany?: string | null;
+  yearsExperience?: number | null;
+  // Up to ~5 most-recent experience entries, each with a title, company,
+  // and 2-3 bullet snippets — enough for the agent to ask about
+  // specific past work without leaking the full resume.
+  experiences?: Array<{
+    title: string;
+    company: string;
+    bullets: string[];
+  }>;
+  topSkills?: string[];
+};
+
 export type SkillAgentInput = {
   messages: { role: "user" | "assistant"; content: string }[];
   sessionState: SkillAgentSessionState;
   profileSeed?: SkillAgentProfileSeed | null;
+  // When the user has a parsed resume loaded, pass it through so the
+  // agent can reference their actual projects in question prompts.
+  resumeContext?: SkillAgentResumeContext | null;
+  // Previous question's verdict — drives adaptive difficulty. If null,
+  // the agent uses the configured difficulty as-is. If "strong_hire" or
+  // "hire", it nudges next question harder. If "soft_pass" or
+  // "no_hire", it eases back / drops to a clarifier.
+  lastVerdict?: "strong_hire" | "hire" | "soft_pass" | "no_hire" | null;
 };
 
 export async function runSkillAgent(input: SkillAgentInput): Promise<ReadableStream<Uint8Array>> {
@@ -148,6 +175,45 @@ function renderLiveContext(input: SkillAgentInput): string {
     parts.push(`  question_emphasis: SQL ${persona.questionEmphasis.sql}% · DistSys ${persona.questionEmphasis.distributedSystems}% · RealTime ${persona.questionEmphasis.realTimeScenarios}%`);
     if (persona.culturalSignals.length > 0) parts.push(`  cultural_signals: ${persona.culturalSignals.join(", ")}`);
     if (persona.redFlagsInAnswers.length > 0) parts.push(`  red_flags_to_warn_about: ${persona.redFlagsInAnswers.join("; ")}`);
+  }
+
+  // Resume context — drives "ask about THIS user's actual projects"
+  // questions. The agent prompt (skillAgentPrompt) instructs it to mix
+  // resume-grounded questions in alongside the generic-skill ones.
+  const r = input.resumeContext;
+  if (r) {
+    parts.push("");
+    parts.push("candidate_resume_context:");
+    if (r.topRole && r.topCompany) parts.push(`  current: ${r.topRole} at ${r.topCompany}`);
+    if (typeof r.yearsExperience === "number" && r.yearsExperience > 0) {
+      parts.push(`  years_experience: ${r.yearsExperience}`);
+    }
+    if (r.topSkills && r.topSkills.length > 0) {
+      parts.push(`  top_skills: ${r.topSkills.slice(0, 12).join(", ")}`);
+    }
+    if (r.experiences && r.experiences.length > 0) {
+      parts.push("  experiences:");
+      for (const exp of r.experiences.slice(0, 5)) {
+        parts.push(`    - ${exp.title} at ${exp.company}`);
+        for (const b of exp.bullets.slice(0, 3)) {
+          parts.push(`      • ${b.slice(0, 180)}`);
+        }
+      }
+    }
+  }
+
+  // Adaptive difficulty — the previous question's verdict tells the
+  // agent how to pitch the next question. Hard rule: read this, adjust
+  // pitch accordingly, don't ignore it.
+  if (input.lastVerdict) {
+    parts.push("");
+    parts.push(`last_verdict: ${input.lastVerdict}`);
+    parts.push("  adjust_next: " + (
+      input.lastVerdict === "strong_hire" ? "ESCALATE — go one notch harder, introduce a curveball or follow-up depth"
+      : input.lastVerdict === "hire" ? "SAME LEVEL — different sub-topic to broaden coverage"
+      : input.lastVerdict === "soft_pass" ? "EASE BACK — clarifier or definitional setup before the next probe"
+      : "STEP DOWN — one notch easier, simpler scenario; offer Foundations link if appropriate"
+    ));
   }
 
   const seed = input.profileSeed;
