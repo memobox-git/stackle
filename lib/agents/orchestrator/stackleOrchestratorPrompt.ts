@@ -133,6 +133,8 @@ Respond with this exact JSON shape, nothing else:
 Rules:
 - managerKey="more_info_needed" until you have enough confidence to route. Then pick one of the four real keys.
 - chips: 2-4 short labels, **1-3 words each**, single concept per chip. Tap-to-act, contextual to your narration. NEVER combine two signals into one chip with "·" or "—" (no "Entry · resume help"). Pick ONE axis per turn. Never recycle the same chips across turns.
+- **Whenever the narration asks the user to choose between options, the options MUST appear in the chips array — NEVER list them as inline prose** (no "Data Engineer? ML Engineer? Analytics Engineer? Something else?" inside the narration). The narration sets up the question; the chips are the answer choices. If you can't think of clean chip labels for the choices, write a different narration that doesn't ask for a choice.
+- The narration MUST NOT end with a question that lists multiple choices inline. Use a single open question + chips, OR no question + chips that imply the question.
 - extractedSignals: include EVERY signal extracted so far across the conversation (including from <resume_context>, including from prior turns via priorSignals). Use null when truly unknown. NEVER null-out a signal you've already captured — once you have a role or careerGoal, it stays.
 
 # Hard rules
