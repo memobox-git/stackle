@@ -1,22 +1,33 @@
 "use client";
 
-// Post-signup intake — single screen, one job: capture a username.
-// (Plus first/last name if Google didn't give us a name.)
+// Post-signup intake — single screen.
+// First name · Last name · Username · Resume upload.
 //
-// Routed to from app/page.tsx auth-init when the signed-in user has
-// no `username` in their profile row. Skipped entirely for users who
-// already have one.
+// All four fields are submitted together: profile row gets the
+// username + names, the resume gets parsed and saved to Drive,
+// and the rest of the profile fields (headline, summary, skills,
+// location, years_experience) auto-populate from the resume.
+//
+// After submit, user lands on the chat hero with a fully-loaded
+// resume context. Every downstream action (Review my resume,
+// Tailor for a JD, Interview prep) can act on the primary resume
+// without re-asking.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import {
+  buildProfileFromResume,
   isUsernameAvailable,
   isValidUsername,
   setUsername,
   suggestUsernameFrom,
 } from "@/lib/supabase/profiles";
-import { Check, X as XIcon } from "lucide-react";
+import { saveOriginalResume, type DriveFile } from "@/lib/supabase/drive";
+import { createChat } from "@/lib/supabase/chats";
+import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
+import { Check, X as XIcon, Upload, FileText } from "lucide-react";
+import type { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
 
 export default function ProfileSetupPage() {
   const router = useRouter();
@@ -28,12 +39,19 @@ export default function ProfileSetupPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
 
+  // Resume state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [parsing, setParsing] = useState(false);
+  const [parsedExtraction, setParsedExtraction] = useState<ResumeExtraction | null>(null);
+  const [parsedText, setParsedText] = useState<string>("");
+  const [parseError, setParseError] = useState<string>("");
+
   // Live availability check (debounced).
   const [availability, setAvailability] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On mount: read the user's Google metadata to pre-fill name +
-  // suggest a username. If they're not signed in, kick to /signin.
+  // On mount: read auth metadata for pre-fill.
   useEffect(() => {
     (async () => {
       const supabase = getSupabaseClient();
@@ -42,8 +60,6 @@ export default function ProfileSetupPage() {
         router.replace("/signin");
         return;
       }
-      // Always show First / Last / Username — pre-fill name fields
-      // from OAuth metadata when we have it (user can still edit).
       const meta = (user.user_metadata ?? {}) as { full_name?: string; name?: string; given_name?: string; family_name?: string };
       const fullName = meta.full_name || meta.name || [meta.given_name, meta.family_name].filter(Boolean).join(" ") || "";
       if (fullName.trim()) {
@@ -78,26 +94,131 @@ export default function ProfileSetupPage() {
     };
   }, [sanitised, validFormat, touched]);
 
+  // Parse the resume file as soon as it's selected so we have a
+  // ResumeExtraction ready by the time the user clicks Continue.
+  async function handleFile(file: File) {
+    setResumeFile(file);
+    setParseError("");
+    setParsing(true);
+    setParsedExtraction(null);
+    try {
+      const parsed = await parseFile(file);
+      const text = parsed.text;
+      if (!text || text.trim().length < 200) {
+        setParseError("This file looks too short or empty — try a different one?");
+        setParsing(false);
+        setResumeFile(null);
+        return;
+      }
+      setParsedText(text);
+      // Extract structured data via the existing API.
+      const res = await fetch("/api/agents/resume/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ resumeText: text }),
+      });
+      if (!res.ok) {
+        setParseError("Couldn't read this resume — try a different file?");
+        setParsing(false);
+        setResumeFile(null);
+        return;
+      }
+      const ext: ResumeExtraction = await res.json();
+      setParsedExtraction(ext);
+      // Auto-fill name fields from the resume if the user hasn't typed them yet.
+      const resumeFullName = (ext.name ?? "").trim();
+      if (resumeFullName) {
+        const [first, ...rest] = resumeFullName.split(/\s+/);
+        if (!firstName.trim()) setFirstName(first);
+        if (!lastName.trim()) setLastName(rest.join(" "));
+      }
+    } catch (err) {
+      console.warn("[profile-setup] parse failed:", err);
+      setParseError("Something went wrong reading that file. Try again?");
+      setResumeFile(null);
+    } finally {
+      setParsing(false);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!validFormat) return;
-    if (availability === "taken") return;
     if (!firstName.trim() || !lastName.trim()) {
       setError("First and last name required");
       return;
     }
+    if (!validFormat) return;
+    if (availability === "taken") return;
+    if (!parsedExtraction || !parsedText || !resumeFile) {
+      setError("Please upload your resume to continue.");
+      return;
+    }
     setSubmitting(true);
-    const res = await setUsername({
+
+    // 1. Save profile row with username + names.
+    const usernameRes = await setUsername({
       username: sanitised,
       firstName: firstName.trim() || null,
       lastName: lastName.trim() || null,
     });
-    setSubmitting(false);
-    if (!res.ok) {
-      setError(res.error);
+    if (!usernameRes.ok) {
+      setError(usernameRes.error);
+      setSubmitting(false);
       return;
     }
+
+    // 2. Seed a chat so the upload has somewhere to attach.
+    let chatId: string | null = null;
+    try {
+      const chat = await createChat("chat", {
+        resumeText: parsedText,
+        resumeFilename: resumeFile.name,
+        resumeExtraction: parsedExtraction,
+        resumeAnalysis: null,
+      });
+      chatId = chat?.id ?? null;
+    } catch (err) {
+      console.warn("[profile-setup] seed-chat failed:", err);
+    }
+
+    // 3. Save the resume to Drive (original) + auto-build profile.
+    let savedDriveFile: DriveFile | null = null;
+    try {
+      if (chatId) {
+        savedDriveFile = await saveOriginalResume({
+          chatId,
+          extraction: parsedExtraction,
+          rawText: parsedText,
+          filename: resumeFile.name,
+        });
+      }
+    } catch (err) {
+      console.warn("[profile-setup] drive save failed:", err);
+    }
+
+    try {
+      await buildProfileFromResume({
+        extraction: parsedExtraction,
+        sourceResumeId: savedDriveFile?.id ?? null,
+      });
+    } catch (err) {
+      console.warn("[profile-setup] profile build failed:", err);
+    }
+
+    // 4. Kick off the resume analysis in the background — by the
+    // time the user clicks "Review my resume" in chat, it'll be ready.
+    // Not awaited; we don't want to block landing on the chat.
+    fetch("/api/agents/resume/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        extraction: parsedExtraction,
+        targetRole: "auto",
+        seniority: "auto",
+      }),
+    }).catch(() => {/* analysis runs lazily on the chat side too */});
+
     // Land on the chat hero.
     router.replace("/");
   }
@@ -141,7 +262,7 @@ export default function ProfileSetupPage() {
           />
         </div>
 
-        <label className="block">
+        <label className="block mb-4">
           <div className="flex items-stretch border border-gray-300 rounded-xl overflow-hidden bg-white focus-within:border-gray-900 transition-colors">
             <span className="inline-flex items-center px-3 text-[14px] text-gray-500 bg-gray-50 border-r border-gray-300">
               stackle.io/profile/
@@ -170,10 +291,65 @@ export default function ProfileSetupPage() {
           <p className="text-[12px] text-gray-500 mt-1.5 h-4">
             {availability === "available" && <span className="text-emerald-700">Available</span>}
             {availability === "taken" && <span className="text-rose-700">That one's taken — try another.</span>}
-            {availability === "invalid" && touched && <span className="text-rose-700">3-20 chars · lowercase letters, digits, hyphens · must start with a letter.</span>}
+            {availability === "invalid" && touched && <span className="text-rose-700">3-20 chars · lowercase · starts with a letter.</span>}
             {availability === "checking" && <span className="text-gray-500">Checking…</span>}
           </p>
         </label>
+
+        {/* Resume drop-zone */}
+        <div className="mb-3">
+          <span className="text-[12px] font-medium text-gray-700 mb-1.5 block">Your resume</span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_EXTENSIONS}
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleFile(file);
+              e.target.value = "";
+            }}
+          />
+          {!resumeFile && !parsing && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full border-2 border-dashed border-gray-300 rounded-xl px-4 py-6 hover:border-gray-400 hover:bg-white transition-colors flex flex-col items-center gap-2 text-gray-600"
+            >
+              <Upload className="w-5 h-5" strokeWidth={1.75} />
+              <span className="text-[14px] font-medium">Drop your resume</span>
+              <span className="text-[12px] text-gray-500">PDF, DOCX, TXT</span>
+            </button>
+          )}
+          {parsing && (
+            <div className="w-full border border-gray-200 rounded-xl px-4 py-5 flex items-center gap-3 bg-white">
+              <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-gray-800 animate-spin" />
+              <span className="text-[14px] text-gray-700">Reading your resume…</span>
+            </div>
+          )}
+          {resumeFile && !parsing && parsedExtraction && (
+            <div className="w-full border border-emerald-200 bg-emerald-50 rounded-xl px-4 py-3 flex items-center gap-3">
+              <FileText className="w-5 h-5 text-emerald-700 flex-shrink-0" strokeWidth={1.75} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[14px] font-medium text-emerald-900 truncate">{resumeFile.name}</p>
+                <p className="text-[12px] text-emerald-800">
+                  Parsed · {parsedExtraction.name || "Resume"}{parsedExtraction.experience?.[0]?.title ? ` · ${parsedExtraction.experience[0].title}` : ""}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setResumeFile(null); setParsedExtraction(null); setParsedText(""); }}
+                className="text-emerald-800 hover:text-emerald-900"
+                aria-label="Remove file"
+              >
+                <XIcon className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+          {parseError && (
+            <p className="text-[12px] text-rose-700 mt-2">{parseError}</p>
+          )}
+        </div>
 
         {error && (
           <p className="text-[13px] text-rose-700 mt-2">{error}</p>
@@ -181,11 +357,11 @@ export default function ProfileSetupPage() {
 
         <button
           type="submit"
-          disabled={submitting || availability !== "available"}
+          disabled={submitting || availability !== "available" || !parsedExtraction || parsing}
           className="mt-6 inline-flex items-center justify-center gap-2 text-sm font-semibold text-black px-5 py-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
           style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
         >
-          {submitting ? "Saving…" : "Continue"}
+          {submitting ? "Setting up…" : "Continue"}
         </button>
       </form>
     </div>
