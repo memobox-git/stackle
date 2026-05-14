@@ -1470,29 +1470,14 @@ export default function Page() {
         action: activeChatIdRef.current ? "appending to existing chat" : "no chat id — creating local-chat fallback",
       });
 
-      // ── Post-analysis actions ─────────────────────────
-      if (/^change settings$/i.test(trimmed) && intakeStep === 5) {
-        setIntakeStep(1);
-        setIntakeAnswers({});
-        setIntakeData(null);
-        setResumeAnalysis(null);
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "user", content: trimmed },
-          { role: "assistant", content: "Sure — let's redo the settings. What kind of report do you need?" },
-          { role: "assistant", content: "__INLINE_CHIPS__:Full Review|Quick Scan" },
-        ]);
-        return;
-      }
-      if (/^all done$/i.test(trimmed) && intakeStep === 5) {
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "user", content: trimmed },
-          { role: "assistant", content: "Great! Your report is ready in the panel on the right. Let me know if you have any questions about the results." },
-        ]);
-        setInput("");
-        return;
-      }
+      // Note: the legacy 'change settings' / 'all done' hardcoded
+      // branches were removed. They were the only path that ever set
+      // intakeStep > 0, so the cascade below is now unreachable. Left
+      // in place to avoid touching the 30+ other references in this
+      // file; a follow-up commit will physically delete the dead
+      // blocks. Any 'change settings' / 'all done' messages now flow
+      // through the normal orchestrator/synthesis path like any other
+      // user input.
 
       // ── Cascading intake flow (Steps 1–4) ──────────────
       const skipIntake = /^(just go|skip|no questions|start|go ahead)/i.test(trimmed);
