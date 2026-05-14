@@ -1479,7 +1479,8 @@ export default function Page() {
         setChatMessages((prev) => [
           ...prev,
           { role: "user", content: trimmed },
-          { role: "assistant", content: "Sure — let's redo the settings.\n\nWhat kind of report do you need?\n📋 Full Review\n⚡ Quick Scan" },
+          { role: "assistant", content: "Sure — let's redo the settings. What kind of report do you need?" },
+          { role: "assistant", content: "__INLINE_CHIPS__:Full Review|Quick Scan" },
         ]);
         return;
       }
@@ -1507,7 +1508,8 @@ export default function Page() {
           setChatMessages((prev) => [
             ...prev,
             userMsg,
-            { role: "assistant", content: `${ack}\n\nWhat level are they targeting?\n⭐ Senior\n⭐ Lead\n🧭 Manager\n💼 Director` },
+            { role: "assistant", content: `${ack} What level are they targeting?` },
+            { role: "assistant", content: "__INLINE_CHIPS__:Senior|Lead|Manager|Director" },
           ]);
           return;
         }
@@ -1518,7 +1520,8 @@ export default function Page() {
           setChatMessages((prev) => [
             ...prev,
             userMsg,
-            { role: "assistant", content: `${trimmed} — noted.\n\nWhat kind of company are they targeting?\n🌎 US General\n🏢 Big Tech\n🚀 Startup\n🏥 Healthcare\n💰 Finance` },
+            { role: "assistant", content: `${trimmed} — noted. What kind of company are they targeting?` },
+            { role: "assistant", content: "__INLINE_CHIPS__:US General|Big Tech|Startup|Healthcare|Finance" },
           ]);
           return;
         }
@@ -1529,7 +1532,8 @@ export default function Page() {
           setChatMessages((prev) => [
             ...prev,
             userMsg,
-            { role: "assistant", content: `${trimmed} — great choice.\n\nDo you have a job description to benchmark against?\n✅ No JD\n📄 I have a JD` },
+            { role: "assistant", content: `${trimmed} — great choice. Do you have a job description to benchmark against?` },
+            { role: "assistant", content: "__INLINE_CHIPS__:No JD|I have a JD" },
           ]);
           return;
         }
