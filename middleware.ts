@@ -25,6 +25,7 @@ const PUBLIC_PREFIXES = [
   "/share/",       // future: shared resume / report public links
   "/shared-resume",
   "/report/",
+  "/profile/",     // /profile/{username} is public; /profile/setup self-gates
 ];
 
 function isPublic(pathname: string): boolean {
