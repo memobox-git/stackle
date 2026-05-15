@@ -3178,6 +3178,16 @@ export default function Page() {
             <JobMatchView
               resumeExtraction={resumeExtraction}
               resumeFilename={resumeFilename}
+              resumeAnalysis={resumeAnalysis}
+              onOpenTailoredResume={(tailored) => {
+                // Route to Resume Builder with the tailored extraction
+                // queued. ResumeBuilder reads editedExtraction or the
+                // resumeExtraction prop; we just swap the working
+                // resumeExtraction so the user sees the rewrite when
+                // RB opens.
+                setResumeExtraction(tailored);
+                setActiveView("resume-builder");
+              }}
             />
           </div>
         ) : activeView === "drive" ? (

@@ -18,7 +18,8 @@ import ChatSurface from "@/components/ChatSurface";
 import { ChatMessage } from "@/components/Message";
 import { createJobMatch, getJobMatch, type JobMatch } from "@/lib/supabase/jobMatches";
 import { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
-import { buildMatchReportArtifact, type Artifact } from "@/lib/artifacts";
+import { buildMatchReportArtifact, buildTailoredResumeArtifact, type Artifact } from "@/lib/artifacts";
+import type { ResumeAnalysis } from "@/lib/agents/schemas/resumeIntelligence";
 
 interface JobMatchViewProps {
   // The resume the user wants to match against. Required to fire the
@@ -26,10 +27,19 @@ interface JobMatchViewProps {
   // can't run pills until a resume is loaded).
   resumeExtraction: ResumeExtraction | null;
   resumeFilename?: string | null;
+  // Optional generic resume analysis (from the chat-mode review). Used
+  // by the tailor pill — when present the JD-tailored rewrite is
+  // grounded in the user's existing strengths/gaps. Optional; the
+  // tailor agent synthesizes priorities from the JD if missing.
+  resumeAnalysis?: ResumeAnalysis | null;
   // Optional: a Job Match id to resume. When present, JobMatchView
   // hydrates state from job_matches + outputs and skips the paste
   // welcome.
   jobMatchId?: string | null;
+  // Callback when the user clicks a tailored-resume artifact card.
+  // The host (app/page.tsx) routes to Resume Builder with the
+  // rewrite queued. Optional; if absent the card is non-clickable.
+  onOpenTailoredResume?: (tailored: ResumeExtraction) => void;
 }
 
 const PILL_LABELS = [
@@ -48,12 +58,16 @@ function now() {
   return `${hh}:${mm} ${ampm}`;
 }
 
-export default function JobMatchView({ resumeExtraction, resumeFilename, jobMatchId }: JobMatchViewProps) {
+export default function JobMatchView({ resumeExtraction, resumeFilename, resumeAnalysis, jobMatchId, onOpenTailoredResume }: JobMatchViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [jobMatch, setJobMatch] = useState<JobMatch | null>(null);
   const greetedRef = useRef(false);
+  // Holds tailored ResumeExtraction payloads keyed by artifact id so
+  // the onOpen handler can route the right one to Resume Builder.
+  // Keeping it in a ref (not state) so re-renders don't blow it away.
+  const tailoredCacheRef = useRef<Map<string, ResumeExtraction>>(new Map());
 
   // Hydrate from existing Job Match if id is provided.
   useEffect(() => {
@@ -213,7 +227,81 @@ export default function JobMatchView({ resumeExtraction, resumeFilename, jobMatc
       return;
     }
 
-    // The other 3 pills (Tailor, Study, Prep) come in Phases 2-4.
+    if (pill === "Tailor my resume") {
+      const pendingId = `tailored-resume-pending-${jobMatch.id}-${Date.now()}`;
+      const pending = buildTailoredResumeArtifact({
+        id: pendingId,
+        company: jobMatch.company,
+        role: jobMatch.role,
+      });
+      pending.title = `Tailoring your resume — ${jobMatch.role ?? "role"}${jobMatch.company ? ` at ${jobMatch.company}` : ""}`;
+      pending.subtitle = "Rewriting bullets + summary for this JD";
+      pending.pending = true;
+      pushAssistant("Tailoring it now. Opus rewrites take a minute or so.", pending);
+
+      try {
+        const res = await fetch("/api/agents/jobmatch/tailor-resume", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobMatchId: jobMatch.id,
+            resumeExtraction,
+            priorAnalysis: resumeAnalysis ?? null,
+          }),
+        });
+        if (!res.ok) throw new Error(`tailor-resume HTTP ${res.status}`);
+        const data = await res.json() as {
+          tailored: ResumeExtraction;
+          changedKeys: string[];
+          qualityWarnings?: string[];
+        };
+        const unchanged = (data.qualityWarnings ?? []).some((w) => w.toLowerCase().includes("identical to input"));
+        if (unchanged) {
+          throw new Error("Rewriter returned the same resume — try again.");
+        }
+        const real = buildTailoredResumeArtifact({
+          id: `tailored-resume-${jobMatch.id}-${Date.now()}`,
+          company: jobMatch.company,
+          role: jobMatch.role,
+        });
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.artifact?.id === pendingId
+              ? {
+                  role: "assistant",
+                  content: `Done. ${data.changedKeys.length} section${data.changedKeys.length === 1 ? "" : "s"} touched. Click the card to open it in Resume Builder.`,
+                  timestamp: now(),
+                  artifact: real,
+                  // Hold the tailored extraction in the message so the
+                  // host can route it to Resume Builder on click.
+                  // (artifact.id is unique; we look up by id when
+                  // onOpen fires.)
+                }
+              : m,
+          ),
+        );
+        // Stash so onOpenTailoredResume can find it.
+        if (onOpenTailoredResume) {
+          tailoredCacheRef.current.set(real.id, data.tailored);
+        }
+      } catch (err) {
+        console.error("[jobmatch:tailor] failed:", err);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.artifact?.id === pendingId
+              ? {
+                  role: "assistant",
+                  content: `Tailor failed — ${err instanceof Error ? err.message : "unknown error"}. Try again?`,
+                  timestamp: now(),
+                }
+              : m,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Study Plan + Interview Prep ship in Phases 3-4.
     pushAssistant(`"${pill}" ships in the next phase — wired but not active yet.`);
   }
 
@@ -242,6 +330,12 @@ export default function JobMatchView({ resumeExtraction, resumeFilename, jobMatc
         setTimeout(() => handleSend(), 0);
       }}
       onChatEditPrompt={onChatEditPrompt}
+      onOpenArtifact={(artifact) => {
+        if (artifact.kind === "tailored_resume") {
+          const tailored = tailoredCacheRef.current.get(artifact.id);
+          if (tailored) onOpenTailoredResume?.(tailored);
+        }
+      }}
       inputValue={input}
       onInputChange={setInput}
       onInputSend={handleSend}

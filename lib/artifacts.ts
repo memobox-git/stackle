@@ -94,6 +94,29 @@ export function buildMatchReportArtifact(opts: {
   };
 }
 
+// Build an artifact for a JD-tailored resume rewrite. No score badge
+// — the value is in the diff, not a number. Subtitle reflects the
+// target role.
+export function buildTailoredResumeArtifact(opts: {
+  id: string;
+  company: string | null;
+  role: string | null;
+  generatedAt?: string;
+  driveFileId?: string;
+}): Artifact {
+  const role = opts.role?.trim() || "Role";
+  const company = opts.company?.trim();
+  const title = company ? `Tailored resume — ${role} at ${company}` : `Tailored resume — ${role}`;
+  return {
+    id: opts.id,
+    kind: "tailored_resume",
+    title,
+    subtitle: "Rewritten to match this JD",
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+    driveFileId: opts.driveFileId,
+  };
+}
+
 // Pretty short relative-time string for card subtitles. Pure function,
 // safe to call on every render.
 export function relativeTime(iso: string): string {
