@@ -40,12 +40,25 @@ export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: A
       : "#A32D2D"
       : null;
 
+  // BUG 5 fix — the prior structure nested a span+onClick "Download"
+  // inside a wrapping <button>, which is invalid HTML and was sometimes
+  // swallowing the open click on Safari. Now: the card body is a div
+  // with role=button + onClick + keyboard support, and the action
+  // buttons are real <button> elements that stopPropagation.
+  function handleCardClick() { onOpen?.(artifact); }
   return (
     <div className="w-full max-w-3xl mx-auto px-4 mb-3">
-      <button
-        type="button"
-        onClick={() => onOpen?.(artifact)}
-        className="w-full text-left rounded-xl border border-gray-200 bg-white hover:border-gray-400 transition-colors overflow-hidden group"
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={handleCardClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleCardClick();
+          }
+        }}
+        className="w-full text-left rounded-xl border border-gray-200 bg-white hover:border-gray-400 transition-colors overflow-hidden cursor-pointer focus:outline-none focus:border-gray-900"
       >
         {/* Header bar — type label + relative time */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
@@ -72,15 +85,17 @@ export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: A
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             {onDownload && (
-              <span
-                role="button"
+              <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); onDownload(artifact); }}
                 className="text-[12px] font-medium text-gray-600 hover:text-gray-900 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 Download
-              </span>
+              </button>
             )}
-            <span
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
               className="text-[12px] font-semibold rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1"
               style={{
                 background: isOpen ? "#f3f4f6" : "linear-gradient(90deg, #fff7ad, #ffa9f9)",
@@ -88,10 +103,10 @@ export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: A
               }}
             >
               {isOpen ? "Viewing" : "Open ↗"}
-            </span>
+            </button>
           </div>
         </div>
-      </button>
+      </div>
     </div>
   );
 }

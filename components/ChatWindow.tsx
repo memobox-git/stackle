@@ -80,6 +80,29 @@ function PrioritiesCard({
   onFixAll?: () => void;
   completedActions?: Set<number>;
 }) {
+  // BUG 2 — user-selectable fix scope. Checkbox per item lets the user
+  // pick exactly which fixes to apply instead of being forced into
+  // single-item OR "Fix All". "Fix Selected (N)" fires onFixItem one
+  // by one for each checked index (parent already knows how to apply).
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  function toggle(i: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i);
+      else next.add(i);
+      return next;
+    });
+  }
+  function fixSelected() {
+    if (!onFixItem) return;
+    // Apply oldest-index first so the chat narration reads top-to-bottom.
+    const indices = Array.from(selected).sort((a, b) => a - b);
+    for (const i of indices) {
+      onFixItem(priorities[i], i);
+    }
+    setSelected(new Set());
+  }
+
   const priorityBadge = (action: string) => {
     const u = action.toUpperCase();
     if (u.startsWith("HIGH")) return { bg: "#fee2e2", color: "#dc2626", border: "#fecaca", label: "HIGH" };
@@ -103,14 +126,25 @@ function PrioritiesCard({
               </span>
             )}
           </div>
-          {onFixAll && doneCount < priorities.length && (
-            <button
-              onClick={onFixAll}
-              className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white text-black hover:bg-gray-100 transition-colors"
-            >
-              Fix All ({priorities.length - doneCount})
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {selected.size > 0 && (
+              <button
+                onClick={fixSelected}
+                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-black hover:opacity-90 transition-opacity"
+                style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+              >
+                Fix Selected ({selected.size})
+              </button>
+            )}
+            {onFixAll && doneCount < priorities.length && (
+              <button
+                onClick={onFixAll}
+                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-white text-black hover:bg-gray-100 border border-gray-300 transition-colors"
+              >
+                Fix All ({priorities.length - doneCount})
+              </button>
+            )}
+          </div>
         </div>
         <div className="p-3 flex flex-col gap-2">
           {priorities.map((action, i) => {
@@ -128,6 +162,17 @@ function PrioritiesCard({
                   opacity: done ? 0.6 : 1,
                 }}
               >
+                {/* BUG 2 — checkbox so the user picks scope before
+                    Fix Selected fires. Hidden for already-done items. */}
+                {!done && (
+                  <input
+                    type="checkbox"
+                    checked={selected.has(i)}
+                    onChange={() => toggle(i)}
+                    className="w-3.5 h-3.5 flex-shrink-0 cursor-pointer accent-gray-900"
+                    aria-label={`Select fix ${i + 1}`}
+                  />
+                )}
                 <span
                   className="text-[9px] font-bold w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
                   style={{ background: done ? "#14532d" : c.bg, color: done ? "#4ade80" : c.color, border: `1px solid ${done ? "#166534" : c.border}` }}
