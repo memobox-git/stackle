@@ -3188,6 +3188,13 @@ export default function Page() {
                 setResumeExtraction(tailored);
                 setActiveView("resume-builder");
               }}
+              onOpenJDInterviewPrep={() => {
+                // For now: just switch to the Interview Prep surface.
+                // Preloading the JD-tailored question set directly into
+                // ActiveSession needs InterviewView to accept a
+                // preloadedQuestions prop — Phase 5 polish.
+                setActiveView("interview");
+              }}
             />
           </div>
         ) : activeView === "drive" ? (

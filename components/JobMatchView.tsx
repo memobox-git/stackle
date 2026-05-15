@@ -18,7 +18,8 @@ import ChatSurface from "@/components/ChatSurface";
 import { ChatMessage } from "@/components/Message";
 import { createJobMatch, getJobMatch, type JobMatch } from "@/lib/supabase/jobMatches";
 import { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
-import { buildMatchReportArtifact, buildTailoredResumeArtifact, buildStudyPlanArtifact, type Artifact } from "@/lib/artifacts";
+import { buildMatchReportArtifact, buildTailoredResumeArtifact, buildStudyPlanArtifact, buildInterviewPrepArtifact, type Artifact } from "@/lib/artifacts";
+import type { InterviewQuestion } from "@/lib/agents/interview/questionBank/types";
 import type { ResumeAnalysis } from "@/lib/agents/schemas/resumeIntelligence";
 
 interface JobMatchViewProps {
@@ -40,6 +41,10 @@ interface JobMatchViewProps {
   // The host (app/page.tsx) routes to Resume Builder with the
   // rewrite queued. Optional; if absent the card is non-clickable.
   onOpenTailoredResume?: (tailored: ResumeExtraction) => void;
+  // Callback when the user clicks the JD-tailored interview prep card.
+  // The host routes to the Interview Prep surface preloaded with these
+  // questions so the user can drill them directly.
+  onOpenJDInterviewPrep?: (questions: InterviewQuestion[], context: { role: string; company: string | null }) => void;
 }
 
 const PILL_LABELS = [
@@ -58,7 +63,7 @@ function now() {
   return `${hh}:${mm} ${ampm}`;
 }
 
-export default function JobMatchView({ resumeExtraction, resumeFilename, resumeAnalysis, jobMatchId, onOpenTailoredResume }: JobMatchViewProps) {
+export default function JobMatchView({ resumeExtraction, resumeFilename, resumeAnalysis, jobMatchId, onOpenTailoredResume, onOpenJDInterviewPrep }: JobMatchViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -68,6 +73,9 @@ export default function JobMatchView({ resumeExtraction, resumeFilename, resumeA
   // the onOpen handler can route the right one to Resume Builder.
   // Keeping it in a ref (not state) so re-renders don't blow it away.
   const tailoredCacheRef = useRef<Map<string, ResumeExtraction>>(new Map());
+  // Same pattern for JD-tailored interview prep questions — routed to
+  // Interview Prep surface preloaded with the question set on click.
+  const prepCacheRef = useRef<Map<string, InterviewQuestion[]>>(new Map());
 
   // Hydrate from existing Job Match if id is provided.
   useEffect(() => {
@@ -368,8 +376,74 @@ export default function JobMatchView({ resumeExtraction, resumeFilename, resumeA
       return;
     }
 
-    // Interview Prep ships in Phase 4.
-    pushAssistant(`"${pill}" ships in the next phase — wired but not active yet.`);
+    if (pill === "Interview prep for this JD") {
+      const pendingId = `interview-prep-pending-${jobMatch.id}-${Date.now()}`;
+      const pending = buildInterviewPrepArtifact({
+        id: pendingId,
+        company: jobMatch.company,
+        role: jobMatch.role,
+        questionCount: 0,
+      });
+      pending.title = `Generating interview prep — ${jobMatch.role ?? "role"}`;
+      pending.subtitle = "Tuning questions to this JD's must-haves";
+      pending.pending = true;
+      pushAssistant("Generating questions. Sonnet's ~15-20s.", pending);
+
+      try {
+        const res = await fetch("/api/agents/jobmatch/interview-prep", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jobMatchId: jobMatch.id,
+            resumeExtraction,
+          }),
+        });
+        if (!res.ok) throw new Error(`interview-prep HTTP ${res.status}`);
+        const data = await res.json() as {
+          primarySkill: string;
+          jdTitle: string;
+          jdCompany: string | null;
+          questions: InterviewQuestion[];
+        };
+        const real = buildInterviewPrepArtifact({
+          id: `interview-prep-${jobMatch.id}-${Date.now()}`,
+          company: jobMatch.company,
+          role: jobMatch.role,
+          questionCount: data.questions.length,
+          primarySkill: data.primarySkill,
+        });
+        prepCacheRef.current.set(real.id, data.questions);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.artifact?.id === pendingId
+              ? {
+                  role: "assistant",
+                  content: `${data.questions.length} ${data.primarySkill} question${data.questions.length === 1 ? "" : "s"} ready. Click the card to drill them in Interview Prep.`,
+                  timestamp: now(),
+                  artifact: real,
+                }
+              : m,
+          ),
+        );
+      } catch (err) {
+        console.error("[jobmatch:interview-prep] failed:", err);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.artifact?.id === pendingId
+              ? {
+                  role: "assistant",
+                  content: `Interview prep failed — ${err instanceof Error ? err.message : "unknown error"}. Try again?`,
+                  timestamp: now(),
+                }
+              : m,
+          ),
+        );
+      }
+      return;
+    }
+
+    // No further pills.
+    pushAssistant(`I don't know how to handle "${pill}" yet.`);
   }
 
   function onChatEditPrompt(prompt: string) {
@@ -401,6 +475,14 @@ export default function JobMatchView({ resumeExtraction, resumeFilename, resumeA
         if (artifact.kind === "tailored_resume") {
           const tailored = tailoredCacheRef.current.get(artifact.id);
           if (tailored) onOpenTailoredResume?.(tailored);
+        } else if (artifact.kind === "interview_prep") {
+          const questions = prepCacheRef.current.get(artifact.id);
+          if (questions && onOpenJDInterviewPrep) {
+            onOpenJDInterviewPrep(questions, {
+              role: jobMatch?.role ?? "Role",
+              company: jobMatch?.company ?? null,
+            });
+          }
         }
       }}
       inputValue={input}

@@ -137,6 +137,30 @@ export function buildStudyPlanArtifact(opts: {
   };
 }
 
+// Build an artifact for JD-tailored interview prep.
+export function buildInterviewPrepArtifact(opts: {
+  id: string;
+  company: string | null;
+  role: string | null;
+  questionCount: number;
+  primarySkill?: string;
+  generatedAt?: string;
+}): Artifact {
+  const role = opts.role?.trim() || "Role";
+  const company = opts.company?.trim();
+  const title = company ? `Interview prep — ${role} at ${company}` : `Interview prep — ${role}`;
+  const subtitle = opts.primarySkill
+    ? `${opts.questionCount} ${opts.primarySkill} question${opts.questionCount === 1 ? "" : "s"}, tuned to this JD`
+    : `${opts.questionCount} question${opts.questionCount === 1 ? "" : "s"} tuned to this JD`;
+  return {
+    id: opts.id,
+    kind: "interview_prep",
+    title,
+    subtitle,
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+  };
+}
+
 // Pretty short relative-time string for card subtitles. Pure function,
 // safe to call on every render.
 export function relativeTime(iso: string): string {
