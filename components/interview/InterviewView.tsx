@@ -215,8 +215,8 @@ function WelcomeScreen({
                     <span className="text-[11px] text-gray-500">· {count} q{count === 1 ? "" : "s"}</span>
                   )}
                   <span
-                    className="inline-flex items-center text-[12px] font-semibold text-black rounded-full px-2.5 py-0.5"
-                    style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+                    className="inline-flex items-center text-[12px] font-semibold text-white rounded-full px-2.5 py-0.5"
+                    style={{ background: "#000" }}
                   >
                     Start
                   </span>
@@ -244,10 +244,10 @@ function WelcomeScreen({
                 <button
                   key={diff}
                   onClick={() => handleStart(diff)}
-                  className={`inline-flex items-center text-[13px] font-semibold text-black rounded-full px-3.5 py-1.5 hover:opacity-90 transition-opacity capitalize ${
+                  className={`inline-flex items-center text-[13px] font-semibold text-white rounded-full px-3.5 py-1.5 hover:opacity-90 transition-opacity capitalize ${
                     diff === lastDifficulty ? "ring-2 ring-offset-1 ring-gray-900" : ""
                   }`}
-                  style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+                  style={{ background: "#000" }}
                 >
                   {diff}
                 </button>

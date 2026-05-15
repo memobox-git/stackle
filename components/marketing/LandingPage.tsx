@@ -29,8 +29,8 @@ export default function LandingPage() {
           </Link>
           <Link
             href="/signup"
-            className="text-sm font-medium text-black px-4 py-2 rounded-full"
-            style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+            className="text-sm font-medium text-white px-4 py-2 rounded-full"
+            style={{ background: "#000" }}
           >
             Get started
           </Link>
@@ -49,8 +49,8 @@ export default function LandingPage() {
         <div className="flex items-center gap-3 mt-8">
           <Link
             href="/signup"
-            className="inline-flex items-center gap-2 text-sm font-semibold text-black px-5 py-3 rounded-full hover:opacity-90 transition-opacity"
-            style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-white px-5 py-3 rounded-full hover:opacity-90 transition-opacity"
+            style={{ background: "#000" }}
           >
             Get started — it&apos;s free
             <ArrowRight className="w-4 h-4" strokeWidth={2} />

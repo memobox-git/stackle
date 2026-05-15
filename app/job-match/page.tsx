@@ -40,8 +40,8 @@ export default function JobMatchListPage() {
             type="button"
             disabled
             title="Paste-JD dialog ships in the next commit"
-            className="inline-flex items-center gap-2 text-sm font-medium text-black px-4 py-2 rounded-full opacity-60 cursor-not-allowed"
-            style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+            className="inline-flex items-center gap-2 text-sm font-medium text-white px-4 py-2 rounded-full opacity-60 cursor-not-allowed"
+            style={{ background: "#000" }}
           >
             <Plus className="w-4 h-4" strokeWidth={2} />
             New Job Match

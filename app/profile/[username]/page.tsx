@@ -88,8 +88,8 @@ export default async function PublicProfilePage(
           </Link>
           <Link
             href="/signup"
-            className="text-sm font-medium text-black px-3.5 py-1.5 rounded-full hover:opacity-90 transition-opacity"
-            style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+            className="text-sm font-medium text-white px-3.5 py-1.5 rounded-full hover:opacity-90 transition-opacity"
+            style={{ background: "#000" }}
           >
             Build yours
           </Link>

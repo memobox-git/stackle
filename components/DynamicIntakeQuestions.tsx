@@ -97,7 +97,7 @@ export default function DynamicIntakeQuestions({
         <button
           onClick={handleSubmit}
           disabled={!allRequired}
-          style={{ background: allRequired ? "linear-gradient(90deg, #fff7ad, #ffa9f9)" : undefined }}
+          style={{ background: allRequired ? "#000" : undefined }}
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${
             allRequired
               ? "text-black active:scale-95 hover:opacity-90"

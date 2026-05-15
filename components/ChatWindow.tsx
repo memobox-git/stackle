@@ -131,8 +131,8 @@ function PrioritiesCard({
             {selected.size > 0 && (
               <button
                 onClick={fixSelected}
-                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-black hover:opacity-90 transition-opacity"
-                style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+                className="text-[11px] font-semibold px-3 py-1.5 rounded-lg text-white hover:opacity-90 transition-opacity"
+                style={{ background: "#000" }}
               >
                 Fix Selected ({selected.size})
               </button>

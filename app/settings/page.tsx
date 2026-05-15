@@ -208,8 +208,8 @@ export default function SettingsPage() {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-black px-5 py-2.5 rounded-full disabled:opacity-50 hover:opacity-90 transition-opacity"
-            style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+            className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-white px-5 py-2.5 rounded-full disabled:opacity-50 hover:opacity-90 transition-opacity"
+            style={{ background: "#000" }}
           >
             {saving ? "Saving…" : "Save changes"}
           </button>

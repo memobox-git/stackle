@@ -376,8 +376,8 @@ export default function ProfileSetupPage() {
         <button
           type="submit"
           disabled={submitting || availability !== "available" || !parsedExtraction || parsing}
-          className="mt-6 inline-flex items-center justify-center gap-2 text-sm font-semibold text-black px-5 py-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-          style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+          className="mt-6 inline-flex items-center justify-center gap-2 text-sm font-semibold text-white px-5 py-3 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+          style={{ background: "#000" }}
         >
           {submitting ? "Setting up…" : "Continue"}
         </button>

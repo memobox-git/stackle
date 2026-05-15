@@ -109,8 +109,8 @@ export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: A
               onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
               className="text-[12px] font-semibold rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1 disabled:cursor-default"
               style={{
-                background: pending ? "#f3f4f6" : isOpen ? "#f3f4f6" : "linear-gradient(90deg, #fff7ad, #ffa9f9)",
-                color: pending ? "#9ca3af" : "#000",
+                background: pending ? "#f3f4f6" : isOpen ? "#f3f4f6" : "#000",
+                color: pending ? "#9ca3af" : isOpen ? "#000" : "#fff",
               }}
             >
               {pending ? "Generating…" : isOpen ? "Viewing" : "Open ↗"}

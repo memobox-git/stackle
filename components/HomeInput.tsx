@@ -116,7 +116,7 @@ export default function HomeInput({ value, onChange, onSend, onFileUpload, disab
           <button
             onClick={onSend}
             disabled={!value.trim() || disabled || uploading}
-            style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+            style={{ background: "#000" }}
             className="w-9 h-9 flex items-center justify-center rounded-xl text-black disabled:cursor-not-allowed disabled:saturate-50 active:scale-95 transition-all"
             aria-label="Send"
           >

@@ -120,7 +120,7 @@ export default function IntakeForm({ onSubmit }: IntakeFormProps) {
       <div className="px-4 pb-4">
         <button
           onClick={handleSubmit}
-          style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+          style={{ background: "#000" }}
           className="w-full py-2.5 rounded-xl text-sm font-semibold text-black active:scale-95 transition-all hover:opacity-90"
         >
           Start review

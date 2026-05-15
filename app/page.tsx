@@ -2447,14 +2447,62 @@ export default function Page() {
       {/* Logo + toggle */}
       <div className={`flex items-center ${expanded ? "justify-between px-3" : "justify-center"} py-3 mb-2`}>
         <div
-          className="w-8 h-8 rounded-xl flex items-center justify-center text-black text-xs font-bold flex-shrink-0 cursor-pointer"
-          style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+          className="w-8 h-8 rounded-xl flex items-center justify-center text-white text-xs font-bold flex-shrink-0 cursor-pointer"
+          style={{ background: "#000" }}
           onClick={() => setIsSidebarExpanded(!expanded)}
           title={expanded ? "Collapse sidebar" : "Expand sidebar"}
         >
           S
         </div>
       </div>
+
+      {/* User avatar — moved from top-right header into the sidebar
+          per user preference. Sits below the logo, above the New
+          conversation button. Dropdown anchors top-left now so it
+          opens DOWN from the avatar inside the sidebar. */}
+      {isSignedUp && (
+        <div className={`relative group ${expanded ? "px-3" : "px-1.5"} mb-3 flex ${expanded ? "items-center gap-2" : "justify-center"}`}>
+          <button
+            onClick={() => setUserMenuOpen((v) => !v)}
+            title={user?.email ?? "Account"}
+            aria-label="Account menu"
+            className="w-8 h-8 rounded-full border border-gray-200 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition-colors flex items-center justify-center text-xs font-semibold flex-shrink-0"
+          >
+            {(user?.email ?? "?").slice(0, 1).toUpperCase()}
+          </button>
+          {expanded && (
+            <span className="text-[12px] text-gray-700 truncate flex-1">
+              {user?.email ?? "Account"}
+            </span>
+          )}
+          {userMenuOpen && (
+            <>
+              <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
+              <div className="absolute left-2 top-full mt-1 z-40 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[220px]">
+                <div className="px-3 py-2.5 border-b border-gray-200">
+                  <p className="text-[10px] uppercase tracking-widest text-gray-500">Signed in as</p>
+                  <p className="text-[13px] text-gray-800 truncate mt-0.5">{user?.email ?? "—"}</p>
+                </div>
+                <a
+                  href="/settings"
+                  onClick={() => setUserMenuOpen(false)}
+                  className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[13px] text-gray-800 hover:bg-gray-100 transition-colors"
+                >
+                  <SettingsIcon className="w-4 h-4" strokeWidth={1.75} />
+                  Settings
+                </a>
+                <button
+                  onClick={() => { setUserMenuOpen(false); handleSignOut(); }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[13px] text-rose-700 hover:bg-rose-50 transition-colors border-t border-gray-200"
+                >
+                  <LogOut className="w-4 h-4" strokeWidth={1.75} />
+                  Sign out
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* New conversation */}
       <div className={`${expanded ? "px-2" : "px-1.5"} mb-3`}>
@@ -2828,46 +2876,8 @@ export default function Page() {
                 {MODE_LABELS[activeMode] ?? activeMode}
               </span>
             )}
-            {/* Account button — circular avatar only (initial). Email
-                still surfaces in the dropdown on click. */}
-            {isSignedUp && (
-              <div className="relative group">
-                <button
-                  onClick={() => setUserMenuOpen((v) => !v)}
-                  title={user?.email ?? "Account"}
-                  aria-label="Account menu"
-                  className="w-9 h-9 rounded-full border border-gray-200 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition-colors flex items-center justify-center text-sm font-semibold"
-                >
-                  {(user?.email ?? "?").slice(0, 1).toUpperCase()}
-                </button>
-                {userMenuOpen && (
-                  <>
-                    <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
-                    <div className="absolute right-0 top-full mt-1 z-40 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[220px]">
-                      <div className="px-3 py-2.5 border-b border-gray-200">
-                        <p className="text-[10px] uppercase tracking-widest text-gray-500">Signed in as</p>
-                        <p className="text-[13px] text-gray-800 truncate mt-0.5">{user?.email ?? "—"}</p>
-                      </div>
-                      <a
-                        href="/settings"
-                        onClick={() => setUserMenuOpen(false)}
-                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[13px] text-gray-800 hover:bg-gray-100 transition-colors"
-                      >
-                        <SettingsIcon className="w-4 h-4" strokeWidth={1.75} />
-                        Settings
-                      </a>
-                      <button
-                        onClick={() => { setUserMenuOpen(false); handleSignOut(); }}
-                        className="flex items-center gap-2.5 w-full px-3 py-2.5 text-[13px] text-rose-700 hover:bg-rose-50 transition-colors border-t border-gray-200"
-                      >
-                        <LogOut className="w-4 h-4" strokeWidth={1.75} />
-                        Sign out
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+            {/* Account avatar removed from header — moved into the
+                sidebar (below the logo) per the chat-as-chassis layout. */}
           </div>
         </header>
 
@@ -3490,8 +3500,8 @@ export default function Page() {
             {/* Upload button */}
             <button
               onClick={() => homeFileInputRef.current?.click()}
-              className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-sm font-semibold text-black mb-6 hover:opacity-90 active:scale-95 transition-all"
-              style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+              className="flex items-center gap-2.5 px-6 py-3 rounded-xl text-sm font-semibold text-white mb-6 hover:opacity-90 active:scale-95 transition-all"
+              style={{ background: "#000" }}
             >
               <Upload className="w-4 h-4" strokeWidth={2} />
               Upload resume
