@@ -18,7 +18,7 @@ import ChatSurface from "@/components/ChatSurface";
 import { ChatMessage } from "@/components/Message";
 import { createJobMatch, getJobMatch, type JobMatch } from "@/lib/supabase/jobMatches";
 import { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
-import { buildMatchReportArtifact, buildTailoredResumeArtifact, type Artifact } from "@/lib/artifacts";
+import { buildMatchReportArtifact, buildTailoredResumeArtifact, buildStudyPlanArtifact, type Artifact } from "@/lib/artifacts";
 import type { ResumeAnalysis } from "@/lib/agents/schemas/resumeIntelligence";
 
 interface JobMatchViewProps {
@@ -301,7 +301,74 @@ export default function JobMatchView({ resumeExtraction, resumeFilename, resumeA
       return;
     }
 
-    // Study Plan + Interview Prep ship in Phases 3-4.
+    if (pill === "Tell me what to study") {
+      const pendingId = `study-plan-pending-${jobMatch.id}-${Date.now()}`;
+      const pending = buildStudyPlanArtifact({
+        id: pendingId,
+        company: jobMatch.company,
+        role: jobMatch.role,
+        itemCount: 0,
+      });
+      pending.title = `Building study plan — ${jobMatch.role ?? "role"}`;
+      pending.subtitle = "Mapping gaps to skills + resources";
+      pending.pending = true;
+      pushAssistant("On it. Sonnet's ~10s.", pending);
+
+      try {
+        const res = await fetch("/api/agents/jobmatch/study-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ jobMatchId: jobMatch.id }),
+        });
+        if (!res.ok) throw new Error(`study-plan HTTP ${res.status}`);
+        const data = await res.json() as { plan: { items: { skill: string; priority: string; estTimeHours: number }[]; overallTimeline: string } };
+        const real = buildStudyPlanArtifact({
+          id: `study-plan-${jobMatch.id}-${Date.now()}`,
+          company: jobMatch.company,
+          role: jobMatch.role,
+          itemCount: data.plan.items.length,
+        });
+        // Render a short inline preview of the top items so the user
+        // can see the plan without opening the artifact. Top 3 by
+        // priority order (high → medium → low).
+        const ordered = [...data.plan.items].sort((a, b) => {
+          const score = (p: string) => p === "high" ? 0 : p === "medium" ? 1 : 2;
+          return score(a.priority) - score(b.priority);
+        });
+        const top = ordered.slice(0, 3);
+        const preview = top
+          .map((it) => `**${it.skill}** (${it.priority}, ~${it.estTimeHours}h)`)
+          .join(" · ");
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.artifact?.id === pendingId
+              ? {
+                  role: "assistant",
+                  content: `${data.plan.overallTimeline || "Here's the plan:"}\n\n${preview}${data.plan.items.length > 3 ? `\n\n+${data.plan.items.length - 3} more — open the card for the full list.` : ""}`,
+                  timestamp: now(),
+                  artifact: real,
+                }
+              : m,
+          ),
+        );
+      } catch (err) {
+        console.error("[jobmatch:study-plan] failed:", err);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.artifact?.id === pendingId
+              ? {
+                  role: "assistant",
+                  content: `Study plan failed — ${err instanceof Error ? err.message : "unknown error"}. Try again?`,
+                  timestamp: now(),
+                }
+              : m,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Interview Prep ships in Phase 4.
     pushAssistant(`"${pill}" ships in the next phase — wired but not active yet.`);
   }
 

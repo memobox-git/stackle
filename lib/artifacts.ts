@@ -117,6 +117,26 @@ export function buildTailoredResumeArtifact(opts: {
   };
 }
 
+// Build an artifact for a Job Match study plan.
+export function buildStudyPlanArtifact(opts: {
+  id: string;
+  company: string | null;
+  role: string | null;
+  itemCount: number;
+  generatedAt?: string;
+}): Artifact {
+  const role = opts.role?.trim() || "Role";
+  const company = opts.company?.trim();
+  const title = company ? `Study plan — ${role} at ${company}` : `Study plan — ${role}`;
+  return {
+    id: opts.id,
+    kind: "study_plan",
+    title,
+    subtitle: `${opts.itemCount} skill${opts.itemCount === 1 ? "" : "s"} prioritized`,
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+  };
+}
+
 // Pretty short relative-time string for card subtitles. Pure function,
 // safe to call on every render.
 export function relativeTime(iso: string): string {
