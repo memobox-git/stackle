@@ -2395,6 +2395,18 @@ export default function Page() {
                     return;
                   }
                   if (item.view) {
+                    // Resume is the heart — but each click on a surface
+                    // should start that surface clean. For Interview Prep,
+                    // clear the persisted picked-skill so the welcome
+                    // screen renders the fresh skill chips instead of
+                    // jumping straight into a difficulty picker from a
+                    // previous session. lastDifficulty stays as a
+                    // preference (ring-highlighted on next pick).
+                    if (item.view === "interview" && typeof window !== "undefined") {
+                      try {
+                        localStorage.removeItem("stackle_interview_picked_skill");
+                      } catch { /* ignore */ }
+                    }
                     setActiveView(item.view);
                     setIsSidebarOpen(false);
                   }
@@ -2972,6 +2984,7 @@ export default function Page() {
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <InterviewView
               candidateName={resumeExtraction?.name ?? null}
+              resumeFilename={resumeFilename ?? null}
               resumeSkills={(resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? [])}
               resumeContext={
                 resumeExtraction

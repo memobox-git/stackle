@@ -49,8 +49,14 @@ export default function InterviewView({
   candidateName,
   resumeSkills,
   resumeContext,
+  resumeFilename,
 }: {
   candidateName?: string | null;
+  // The active resume's filename. Surfaced on the welcome screen as
+  // "Drilling against: {filename}" so the user always sees which
+  // resume the session is grounded in. Resume is the heart of every
+  // surface — Interview Prep included.
+  resumeFilename?: string | null;
   // Top skills extracted from the user's primary resume. Surfaced as
   // quick-start chips in the lobby — click → goes straight to a drill
   // on that skill. Empty / undefined → no chips, classic 'New Session'
@@ -92,6 +98,7 @@ export default function InterviewView({
         <WelcomeScreen
           candidateName={candidateName}
           resumeSkills={resumeSkills}
+          resumeFilename={resumeFilename}
           onStart={(opts) => startNewSession(opts)}
         />
       )}
@@ -117,10 +124,11 @@ export default function InterviewView({
 // chips with Start buttons inline. Click Start → pick difficulty → drill.
 
 function WelcomeScreen({
-  candidateName, resumeSkills, onStart,
+  candidateName, resumeSkills, resumeFilename, onStart,
 }: {
   candidateName?: string | null;
   resumeSkills?: string[];
+  resumeFilename?: string | null;
   onStart: (opts: { skill: string; difficulty: "beginner" | "intermediate" | "advanced" | "mixed" }) => void;
 }) {
   const firstName = candidateName?.trim().split(/\s+/)[0] ?? "there";
@@ -140,13 +148,12 @@ function WelcomeScreen({
     return out;
   }, [resumeSkills]);
 
-  // Persist picked skill + last-chosen difficulty across reloads so the
-  // user doesn't lose mid-flow state. Keys are namespaced so they don't
-  // collide with anything else in localStorage.
-  const [pickedSkill, setPickedSkill] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem("stackle_interview_picked_skill");
-  });
+  // Every Interview Prep open starts fresh — no auto-jumping into a
+  // difficulty picker from a previous session. pickedSkill always
+  // initializes to null. lastDifficulty (a preference, not a state)
+  // stays remembered so the previous choice is ring-highlighted when
+  // the user does pick a skill.
+  const [pickedSkill, setPickedSkill] = useState<string | null>(null);
   const [lastDifficulty, setLastDifficulty] = useState<"beginner" | "intermediate" | "advanced" | "mixed">(() => {
     if (typeof window === "undefined") return "mixed";
     const saved = localStorage.getItem("stackle_interview_last_difficulty");
@@ -154,12 +161,6 @@ function WelcomeScreen({
       ? (saved as "beginner" | "intermediate" | "advanced" | "mixed")
       : "mixed";
   });
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (pickedSkill) localStorage.setItem("stackle_interview_picked_skill", pickedSkill);
-    else localStorage.removeItem("stackle_interview_picked_skill");
-  }, [pickedSkill]);
   useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem("stackle_interview_last_difficulty", lastDifficulty);
@@ -175,7 +176,7 @@ function WelcomeScreen({
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Welcome bubble — chat-style */}
-        <div className="text-[15px] text-gray-800 leading-relaxed mb-6">
+        <div className="text-[15px] text-gray-800 leading-relaxed mb-2">
           Hey {firstName} — welcome to interview prep.
           {suggestedSkills.length > 0 ? (
             <> Based on your resume, here are skills we can drill. Pick one to start.</>
@@ -183,6 +184,15 @@ function WelcomeScreen({
             <> Upload your resume on the chat surface and I&apos;ll surface skills to drill here.</>
           )}
         </div>
+        {/* Resume cue — every session is grounded in a specific resume.
+            Resume is the heart, so we show the user exactly which file
+            this drill is built around. */}
+        {resumeFilename && (
+          <div className="text-[12px] text-gray-500 mb-6 inline-flex items-center gap-1.5">
+            <span className="inline-flex w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Drilling against <span className="font-medium text-gray-700">{resumeFilename}</span>
+          </div>
+        )}
 
         {suggestedSkills.length > 0 && !pickedSkill && (
           <div className="flex flex-wrap gap-2 mb-6">
