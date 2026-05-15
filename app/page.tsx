@@ -2080,53 +2080,46 @@ export default function Page() {
 
         setOrchestratorDecision(decision);
 
-        // Step 2: Resume Intelligence
-        let currentAnalysis = resumeAnalysis;
-        console.log('SEND MESSAGE - resumeText length:', resumeText?.length, 'runResumeIntelligence:', decision.runResumeIntelligence, 'hasAnalysis:', !!resumeAnalysis);
+        // Step 2: Resume Intelligence — fire in BACKGROUND so synthesis
+        // doesn't block on the ~15s analyzer call. The analysis-landed
+        // watcher (resumeAnalysis state change) handles the artifact
+        // card push when results arrive. Chat text streams immediately.
+        const currentAnalysis = resumeAnalysis;
         if (decision.runResumeIntelligence && resumeText && !resumeAnalysis) {
           setIsAnalyzingResume(true);
-          try {
-            const analyzeRes = await fetch("/api/agents/resume/analyze", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                resumeText,
-                targetRole: decision.detectedTargetRole,
-                messages: apiMessages,
-                reviewType: intakeData?.reviewType,
-                targetMarket: intakeData?.targetMarket,
-                seniorityLevel: intakeData?.seniorityLevel,
-                jobDescription: intakeData?.jobDescription,
-              }),
-            });
-            if (analyzeRes.ok) {
-              currentAnalysis = await analyzeRes.json();
-              finalAnalysis = currentAnalysis;
-              setResumeAnalysis(currentAnalysis);
-              const withAnalysis: ChatMessage[] = [
-                ...updatedMessages,
-                { role: "assistant", content: "__RESUME_ANALYSIS__" },
-                { role: "assistant", content: "__RESUME_PRIORITIES__" },
-              ];
-              setMessages(withAnalysis);
-              finalMessages = withAnalysis;
-
-              // Auto-save report to Drive
+          fetch("/api/agents/resume/analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              resumeText,
+              targetRole: decision.detectedTargetRole,
+              messages: apiMessages,
+              reviewType: intakeData?.reviewType,
+              targetMarket: intakeData?.targetMarket,
+              seniorityLevel: intakeData?.seniorityLevel,
+              jobDescription: intakeData?.jobDescription,
+            }),
+          })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((a: ResumeAnalysis | null) => {
+              if (!a) return;
+              setResumeAnalysis(a);
+              // Auto-save report to Drive in background.
               const chatId = activeChatIdRef.current;
-              if (chatId && currentAnalysis) {
+              if (chatId) {
                 saveReport({
                   chatId,
                   parentDriveId: originalDriveFileId ?? null,
                   extraction: resumeExtraction,
-                  analysis: currentAnalysis,
+                  analysis: a,
                   candidateName: resumeExtraction?.name ?? "Resume",
                 }).then((file) => {
                   if (file) loadDriveFiles(chatId).then(setDriveFiles).catch(() => {});
                 }).catch(() => {});
               }
-            }
-          } catch { /* non-blocking */ }
-          finally { setIsAnalyzingResume(false); }
+            })
+            .catch(() => { /* non-blocking */ })
+            .finally(() => setIsAnalyzingResume(false));
         }
 
         // Step 3: Market Intelligence
