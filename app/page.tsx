@@ -2558,19 +2558,6 @@ export default function Page() {
           Drive nav item instead. The compact Resumes/Reports list felt
           like clutter inside the main nav. */}
 
-      {/* Bottom: sign out */}
-      <div className={`mt-auto pt-2 ${expanded ? "px-2" : "px-1.5"}`}>
-        <div className="relative group">
-          <button
-            onClick={handleSignOut}
-            className={`flex items-center ${expanded ? "gap-2.5 px-3 w-full" : "justify-center w-full px-0"} py-2.5 rounded-lg text-gray-600 hover:text-gray-500 hover:bg-gray-100 transition-colors border border-transparent`}
-          >
-            <LogOut className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
-            {expanded && <span className="text-sm">Sign out</span>}
-          </button>
-          {!expanded && <SidebarTooltip label="Sign out" />}
-        </div>
-      </div>
     </div>
   );
 
