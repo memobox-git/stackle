@@ -5,11 +5,20 @@ import { NextRequest } from "next/server";
 import { runFinalSynthesis } from "@/lib/agents/synthesize/runFinalSynthesis";
 import { WorkspaceViewModel } from "@/lib/agents/schemas/workspaceViewModel";
 import { rateLimit } from "@/lib/rateLimit";
+import { flowIdFromHeaders, flowStart } from "@/lib/flowLog";
 
 export async function POST(req: NextRequest) {
   const __rl = rateLimit(req, { limit: 40, windowMs: 60000 });
   if (__rl.blocked) return __rl.response;
+  const flowId = flowIdFromHeaders(req.headers);
   const { messages, resumeText, resumeExtraction, resumeAnalysis, marketAnalysis, orchestratorDecision, interviewPrepPlan, mode, careerGoal } = await req.json();
+  const log = flowStart("synthesize", flowId, {
+    from: "server",
+    mode: mode ?? "chat",
+    msgs: messages?.length ?? 0,
+    hasAnalysis: !!resumeAnalysis,
+    hasMarket: !!marketAnalysis,
+  });
 
   const workspace: WorkspaceViewModel = {
     conversationHistory: messages ?? [],
@@ -24,6 +33,7 @@ export async function POST(req: NextRequest) {
   };
 
   const stream = await runFinalSynthesis(workspace);
+  log.end({ note: "stream-started" });
 
   return new Response(stream, {
     headers: {

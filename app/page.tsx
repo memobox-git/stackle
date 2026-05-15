@@ -6,6 +6,7 @@ import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOu
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import { buildResumeReviewArtifact, type Artifact } from "@/lib/artifacts";
 import { deriveScoreFromAnalysis } from "@/lib/score";
+import { newFlowId, flowStart, flowInfo } from "@/lib/flowLog";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
 import HomeInput from "@/components/HomeInput";
@@ -893,7 +894,12 @@ export default function Page() {
     const analysisKey = `chat:${resumeText.length}:${resumeText.slice(0, 32)}`;
     if (chatAnalysisKickoffRef.current.has(analysisKey)) return;
     chatAnalysisKickoffRef.current.add(analysisKey);
-    console.log("[artifact:resume-review] kickoff fired", { chatId: activeChatId, view: activeView });
+    const flowId = newFlowId();
+    const analyzeLog = flowStart("analyze", flowId, {
+      from: "chat-kickoff",
+      chatId: activeChatId,
+      bytes: resumeText.length,
+    });
 
     // Push a placeholder artifact card the MOMENT the analyzer fires,
     // not when it returns. Bug from user: "the button didn't come
@@ -922,7 +928,7 @@ export default function Page() {
 
     fetch("/api/agents/resume/analyze", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-stackle-flow-id": flowId },
       body: JSON.stringify({
         resumeText,
         reviewType: "Full Review",
@@ -935,8 +941,17 @@ export default function Page() {
       }),
     })
       .then((r) => (r.ok ? r.json() : null))
-      .then((a: ResumeAnalysis | null) => { if (a) setResumeAnalysis(a); })
-      .catch(() => { /* artifact just won't render — prose still does */ });
+      .then((a: ResumeAnalysis | null) => {
+        if (a) {
+          analyzeLog.end({ score: deriveScoreFromAnalysis(a), priorities: a.rewritePriorities?.length ?? 0, gaps: a.keywordGaps?.length ?? 0 });
+          setResumeAnalysis(a);
+        } else {
+          analyzeLog.err(new Error("analyze returned null"));
+        }
+      })
+      .catch((err) => {
+        analyzeLog.err(err);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, resumeExtraction, resumeText, resumeAnalysis, chatMessages.length]);
 
@@ -1487,8 +1502,12 @@ export default function Page() {
 
   // ── Resume upload ─────────────────────────────────────
   const handleResumeUpload = async (text: string, filename: string) => {
-    console.log('RESUME TEXT LENGTH:', text?.length);
-    console.log('RESUME TEXT PREVIEW:', text?.slice(0, 200));
+    const flowId = newFlowId();
+    const uploadLog = flowStart("upload", flowId, {
+      filename,
+      bytes: text?.length ?? 0,
+      preview: (text ?? "").slice(0, 60),
+    });
     // Step 7: guard against incomplete PDF extraction
     if (filename.toLowerCase().endsWith('.pdf') && text.length < 500) {
       setActiveView("chat");
@@ -1523,14 +1542,17 @@ export default function Page() {
 
     // Run extraction in background — welcome auto-fires once it lands
     let extraction: ResumeExtraction | null = null;
+    const extractLog = flowStart("extract", flowId, { bytes: safeText.length });
     try {
       const extractRes = await fetch("/api/agents/resume/extract", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-stackle-flow-id": flowId },
         body: JSON.stringify({ resumeText: safeText }),
       });
       if (extractRes.ok) {
         extraction = await extractRes.json();
+        extractLog.end({ name: extraction?.name ?? null, experiences: extraction?.experience?.length ?? 0, skills: (extraction?.skillGroups ?? []).reduce((n, g) => n + (g.skills?.length ?? 0), 0) });
+        uploadLog.end({ extraction: "ok" });
         setResumeExtraction(extraction);
 
         const id = activeChatIdRef.current;
@@ -1565,7 +1587,9 @@ export default function Page() {
           }
         }
       }
-    } catch {
+    } catch (err) {
+      extractLog.err(err);
+      uploadLog.err(err);
       setIsLoading(false);
       setChatMessages((prev) => [...prev, {
         role: "assistant",
@@ -2086,18 +2110,31 @@ export default function Page() {
         }
       }
 
+      const sendFlowId = newFlowId();
+      flowInfo("chat-receive", sendFlowId, { userMessage: trimmed.slice(0, 60), len: trimmed.length });
       try {
         // Step 1: Orchestrate
         let decision: OrchestratorDecision = DEFAULT_ORCHESTRATOR_DECISION;
+        const orchLog = flowStart("orchestrate", sendFlowId, { msgs: apiMessages.length, hasResume: !!resumeText });
         try {
           const orchRes = await fetch("/api/orchestrate", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "x-stackle-flow-id": sendFlowId },
             signal: controller.signal,
             body: JSON.stringify({ messages: apiMessages, resumeText }),
           });
-          if (orchRes.ok) decision = await orchRes.json();
-        } catch { /* fallback */ }
+          if (orchRes.ok) {
+            decision = await orchRes.json();
+            orchLog.end({
+              runResumeIntelligence: decision.runResumeIntelligence,
+              runMarketIntelligence: decision.runMarketIntelligence,
+              runInterviewPrep: decision.runInterviewPrep,
+              targetRole: decision.detectedTargetRole,
+            });
+          } else {
+            orchLog.err(new Error(`http ${orchRes.status}`));
+          }
+        } catch (e) { orchLog.err(e); }
 
         setOrchestratorDecision(decision);
 
@@ -2148,10 +2185,11 @@ export default function Page() {
         if (decision.runMarketIntelligence && decision.detectedTargetRole) {
           const marketKey = `${decision.detectedTargetRole}::${decision.detectedSeniority ?? "any"}::${decision.detectedLocation ?? "global"}`;
           if (analyzedMarketKey !== marketKey) {
+            const marketLog = flowStart("market", sendFlowId, { targetRole: decision.detectedTargetRole, seniority: decision.detectedSeniority });
             try {
               const marketRes = await fetch("/api/agents/market/analyze", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", "x-stackle-flow-id": sendFlowId },
                 body: JSON.stringify({
                   targetRole: decision.detectedTargetRole,
                   seniority: decision.detectedSeniority,
@@ -2161,6 +2199,7 @@ export default function Page() {
               });
               if (marketRes.ok) {
                 currentMarketAnalysis = await marketRes.json();
+                marketLog.end({ ok: true });
                 setMarketAnalysis(currentMarketAnalysis);
                 setAnalyzedMarketKey(marketKey);
                 const withMarket: ChatMessage[] = [
@@ -2169,8 +2208,10 @@ export default function Page() {
                 ];
                 setMessages(withMarket);
                 finalMessages = withMarket;
+              } else {
+                marketLog.err(new Error(`http ${marketRes.status}`));
               }
-            } catch { /* non-blocking */ }
+            } catch (e) { marketLog.err(e); }
           }
         }
 
@@ -2208,9 +2249,15 @@ export default function Page() {
 
         // Step 5: Stream synthesis
         const stackleStart = Date.now();
+        const synthLog = flowStart("synthesize", sendFlowId, {
+          mode: isResumeMode ? "resume_builder" : "chat",
+          hasAnalysis: !!currentAnalysis,
+          hasMarket: !!currentMarketAnalysis,
+          hasInterview: !!currentInterviewPlan,
+        });
         const res = await fetch("/api/synthesize", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "x-stackle-flow-id": sendFlowId },
           signal: controller.signal,
           body: JSON.stringify({
             messages: apiMessages,
@@ -2256,6 +2303,7 @@ export default function Page() {
           }
         }
 
+        synthLog.end({ chars: assistantText.length, tookFromStart: Date.now() - stackleStart });
         // Final messages with streamed content
         const streamedMessages: ChatMessage[] = [
           ...finalMessages.slice(0, -1),

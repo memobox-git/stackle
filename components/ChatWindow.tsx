@@ -13,6 +13,7 @@ import ResumeWelcomeCard from "@/components/ResumeWelcomeCard";
 import FixProgressCard from "@/components/FixProgressCard";
 import ArtifactCard from "@/components/ArtifactCard";
 import type { Artifact } from "@/lib/artifacts";
+import { flowInfo, newFlowId } from "@/lib/flowLog";
 
 interface ChatWindowProps {
   messages: ChatMessage[];
@@ -997,6 +998,7 @@ export default function ChatWindow({
             .map((s) => stripChipLabel(s.trim()))
             .filter(Boolean);
           if (labels.length === 0) return null;
+          flowInfo("pills-render", newFlowId(), { source: "sentinel", count: labels.length, labels });
           return (
             <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-2 mb-6">
               <div className="flex flex-wrap gap-2">
@@ -1004,6 +1006,7 @@ export default function ChatWindow({
                   <button
                     key={j}
                     onClick={() => {
+                      flowInfo("chip-click", newFlowId(), { source: "sentinel", label });
                       if (onChatEditPrompt) onChatEditPrompt(label);
                       else onStarterPromptClick?.(label);
                     }}
@@ -1100,6 +1103,7 @@ export default function ChatWindow({
                     <button
                       key={`${label}-${j}`}
                       onClick={() => {
+                        flowInfo("chip-click", newFlowId(), { source: canonicalChips.length > 0 ? "canonical" : "parsed", label });
                         if (onChatEditPrompt) onChatEditPrompt(label);
                         else onStarterPromptClick?.(label);
                       }}
