@@ -28,6 +28,7 @@ import { createChat } from "@/lib/supabase/chats";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
 import { Check, X as XIcon, Upload, FileText } from "lucide-react";
 import type { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
+import { useTypewriter } from "@/lib/useTypewriter";
 
 export default function ProfileSetupPage() {
   const router = useRouter();
@@ -38,6 +39,15 @@ export default function ProfileSetupPage() {
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string>("");
+
+  // Typewriter on the heading. Every onboarding page opens with one —
+  // matches the "Create your account" / "Sign in to Stackle" cadence on
+  // the auth screens. Speed 32ms/char keeps it punchy without feeling
+  // slow.
+  const { displayed: headingText, done: headingDone } = useTypewriter(
+    authChecked ? "Finish setting up" : "",
+    32,
+  );
 
   // Resume state
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -244,7 +254,10 @@ export default function ProfileSetupPage() {
           className="w-10 h-10 rounded-2xl mx-auto flex items-center justify-center text-black text-sm font-bold mb-6"
           style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
         >S</div>
-        <h1 className="text-[24px] font-semibold text-gray-900 text-center mb-6">Finish setting up</h1>
+        <h1 className="text-[24px] font-semibold text-gray-900 text-center mb-6 min-h-[32px]">
+          {headingText}
+          {!headingDone && <span className="inline-block w-[2px] h-5 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />}
+        </h1>
 
         <div className="grid grid-cols-2 gap-2 mb-3">
           <input
