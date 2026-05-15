@@ -13,6 +13,7 @@ import ChatSurface from "@/components/ChatSurface";
 import HomeInput from "@/components/HomeInput";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import InterviewView from "@/components/interview/InterviewView";
+import JobMatchView from "@/components/JobMatchView";
 import LearnView from "@/components/LearnView";
 import MarketingLanding from "@/components/marketing/LandingPage";
 import AppChatPanel from "@/components/AppChatPanel";
@@ -50,7 +51,7 @@ import type { User } from "@supabase/supabase-js";
 import OnboardingFlow from "@/components/OnboardingFlow";
 import AuthModal from "@/components/AuthModal";
 
-type ActiveView = "chat" | "resume-builder" | "drive" | "interview" | "learn";
+type ActiveView = "chat" | "resume-builder" | "drive" | "interview" | "learn" | "job-match";
 
 // Instant dark tooltip shown to the right of a collapsed sidebar icon.
 // Uses Tailwind's group-hover; must live inside a parent with `relative group`.
@@ -167,7 +168,7 @@ export default function Page() {
   const [activeView, setActiveView] = useState<ActiveView>(() => {
     if (typeof window === "undefined") return "chat";
     const saved = localStorage.getItem("stackle_active_view");
-    const valid: ActiveView[] = ["chat", "resume-builder", "drive", "interview", "learn"];
+    const valid: ActiveView[] = ["chat", "resume-builder", "drive", "interview", "learn", "job-match"];
     return (valid as string[]).includes(saved ?? "") ? (saved as ActiveView) : "chat";
   });
   useEffect(() => {
@@ -1304,7 +1305,7 @@ export default function Page() {
   function persistChat(
     id: string,
     msgs: ChatMessage[],
-    mode: "chat" | "resume_builder",
+    mode: "chat" | "resume_builder" | "job_match",
     extra?: {
       resumeText?: string | null;
       resumeFilename?: string;
@@ -2430,11 +2431,11 @@ export default function Page() {
     {
       label: "Library",
       items: [
-        // Job Match has its own /job-match list route (href). Drive +
+        // Job Match is its own chat surface (mode="job_match"). Drive +
         // Foundations open inside the chat shell as workspace lenses.
-        { key: "job-match",   label: "Job Match",   icon: Target,        view: null,    locked: false, href: "/job-match" },
-        { key: "drive",       label: "Drive",       icon: FolderOpen,    view: "drive", locked: false },
-        { key: "foundations", label: "Foundations", icon: GraduationCap, view: "learn", locked: false },
+        { key: "job-match",   label: "Job Match",   icon: Target,        view: "job-match", locked: false },
+        { key: "drive",       label: "Drive",       icon: FolderOpen,    view: "drive",     locked: false },
+        { key: "foundations", label: "Foundations", icon: GraduationCap, view: "learn",     locked: false },
       ],
     },
   ];
@@ -3170,6 +3171,14 @@ export default function Page() {
         ) : activeView === "learn" ? (
           <div className="flex flex-1 min-h-0 overflow-hidden">
             <LearnView />
+          </div>
+        ) : activeView === "job-match" ? (
+          // Job Match — dedicated chat surface for paste-a-JD → 4 pills.
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            <JobMatchView
+              resumeExtraction={resumeExtraction}
+              resumeFilename={resumeFilename}
+            />
           </div>
         ) : activeView === "drive" ? (
           /* Drive view — chat-as-chassis: persistent chat on left,

@@ -8,7 +8,7 @@ export interface SupabaseChat {
   user_id: string;
   title: string;
   messages: ChatMessage[];
-  mode: "chat" | "resume_builder";
+  mode: "chat" | "resume_builder" | "job_match";
   resume_text: string | null;
   resume_filename: string | null;
   resume_extraction: ResumeExtraction | null;
@@ -109,7 +109,7 @@ export interface ChatSeed {
 }
 
 export async function createChat(
-  mode: "chat" | "resume_builder" = "chat",
+  mode: "chat" | "resume_builder" | "job_match" = "chat",
   seed?: ChatSeed
 ): Promise<SupabaseChat> {
   const supabase = getSupabaseClient();

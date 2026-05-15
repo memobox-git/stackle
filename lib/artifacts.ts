@@ -70,6 +70,30 @@ export function buildResumeReviewArtifact(opts: {
   };
 }
 
+// Build an artifact for a Job Match Match Report. Verdict-driven —
+// the score (0-100) drives the score badge color in ArtifactCard.
+export function buildMatchReportArtifact(opts: {
+  id: string;
+  company: string | null;
+  role: string | null;
+  score: number;
+  generatedAt?: string;
+  driveFileId?: string;
+}): Artifact {
+  const role = opts.role?.trim() || "Role";
+  const company = opts.company?.trim();
+  const title = company ? `${role} at ${company} — Match Report` : `${role} — Match Report`;
+  return {
+    id: opts.id,
+    kind: "match_report",
+    title,
+    subtitle: company ? `Match analysis vs your primary resume` : undefined,
+    score: opts.score,
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+    driveFileId: opts.driveFileId,
+  };
+}
+
 // Pretty short relative-time string for card subtitles. Pure function,
 // safe to call on every render.
 export function relativeTime(iso: string): string {
