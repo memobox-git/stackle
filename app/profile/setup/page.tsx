@@ -77,8 +77,14 @@ export default function ProfileSetupPage() {
   const sanitised = useMemo(() => username.trim().toLowerCase(), [username]);
   const validFormat = useMemo(() => isValidUsername(sanitised), [sanitised]);
 
+  // Used to be gated on `touched`, which only flips when the user types
+  // into the username field. But the username is pre-filled on mount
+  // from full_name / email — so `touched` stayed false, availability
+  // never advanced past its initial state, and the Continue button
+  // remained disabled even with a perfectly valid pre-filled username.
+  // Fix: run the check whenever sanitised + validFormat are ready.
   useEffect(() => {
-    if (!touched) return;
+    if (!sanitised) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     if (!validFormat) {
       setAvailability("invalid");
@@ -92,7 +98,7 @@ export default function ProfileSetupPage() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [sanitised, validFormat, touched]);
+  }, [sanitised, validFormat]);
 
   // Parse the resume file as soon as it's selected so we have a
   // ResumeExtraction ready by the time the user clicks Continue.
