@@ -229,9 +229,11 @@ export default function ProfileSetupPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        extraction: parsedExtraction,
-        targetRole: "auto",
-        seniority: "auto",
+        resumeText: parsedText,
+        reviewType: "Full Review",
+        targetMarket: "US General",
+        seniorityLevel: parsedExtraction.totalYearsExperience && parsedExtraction.totalYearsExperience >= 7 ? "Senior" : "Mid",
+        jobDescription: "",
       }),
     }).catch(() => {/* analysis runs lazily on the chat side too */});
 
