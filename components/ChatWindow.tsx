@@ -987,7 +987,15 @@ export default function ChatWindow({
         // present its CTAs as part of the conversation instead of a tray
         // hovering above the input. Each chip's label is the prompt text.
         if (msg.content.startsWith(INLINE_CHIPS_PREFIX)) {
-          const labels = msg.content.slice(INLINE_CHIPS_PREFIX.length).split("|").map((s) => s.trim()).filter(Boolean);
+          const labels = msg.content
+            .slice(INLINE_CHIPS_PREFIX.length)
+            .split("|")
+            // Strip ** ** ** markdown so chips never render raw asterisks.
+            // Bug from user: chips showed "**Senior**" etc. The agent
+            // sometimes emits markdown inside __INLINE_CHIPS__ labels;
+            // chip UI doesn't render markdown so strip it here.
+            .map((s) => stripChipLabel(s.trim()))
+            .filter(Boolean);
           if (labels.length === 0) return null;
           return (
             <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-2 mb-6">

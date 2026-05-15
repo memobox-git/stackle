@@ -1620,6 +1620,27 @@ export default function Page() {
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
+
+      // Client-side intent short-circuit for Interview Prep. The legacy
+      // orchestrator on /api/orchestrate (used in chat view) doesn't
+      // route to "interview" view — only the Stackle orchestrator does,
+      // and it only runs in Resume Builder mode. So a chat-view user
+      // saying "interview prep" never got routed. Detect that intent
+      // here and switch view immediately. Saves an orchestrator call
+      // too (faster).
+      const lc = trimmed.toLowerCase();
+      const interviewIntent = /\b(interview prep|practice interview|mock interview|drill (sql|python|coding)|prep for (an? )?interview|interview practice|practice for (my )?interview)\b/.test(lc);
+      if (interviewIntent && activeView !== "interview") {
+        // Echo the user message into chat so the surface change has a
+        // narrative reason, then switch view. Skill Agent will handle
+        // greeting on the Interview Prep surface.
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "user", content: trimmed, timestamp: now() },
+        ]);
+        setTimeout(() => setActiveView("interview"), 150);
+        return;
+      }
       // Diagnostic: confirm we're appending to the existing chat, not
       // spawning a new one. There is no createChat() anywhere in this
       // function — the message goes through persistChat → updateChat,

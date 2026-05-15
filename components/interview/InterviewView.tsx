@@ -131,7 +131,12 @@ function WelcomeScreen({
   resumeFilename?: string | null;
   onStart: (opts: { skill: string; difficulty: "beginner" | "intermediate" | "advanced" | "mixed" }) => void;
 }) {
-  const firstName = candidateName?.trim().split(/\s+/)[0] ?? "there";
+  // Title-case the first name so "RAHUL" doesn't shout at the user.
+  const firstName = (() => {
+    const raw = candidateName?.trim().split(/\s+/)[0] ?? "there";
+    if (raw === "there") return raw;
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  })();
   const suggestedSkills = useMemo(() => {
     if (!resumeSkills || resumeSkills.length === 0) return [];
     const seen = new Set<string>();
