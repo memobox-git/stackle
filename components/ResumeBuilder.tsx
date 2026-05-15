@@ -2892,6 +2892,12 @@ export default function ResumeBuilder({
                 jobDescription={null}
                 acceptedFixCount={acceptedIndices.size}
                 baseScore={baseScore}
+                appliedPriorities={
+                  // Fix #6 — translate Set<number> of completed indices
+                  // into the actual priority strings the rewriter prompt
+                  // needs. Order preserved.
+                  (effectiveAnalysis?.rewritePriorities ?? []).filter((_, i) => completedActions.has(i))
+                }
                 initialRewritten={savedRewrite?.extraction ?? null}
                 initialChangedKeys={savedRewrite?.changedKeys ?? []}
                 onRewriteGenerated={(rewritten, changedKeys, styleHint) => {

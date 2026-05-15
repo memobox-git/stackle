@@ -15,6 +15,11 @@ export interface RewriteAllInput {
   /** Optional style hint for regeneration ("more senior tone", "more
    *  technical depth", "less corporate") so subsequent runs feel different. */
   styleHint?: string;
+  /** Fix #6 — priorities the user already accepted in a prior pass.
+   *  The writer prompt tells the model NOT to re-propose these so
+   *  successive runs don't loop on the same items. Optional; empty
+   *  array means "fresh rewrite, apply everything in priorities". */
+  appliedPriorities?: string[];
 }
 
 export interface RewriteAllOutput {
@@ -85,6 +90,13 @@ async function callWriter(userMessage: string): Promise<{ parsed: ResumeExtracti
 }
 
 export async function runRewriteAll(input: RewriteAllInput): Promise<RewriteAllOutput> {
+  // Fix #6 — partition priorities into pending vs already-applied so the
+  // writer doesn't re-propose what the user already accepted.
+  const allPriorities = input.analysis.rewritePriorities ?? [];
+  const applied = new Set(input.appliedPriorities ?? []);
+  const pending = allPriorities.filter((p) => !applied.has(p));
+  const alreadyDone = allPriorities.filter((p) => applied.has(p));
+
   const baseUserMessage = [
     `TARGET ROLE: ${input.targetRole}`,
     `Preserve this role exactly — do not substitute based on resume content.`,
@@ -92,7 +104,14 @@ export async function runRewriteAll(input: RewriteAllInput): Promise<RewriteAllO
     input.styleHint ? `STYLE HINT (this regeneration): ${input.styleHint}` : "",
     "",
     "PRIORITIES (apply ALL high+medium):",
-    ...(input.analysis.rewritePriorities ?? []).map((p, i) => `  ${i + 1}. ${p}`),
+    ...pending.map((p, i) => `  ${i + 1}. ${p}`),
+    "",
+    alreadyDone.length > 0
+      ? [
+          "ALREADY APPLIED (do NOT re-suggest, do NOT undo, treat as resolved):",
+          ...alreadyDone.map((p, i) => `  ${i + 1}. ${p}`),
+        ].join("\n")
+      : "",
     "",
     input.jobDescription ? `JOB DESCRIPTION (lean keywords toward this):\n${input.jobDescription.slice(0, 4000)}` : "",
     "",
@@ -164,6 +183,23 @@ function pickArrayField<T>(rewritten: unknown, original: T[] | undefined): T[] {
   return Array.isArray(original) ? original : [];
 }
 
+// Fix #7 — diff guard. If the rewriter returned content that's
+// functionally identical to the input (summary unchanged AND no
+// experience bullet was touched), flag it as a quality warning so
+// the client can surface "Rewriter returned content identical to
+// input" instead of silently shipping an unchanged resume.
+function isUnchanged(merged: ResumeExtraction, original: ResumeExtraction): boolean {
+  const sumSame = (merged.summary ?? "").trim() === (original.summary ?? "").trim();
+  if (!sumSame) return false;
+  const mergedBullets = (merged.experience ?? []).flatMap((e) => e.bullets ?? []);
+  const originalBullets = (original.experience ?? []).flatMap((e) => e.bullets ?? []);
+  if (mergedBullets.length !== originalBullets.length) return false;
+  for (let i = 0; i < mergedBullets.length; i++) {
+    if ((mergedBullets[i] ?? "").trim() !== (originalBullets[i] ?? "").trim()) return false;
+  }
+  return true;
+}
+
 function assembleOutput(
   parsed: ResumeExtraction & { changedKeys?: unknown },
   original: ResumeExtraction,
@@ -197,5 +233,13 @@ function assembleOutput(
     languages:             pickArrayField(rest.languages, original.languages),
   };
 
-  return { extraction: merged, changedKeys, qualityWarnings };
+  // Fix #7 — surface unchanged-output as a quality warning. Client can
+  // detect this exact string and surface a user-visible error instead
+  // of silently rendering the same resume back.
+  const warnings = [...qualityWarnings];
+  if (isUnchanged(merged, original)) {
+    warnings.unshift("Rewriter returned content identical to input — try a different style or regenerate.");
+  }
+
+  return { extraction: merged, changedKeys, qualityWarnings: warnings };
 }

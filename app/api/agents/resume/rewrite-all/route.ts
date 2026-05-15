@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { extraction, analysis, targetRole, jobDescription, styleHint } = body ?? {};
+    const { extraction, analysis, targetRole, jobDescription, styleHint, appliedPriorities } = body ?? {};
 
     if (!extraction || !analysis || !targetRole) {
       return NextResponse.json(
@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
       targetRole,
       jobDescription,
       styleHint,
+      appliedPriorities: Array.isArray(appliedPriorities)
+        ? appliedPriorities.filter((p: unknown): p is string => typeof p === "string")
+        : [],
     });
     return NextResponse.json(result);
   } catch (err) {

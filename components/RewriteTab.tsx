@@ -27,6 +27,10 @@ interface Props {
   /** Original (pre-edit) score — shown alongside current when changes
    *  exist so the user sees the full progression: Original → Current → After Rewrite. */
   baseScore?: number;
+  /** Fix #6 — priorities the user already accepted in the Edit/Fix flow.
+   *  Forwarded to the rewriter so it doesn't re-propose them. Optional
+   *  for legacy callers; an empty array means "treat as a fresh rewrite". */
+  appliedPriorities?: string[];
   /** When the user accepts the rewrite, swap working copy + auto-save. */
   onAcceptAll: (rewritten: ResumeExtraction) => void;
   /** "Tweak in Edit" — push the rewritten extraction into edit mode. */
@@ -103,6 +107,7 @@ export default function RewriteTab({
   jobDescription,
   acceptedFixCount = 0,
   baseScore,
+  appliedPriorities,
   onAcceptAll,
   onTweakInEdit,
   initialRewritten = null,
@@ -182,13 +187,22 @@ export default function RewriteTab({
           targetRole,
           jobDescription: jobDescription ?? undefined,
           styleHint,
+          // Fix #6 — tell the rewriter which priorities are already done
+          // so successive runs don't loop on the same items.
+          appliedPriorities: appliedPriorities ?? [],
         }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body?.error ?? "Rewrite failed");
       }
-      const data = await res.json() as { extraction: ResumeExtraction; changedKeys: string[] };
+      const data = await res.json() as { extraction: ResumeExtraction; changedKeys: string[]; qualityWarnings?: string[] };
+      // Fix #7 — surface unchanged-output as an error instead of
+      // silently rendering the same resume back.
+      const unchanged = (data.qualityWarnings ?? []).some((w) => w.toLowerCase().includes("identical to input"));
+      if (unchanged) {
+        throw new Error("Rewriter returned the same resume — try a different style or regenerate.");
+      }
       setRewritten(data.extraction);
       setChangedKeys(data.changedKeys ?? []);
       setView("optimized");
