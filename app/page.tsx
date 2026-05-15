@@ -9,6 +9,7 @@ import { deriveScoreFromAnalysis } from "@/lib/score";
 import { newFlowId, flowStart, flowInfo } from "@/lib/flowLog";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
+import ChatSurface from "@/components/ChatSurface";
 import HomeInput from "@/components/HomeInput";
 import ResumeBuilder from "@/components/ResumeBuilder";
 import InterviewView from "@/components/interview/InterviewView";
@@ -2964,36 +2965,38 @@ export default function Page() {
                 </div>
               </div>
             ) : (
-              <>
-                <ChatWindow
-                  messages={chatMessages}
-                  isLoading={isLoading}
-                  resumeAnalysis={null}
-                  marketAnalysis={null}
-                  resumePreview={null}
-                  resumeExtraction={null}
-                  interviewPrepPlan={null}
-                  onSend={sendMessage}
-                  resumeText={resumeText}
-                  onApplyInBuilder={(instruction) => {
-                    if (!resumeExtraction) {
-                      alert("Upload your resume first so I can apply this rewrite.");
-                      return;
-                    }
-                    setPendingBuilderInstruction(instruction);
+              // Phase B of chat-as-chassis: main chat view now renders
+              // <ChatSurface/> instead of inline ChatWindow + ChatInput.
+              // Behavior unchanged — every prop that was on the inline
+              // pair is forwarded to ChatSurface, which composes them
+              // back together internally.
+              <ChatSurface
+                className="flex-1 min-h-0"
+                messages={chatMessages}
+                isLoading={isLoading}
+                resumeAnalysis={null}
+                marketAnalysis={null}
+                resumePreview={null}
+                resumeExtraction={null}
+                interviewPrepPlan={null}
+                onSend={sendMessage}
+                resumeText={resumeText}
+                onApplyInBuilder={(instruction) => {
+                  if (!resumeExtraction) {
+                    alert("Upload your resume first so I can apply this rewrite.");
+                    return;
+                  }
+                  setPendingBuilderInstruction(instruction);
+                  setActiveView("resume-builder");
+                }}
+                onEditUserMessage={handleEditUserMessage}
+                onRetryAssistant={handleRetryAssistant}
+                onOpenArtifact={(artifact: Artifact) => {
+                  if (artifact.kind === "resume_review") {
                     setActiveView("resume-builder");
-                  }}
-                  onEditUserMessage={handleEditUserMessage}
-                  onRetryAssistant={handleRetryAssistant}
-                  onOpenArtifact={(artifact: Artifact) => {
-                    // Per artifact.kind, route to the right preview.
-                    // resume_review → switch to Resume Builder + open Report tab.
-                    if (artifact.kind === "resume_review") {
-                      setActiveView("resume-builder");
-                      setOpenReportSignal((n) => n + 1);
-                    }
-                    // Other kinds will plug in here as they ship.
-                  }}
+                    setOpenReportSignal((n) => n + 1);
+                  }
+                }}
                   onChatEditPrompt={(prompt) => {
                     const t = prompt.trim().toLowerCase();
 
@@ -3052,27 +3055,22 @@ export default function Page() {
                       return;
                     }
 
-                    // All other chips → orchestrator decides.
-                    sendMessage(prompt);
-                  }}
-                />
-                <div className="flex-shrink-0 px-4 pb-4 pt-2 bg-white">
-                  <ChatInput
-                    value={chatInput}
-                    onChange={setChatInput}
-                    onSend={() => sendMessage(chatInput)}
-                    onFileUpload={handleResumeUpload}
-                    disabled={isLoading}
-                    busy={isLoading}
-                    onStop={() => {
-                      agentAbortRef.current?.abort();
-                      agentAbortRef.current = null;
-                      setIsLoading(false);
-                    }}
-                    placeholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
-                  />
-                </div>
-              </>
+                  // All other chips → orchestrator decides.
+                  sendMessage(prompt);
+                }}
+                inputValue={chatInput}
+                onInputChange={setChatInput}
+                onInputSend={() => sendMessage(chatInput)}
+                onFileUpload={handleResumeUpload}
+                inputDisabled={isLoading}
+                inputBusy={isLoading}
+                onInputStop={() => {
+                  agentAbortRef.current?.abort();
+                  agentAbortRef.current = null;
+                  setIsLoading(false);
+                }}
+                inputPlaceholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
+              />
             )}
           </div>
         ) : activeView === "interview" ? (
