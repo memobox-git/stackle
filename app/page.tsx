@@ -888,6 +888,32 @@ export default function Page() {
     const analysisKey = `chat:${resumeText.length}:${resumeText.slice(0, 32)}`;
     if (chatAnalysisKickoffRef.current.has(analysisKey)) return;
     chatAnalysisKickoffRef.current.add(analysisKey);
+
+    // Push a placeholder artifact card the MOMENT the analyzer fires,
+    // not when it returns. Bug from user: "the button didn't come
+    // earlier. It came way later. It should have come the minute I
+    // clicked Resume Review." Card appears immediately with no score
+    // (skeleton state); analysis-landed watcher replaces it in-place
+    // when results arrive. Carries a stable placeholder id so the
+    // watcher can find + update it.
+    const placeholderId = `resume-review-pending-${activeChatId ?? "local"}`;
+    const placeholderArtifact = {
+      id: placeholderId,
+      kind: "resume_review" as const,
+      title: "Analyzing your resume…",
+      subtitle: "Reading sections, scoring, drafting fixes",
+      generatedAt: new Date().toISOString(),
+      pending: true,
+    };
+    setChatMessages((prev) => {
+      // Avoid duplicates if a placeholder is already in the thread.
+      if (prev.some((m) => m.artifact?.id === placeholderId)) return prev;
+      return [
+        ...prev,
+        { role: "assistant" as const, content: "On it.", timestamp: now(), artifact: placeholderArtifact },
+      ];
+    });
+
     fetch("/api/agents/resume/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -950,11 +976,22 @@ export default function Page() {
       { role: "assistant", content: chipLine },
     ];
 
+    // Look for the pending-artifact placeholder we pushed at kickoff
+    // (chat mode) — if it exists, swap it in-place with the real
+    // report block so the user's eye stays on the same row.
+    const pendingPlaceholderId = `resume-review-pending-${activeChatId ?? "local"}`;
+    const hasPendingArtifact = chatMessages.some((m) => m.artifact?.id === pendingPlaceholderId);
+
     let reportMsgs: ChatMessage[];
     if (hasProgressPlaceholder) {
-      // Replace the placeholder in-place so the chat reads naturally.
+      // Replace the legacy __ANALYSIS_PROGRESS__ sentinel.
       reportMsgs = chatMessages.flatMap((m) =>
         m.content === "__ANALYSIS_PROGRESS__" ? reportBlock : [m],
+      );
+    } else if (hasPendingArtifact) {
+      // Replace the pending artifact placeholder in-place.
+      reportMsgs = chatMessages.flatMap((m) =>
+        m.artifact?.id === pendingPlaceholderId ? reportBlock : [m],
       );
     } else {
       // Append at the end.

@@ -45,20 +45,26 @@ export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: A
   // swallowing the open click on Safari. Now: the card body is a div
   // with role=button + onClick + keyboard support, and the action
   // buttons are real <button> elements that stopPropagation.
-  function handleCardClick() { onOpen?.(artifact); }
+  const pending = !!artifact.pending;
+  function handleCardClick() { if (!pending) onOpen?.(artifact); }
   return (
     <div className="w-full max-w-3xl mx-auto px-4 mb-3">
       <div
-        role="button"
-        tabIndex={0}
+        role={pending ? undefined : "button"}
+        tabIndex={pending ? -1 : 0}
         onClick={handleCardClick}
         onKeyDown={(e) => {
+          if (pending) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             handleCardClick();
           }
         }}
-        className="w-full text-left rounded-xl border border-gray-200 bg-white hover:border-gray-400 transition-colors overflow-hidden cursor-pointer focus:outline-none focus:border-gray-900"
+        className={`w-full text-left rounded-xl border bg-white transition-colors overflow-hidden focus:outline-none ${
+          pending
+            ? "border-gray-200 cursor-default"
+            : "border-gray-200 hover:border-gray-400 cursor-pointer focus:border-gray-900"
+        }`}
       >
         {/* Header bar — type label + relative time */}
         <div className="flex items-center gap-2 px-4 py-2.5 border-b border-gray-100 bg-gray-50">
@@ -69,7 +75,11 @@ export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: A
 
         {/* Body */}
         <div className="px-4 py-3 flex gap-4 items-center">
-          {scoreColor !== null && (
+          {pending ? (
+            <div className="flex-shrink-0 w-12 h-12 rounded-full border-2 border-gray-200 flex items-center justify-center">
+              <span className="inline-block w-4 h-4 border-2 border-gray-300 border-t-gray-700 rounded-full animate-spin" />
+            </div>
+          ) : scoreColor !== null && (
             <div
               className="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center border-2"
               style={{ borderColor: scoreColor, background: `${scoreColor}14` }}
@@ -95,14 +105,15 @@ export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: A
             )}
             <button
               type="button"
+              disabled={pending}
               onClick={(e) => { e.stopPropagation(); handleCardClick(); }}
-              className="text-[12px] font-semibold rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1"
+              className="text-[12px] font-semibold rounded-lg px-3 py-1.5 transition-colors inline-flex items-center gap-1 disabled:cursor-default"
               style={{
-                background: isOpen ? "#f3f4f6" : "linear-gradient(90deg, #fff7ad, #ffa9f9)",
-                color: "#000",
+                background: pending ? "#f3f4f6" : isOpen ? "#f3f4f6" : "linear-gradient(90deg, #fff7ad, #ffa9f9)",
+                color: pending ? "#9ca3af" : "#000",
               }}
             >
-              {isOpen ? "Viewing" : "Open ↗"}
+              {pending ? "Generating…" : isOpen ? "Viewing" : "Open ↗"}
             </button>
           </div>
         </div>

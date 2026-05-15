@@ -39,6 +39,11 @@ export interface Artifact {
   // resume reviews this is null because the existing Report tab handles
   // preview; for cover letters this will point to the rendered DOCX/PDF.
   previewUrl?: string;
+  // When true, the card is a placeholder shown the moment the
+  // generator kicks off. ArtifactCard renders a skeleton score + a
+  // "Generating…" non-clickable open button. The host replaces this
+  // entry in-place when the real artifact lands.
+  pending?: boolean;
 }
 
 // Build an artifact from a resume-review analysis. Pulls the score and

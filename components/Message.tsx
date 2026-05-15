@@ -487,12 +487,25 @@ function AssistantBody({
 
   const showActions = !isSentinel && !shouldAnimate && message.content.trim().length > 0;
 
+  // Anti-flicker: during streaming, render the partial text as plain
+  // body text (whitespace-pre-wrap) so markdown parsing doesn't run on
+  // every chunk. Parsing partial markdown was the flicker source —
+  // mid-stream "**bold" stayed as raw asterisks until the closing `**`
+  // arrived, then flipped to bold mid-paragraph; bullet starters ("- ")
+  // re-grouped on every line break; headings appeared/disappeared.
+  // After `done`, swap to renderContent for full markdown. Font size
+  // (15px) and line-height (1.65) match so the swap is invisible.
+  const isStreaming = shouldAnimate && !done;
   return (
     <div className="group flex mb-5 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
-        {renderContent(visible)}
-        {shouldAnimate && !done && (
-          <span className="inline-block w-[2px] h-4 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />
+        {isStreaming ? (
+          <p className="text-[15px] leading-[1.65] text-gray-900 whitespace-pre-wrap">
+            {visible}
+            <span className="inline-block w-[2px] h-4 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />
+          </p>
+        ) : (
+          renderContent(visible)
         )}
         {showActions && (
           <div className="flex items-center gap-0.5 mt-1 -ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
