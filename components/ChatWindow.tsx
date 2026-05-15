@@ -157,9 +157,9 @@ function PrioritiesCard({
                 key={i}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all"
                 style={{
-                  background: done ? "#0f1f0f" : "#1a1a1a",
-                  border: `1px solid ${done ? "#1a3a1a" : "#2a2a2a"}`,
-                  opacity: done ? 0.6 : 1,
+                  background: done ? "#f0fdf4" : "#ffffff",
+                  border: `1px solid ${done ? "#bbf7d0" : "#e5e7eb"}`,
+                  opacity: done ? 0.7 : 1,
                 }}
               >
                 {/* BUG 2 — checkbox so the user picks scope before
@@ -175,14 +175,18 @@ function PrioritiesCard({
                 )}
                 <span
                   className="text-[9px] font-bold w-6 h-6 rounded flex items-center justify-center flex-shrink-0"
-                  style={{ background: done ? "#14532d" : c.bg, color: done ? "#4ade80" : c.color, border: `1px solid ${done ? "#166534" : c.border}` }}
+                  style={{
+                    background: done ? "#dcfce7" : c.bg,
+                    color: done ? "#15803d" : c.color,
+                    border: `1px solid ${done ? "#86efac" : c.border}`,
+                  }}
                 >
                   {done ? "✓" : `P${i + 1}`}
                 </span>
-                <span className={`flex-1 text-xs leading-snug ${done ? "text-gray-500 line-through" : "text-gray-700"}`}>{display}</span>
+                <span className={`flex-1 text-xs leading-snug ${done ? "text-gray-500 line-through" : "text-gray-800"}`}>{display}</span>
                 <span
                   className="text-[8px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
-                  style={{ background: done ? "#14532d" : c.bg, color: done ? "#4ade80" : c.color }}
+                  style={{ background: done ? "#dcfce7" : c.bg, color: done ? "#15803d" : c.color }}
                 >
                   {c.label}
                 </span>
