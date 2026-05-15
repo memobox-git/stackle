@@ -1045,6 +1045,12 @@ export default function ChatWindow({
                 return { ...displayMsg, __isFresh: isFresh };
               })()}
               messageIndex={i}
+              isStreamingMessage={
+                // Only the LAST assistant message can be actively
+                // streaming. isLoading=true from parent = SSE in flight.
+                // This is the stable signal that drives plain→markdown.
+                msg.role === "assistant" && i === lastAssistantIdx && isLoading
+              }
               onEdit={
                 onEditUserMessage && msg.role === "user" && !msg.content.startsWith("__FILE_UPLOAD__:")
                   ? (newContent) => onEditUserMessage(i, newContent)

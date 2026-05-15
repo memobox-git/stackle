@@ -45,6 +45,12 @@ interface MessageProps {
   // are handled locally; Retry + EditPrevious need parent state.
   onRetry?: () => void;
   onEditPrevious?: () => void;
+  // External streaming signal from the parent. True ONLY while the SSE
+  // stream is actively producing this message. Used to decide plain-text
+  // vs markdown render — driven by a stable external flag, not by the
+  // typewriter's per-chunk `done` toggling. That toggling was the
+  // flicker source.
+  isStreamingMessage?: boolean;
 }
 
 // Local registry of Like/Dislike per message content. Lives in
@@ -295,7 +301,7 @@ function renderContent(content: string) {
   return elements;
 }
 
-export default function Message({ message, onEdit, onRetry, onEditPrevious, messageIndex }: MessageProps) {
+export default function Message({ message, onEdit, onRetry, onEditPrevious, messageIndex, isStreamingMessage }: MessageProps) {
   const isUser = message.role === "user";
   const ts = message.timestamp;
   const [editing, setEditing] = useState(false);
@@ -434,6 +440,7 @@ export default function Message({ message, onEdit, onRetry, onEditPrevious, mess
       ts={ts}
       isSentinel={isSentinel}
       isFresh={!!message.__isFresh}
+      isStreamingMessage={!!isStreamingMessage}
       onRetry={onRetry}
       onEditPrevious={onEditPrevious}
     />
@@ -441,21 +448,27 @@ export default function Message({ message, onEdit, onRetry, onEditPrevious, mess
 }
 
 function AssistantBody({
-  message, ts, isSentinel, isFresh, onRetry, onEditPrevious,
+  message, ts, isSentinel, isFresh, isStreamingMessage, onRetry, onEditPrevious,
 }: {
   message: ChatMessage;
   ts?: string;
   isSentinel: boolean;
   isFresh: boolean;
+  isStreamingMessage: boolean;
   onRetry?: () => void;
   onEditPrevious?: () => void;
 }) {
   const key = messageKey(message.role, message.content, ts);
   // Animate only when the parent flagged this as a freshly-arrived
-  // message AND we haven't already typed it. Old history renders
-  // instantly even on first mount (page reload, chat switch, etc).
+  // message AND we haven't already typed it AND we're NOT currently
+  // streaming from the parent. While streaming, we don't run the
+  // typewriter — the SSE chunks themselves provide the typing cadence,
+  // and layering a typewriter on top caused the chunked done→!done→done
+  // toggling that produced the flicker. After streaming ends, the
+  // message renders as final markdown directly. No typewriter on the
+  // post-stream path either — the message is fully there, instantly.
   const alreadyTyped = TYPED_REGISTRY.has(key);
-  const shouldAnimate = isFresh && !alreadyTyped && !isSentinel;
+  const shouldAnimate = isFresh && !alreadyTyped && !isSentinel && !isStreamingMessage && message.content.length < 200;
   const { displayed, done } = useTypewriter(shouldAnimate ? message.content : "", 14);
   useEffect(() => {
     if (done && shouldAnimate) TYPED_REGISTRY.add(key);
@@ -485,24 +498,23 @@ function AssistantBody({
     saveFeedback(feedbackKey, next);
   }
 
-  const showActions = !isSentinel && !shouldAnimate && message.content.trim().length > 0;
+  const showActions = !isSentinel && !isStreamingMessage && message.content.trim().length > 0;
 
-  // Anti-flicker: during streaming, render the partial text as plain
-  // body text (whitespace-pre-wrap) so markdown parsing doesn't run on
-  // every chunk. Parsing partial markdown was the flicker source —
-  // mid-stream "**bold" stayed as raw asterisks until the closing `**`
-  // arrived, then flipped to bold mid-paragraph; bullet starters ("- ")
-  // re-grouped on every line break; headings appeared/disappeared.
-  // After `done`, swap to renderContent for full markdown. Font size
-  // (15px) and line-height (1.65) match so the swap is invisible.
-  const isStreaming = shouldAnimate && !done;
+  // Plain text DURING streaming (parent SSE flag stable). Markdown
+  // AFTER streaming completes. The swap happens ONCE per message at
+  // stream-end — driven by isStreamingMessage from the parent, not by
+  // the typewriter's per-chunk done toggling. That toggling caused the
+  // chunked plain↔markdown DOM swap that produced the flicker.
+  //
+  // Short typewriter for already-finalized fresh messages (e.g. assistant
+  // greeting that lands non-streamed). Capped at <200 chars so it stays
+  // a quick reveal, not a slow drag through a long answer.
   return (
     <div className="group flex mb-5 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
-        {isStreaming ? (
+        {isStreamingMessage ? (
           <p className="text-[15px] leading-[1.65] text-gray-900 whitespace-pre-wrap">
-            {visible}
-            <span className="inline-block w-[2px] h-4 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />
+            {message.content}
           </p>
         ) : (
           renderContent(visible)
