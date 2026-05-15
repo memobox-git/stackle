@@ -879,15 +879,21 @@ export default function Page() {
   // signals focus=resume from chat AND we have an extraction but no
   // analysis, run the analyzer in the background. The analysis-landed
   // watcher (below) then pushes the artifact card.
+  // Resume is the heart of everything. As soon as the chat view has a
+  // parsed resume without an analysis, kick off the analyzer in the
+  // background. The orchFocusRef gate used to block this and was the
+  // root cause of the artifact-card-doesn't-appear bug: the
+  // orchestrator wasn't reliably setting focus=resume, so the kickoff
+  // never fired, no analysis existed, no card appeared.
   const chatAnalysisKickoffRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (activeView !== "chat") return;
     if (!resumeExtraction || !resumeText) return;
     if (resumeAnalysis) return;
-    if (orchFocusRef.current !== "resume") return;
     const analysisKey = `chat:${resumeText.length}:${resumeText.slice(0, 32)}`;
     if (chatAnalysisKickoffRef.current.has(analysisKey)) return;
     chatAnalysisKickoffRef.current.add(analysisKey);
+    console.log("[artifact:resume-review] kickoff fired", { chatId: activeChatId, view: activeView });
 
     // Push a placeholder artifact card the MOMENT the analyzer fires,
     // not when it returns. Bug from user: "the button didn't come
@@ -947,15 +953,23 @@ export default function Page() {
     const id = activeChatId ?? "local-chat";
     if (analysisLandedFiredRef.current.has(id)) return;
 
-    // Detect the rotating-status placeholder pushed when user asked for
-    // resume review before analysis finished.
+    // Detect placeholders we may have pushed earlier.
     const hasProgressPlaceholder = chatMessages.some((m) => m.content === "__ANALYSIS_PROGRESS__");
+    const pendingArtifactId = `resume-review-pending-${activeChatId ?? "local"}`;
+    const hasPendingArtifact = chatMessages.some((m) => m.artifact?.id === pendingArtifactId);
 
-    // Only fire if the user has signalled they want the resume review
-    // (focus=resume from the orchestrator) OR if the placeholder exists.
-    // Otherwise the user might be in another flow and we'd interrupt them.
-    const userWantsResumeReview = orchFocusRef.current === "resume" || hasProgressPlaceholder;
-    if (!userWantsResumeReview) return;
+    // In resume-builder, gate on a clear signal so we don't interrupt
+    // flows. In chat, if analysis exists, ALWAYS push the artifact —
+    // user complaint: "the artifact didn't show up." The guard was
+    // too strict and the prose review appeared without the card.
+    if (activeView === "resume-builder") {
+      const userWantsResumeReview =
+        orchFocusRef.current === "resume" || hasProgressPlaceholder || hasPendingArtifact;
+      if (!userWantsResumeReview) return;
+    }
+    console.log("[artifact:resume-review] pushing card", {
+      view: activeView, chatId: id, hasPendingArtifact, hasProgressPlaceholder,
+    });
 
     analysisLandedFiredRef.current.add(id);
 
@@ -976,12 +990,6 @@ export default function Page() {
       { role: "assistant", content: chipLine },
     ];
 
-    // Look for the pending-artifact placeholder we pushed at kickoff
-    // (chat mode) — if it exists, swap it in-place with the real
-    // report block so the user's eye stays on the same row.
-    const pendingPlaceholderId = `resume-review-pending-${activeChatId ?? "local"}`;
-    const hasPendingArtifact = chatMessages.some((m) => m.artifact?.id === pendingPlaceholderId);
-
     let reportMsgs: ChatMessage[];
     if (hasProgressPlaceholder) {
       // Replace the legacy __ANALYSIS_PROGRESS__ sentinel.
@@ -991,7 +999,7 @@ export default function Page() {
     } else if (hasPendingArtifact) {
       // Replace the pending artifact placeholder in-place.
       reportMsgs = chatMessages.flatMap((m) =>
-        m.artifact?.id === pendingPlaceholderId ? reportBlock : [m],
+        m.artifact?.id === pendingArtifactId ? reportBlock : [m],
       );
     } else {
       // Append at the end.

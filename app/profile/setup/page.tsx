@@ -256,7 +256,7 @@ export default function ProfileSetupPage() {
         >S</div>
         <h1 className="text-[24px] font-semibold text-gray-900 text-center mb-6 min-h-[32px]">
           {headingText}
-          {!headingDone && <span className="inline-block w-[2px] h-5 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />}
+          {!headingDone && <span className="inline-block w-[2px] h-5 bg-gray-700 align-middle ml-0.5" aria-hidden />}
         </h1>
 
         <div className="grid grid-cols-2 gap-2 mb-3">
