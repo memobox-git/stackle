@@ -238,10 +238,7 @@ export default function ProfileSetupPage() {
           className="w-10 h-10 rounded-2xl mx-auto flex items-center justify-center text-black text-sm font-bold mb-6"
           style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)" }}
         >S</div>
-        <h1 className="text-[24px] font-semibold text-gray-900 text-center mb-1">Finish setting up</h1>
-        <p className="text-[14px] text-gray-600 text-center mb-6">
-          Your username powers sharing — like <span className="font-mono text-gray-800">stackle.io/profile/your-name</span>.
-        </p>
+        <h1 className="text-[24px] font-semibold text-gray-900 text-center mb-6">Finish setting up</h1>
 
         <div className="grid grid-cols-2 gap-2 mb-3">
           <input
