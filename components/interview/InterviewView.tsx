@@ -25,9 +25,10 @@ import { ChevronLeft, Send, ArrowUp } from "lucide-react";
 import { pickQuestions, getQuestionById, countQuestionsBySkill } from "@/lib/agents/interview/questionBank";
 import type { InterviewQuestion, InterviewEvaluation, Verdict, Difficulty } from "@/lib/agents/interview/questionBank/types";
 import {
-  saveSession, generateReport, buildProfileSeed,
+  saveSession, generateReport, buildProfileSeed, loadSessions,
   type SkillSession, type ChatMsg,
 } from "@/lib/interview/sessionStore";
+import { loadCachedQuestions, saveQuestions } from "@/lib/supabase/interviewQuestions";
 type View = "welcome" | "active";
 // Simplified phase state — only what affects UI surface visibility:
 //   "idle"        : agent collecting config or chatting; no question active
@@ -534,9 +535,54 @@ function ActiveSession({
       };
       const liveDiff: Difficulty | "mixed" = diffMap[liveDiffRaw?.toLowerCase()] ?? "medium";
 
-      // Push a "Generating questions…" message so the user has feedback
-      // during the ~10s API call.
-      pushAssistant(`Generating ${liveCount} ${liveDiff} ${liveSkill} question${liveCount === 1 ? "" : "s"}…`);
+      // Build the seen-ids list from past sessions so the cache returns
+      // questions the user hasn't drilled before. Variety > repetition.
+      const seenIds = new Set<string>();
+      try {
+        const allSessions = loadSessions();
+        for (const s of allSessions) {
+          for (const q of s.questions ?? []) {
+            if (q.questionId) seenIds.add(q.questionId);
+          }
+        }
+      } catch { /* localStorage may be off — fine */ }
+
+      // Cache lookup first (only meaningful when difficulty is not "mixed").
+      // "mixed" implies the user wants a spread, so we don't trust a
+      // bucket-filtered cache to deliver that — we go straight to gen.
+      const fallbackDifficulty: Difficulty = liveDiff === "mixed" ? "medium" : liveDiff;
+      let cached: InterviewQuestion[] = [];
+      if (liveDiff !== "mixed") {
+        try {
+          const rows = await loadCachedQuestions({
+            skill: liveSkill,
+            difficulty: liveDiff,
+            excludeIds: Array.from(seenIds),
+            limit: liveCount,
+          });
+          cached = rows.map((r) => r.payload);
+        } catch (err) {
+          console.warn("[start_session] cache lookup failed:", err);
+        }
+      }
+
+      const needed = Math.max(0, liveCount - cached.length);
+      if (needed === 0) {
+        // Full cache hit — skip generation entirely.
+        pushAssistant(`Pulling ${cached.length} ${liveDiff} ${liveSkill} question${cached.length === 1 ? "" : "s"} from your saved set.`);
+        setQuestions(cached);
+        setQuestionIdx(0);
+        setAnswer(cached[0]?.starterCode ?? "");
+        setPhase("running");
+        return;
+      }
+
+      // Partial or no cache → generate the delta and save.
+      pushAssistant(
+        cached.length > 0
+          ? `Pulling ${cached.length} from cache + generating ${needed} fresh ${liveDiff} ${liveSkill} question${needed === 1 ? "" : "s"}…`
+          : `Generating ${needed} ${liveDiff} ${liveSkill} question${needed === 1 ? "" : "s"}…`,
+      );
 
       try {
         const res = await fetch("/api/agents/interview/generate-questions", {
@@ -545,16 +591,29 @@ function ActiveSession({
           body: JSON.stringify({
             skill: liveSkill,
             difficulty: liveDiff,
-            count: liveCount,
+            count: needed,
             resumeContext,
           }),
         });
         if (!res.ok) throw new Error(`generate-questions HTTP ${res.status}`);
         const data = await res.json() as { questions: InterviewQuestion[] };
-        const qs = data.questions ?? [];
-        if (qs.length === 0) {
-          // Fall back to the static bank if the generator returned empty.
-          const bankFallback = pickQuestions({ skill: liveSkill, difficulty: liveDiff, count: liveCount });
+        const fresh = data.questions ?? [];
+
+        // Save the freshly-generated questions to the cache. Resume-
+        // grounded ones are scoped per-user; generic ones (no resume
+        // context) are shareable. We don't know which is which per
+        // question here, so heuristic: if resumeContext was provided,
+        // mark the batch resume-grounded.
+        if (fresh.length > 0) {
+          saveQuestions({
+            questions: fresh,
+            resumeGrounded: !!resumeContext,
+          }).catch(() => { /* best-effort */ });
+        }
+
+        const combined = [...cached, ...fresh].slice(0, liveCount);
+        if (combined.length === 0) {
+          const bankFallback = pickQuestions({ skill: liveSkill, difficulty: fallbackDifficulty, count: liveCount });
           if (bankFallback.length === 0) {
             pushAssistant(`Couldn't generate ${liveSkill} questions. Try a different skill?`, []);
             return;
@@ -565,20 +624,21 @@ function ActiveSession({
           setPhase("running");
           return;
         }
-        setQuestions(qs);
+        setQuestions(combined);
         setQuestionIdx(0);
-        setAnswer(qs[0].starterCode ?? "");
+        setAnswer(combined[0].starterCode ?? "");
         setPhase("running");
       } catch (err) {
         console.error("[start_session] generator failed, falling back to bank:", err);
-        const qs = pickQuestions({ skill: liveSkill, difficulty: liveDiff, count: liveCount });
-        if (qs.length === 0) {
+        const qs = pickQuestions({ skill: liveSkill, difficulty: fallbackDifficulty, count: liveCount });
+        const combined = [...cached, ...qs].slice(0, liveCount);
+        if (combined.length === 0) {
           pushAssistant(`Couldn't generate ${liveSkill} questions right now. Try again or pick a different skill?`, []);
           return;
         }
-        setQuestions(qs);
+        setQuestions(combined);
         setQuestionIdx(0);
-        setAnswer(qs[0].starterCode ?? "");
+        setAnswer(combined[0].starterCode ?? "");
         setPhase("running");
       }
     } else if (name === "next_question") {
