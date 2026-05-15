@@ -1615,13 +1615,16 @@ export default function Page() {
       });
       if (analyzeRes.ok) {
         const analysis = await analyzeRes.json();
+        // Fix #2 — only setResumeAnalysis here. The analysis-landed
+        // watcher (downstream useEffect) handles the user-visible push:
+        // it replaces the pending artifact placeholder with the real
+        // ArtifactCard and a welcome block. Previously this branch ALSO
+        // pushed __RESUME_ANALYSIS__ + __RESUME_PRIORITIES__ sentinels,
+        // which the ChatWindow renders as a SEPARATE legacy card —
+        // user saw two cards for one analysis. The sentinel pushes
+        // are gone; the legacy ChatWindow render branch stays for any
+        // older persisted chats that still contain those strings.
         setResumeAnalysis(analysis);
-        setChatMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: "__RESUME_ANALYSIS__" },
-          { role: "assistant", content: "__RESUME_PRIORITIES__" },
-          { role: "assistant", content: "Your report is ready. You can ask me anything — \"rewrite my summary\", \"explain my ATS score\", \"what keywords am I missing\"...\n\n📋 Change settings\n✅ All done" },
-        ]);
         const chatId = activeChatIdRef.current;
         if (chatId && user) {
           saveReport({
