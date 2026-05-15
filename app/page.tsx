@@ -3016,7 +3016,48 @@ export default function Page() {
                     // Chooser responses
                     if (t.startsWith("use current")) {
                       setPendingResumeReviewSource(false);
-                      sendMessage("Proceed with the current resume review.");
+                      // Fix #3 — don't go through sendMessage / synthesis
+                      // here. That path made the agent ask "what kind of
+                      // review?" again even though the user already
+                      // committed to "Review my resume" + picked a file.
+                      // The chat-mode analyzer kickoff effect (deps:
+                      // activeView, resumeExtraction, resumeText,
+                      // !resumeAnalysis) auto-fires the analyzer with a
+                      // Full Review default; the analysis-landed watcher
+                      // then pushes the artifact card. We just announce
+                      // what's happening so the user has acknowledgment.
+                      if (resumeAnalysis) {
+                        // Analysis already exists (returning user with
+                        // pre-warmed analyzer). Show a quick artifact
+                        // pointer rather than re-running.
+                        setChatMessages((prev) => [
+                          ...prev,
+                          {
+                            role: "assistant",
+                            content: `Already have a review for ${resumeFilename ?? "your resume"}. Pulling it up.`,
+                            timestamp: now(),
+                            artifact: buildResumeReviewArtifact({
+                              id: `resume-review-existing-${activeChatId ?? "local"}-${Date.now()}`,
+                              candidateName: resumeExtraction?.name,
+                              targetRole: resumeAnalysis.likelyTargetRole ?? chosenTargetRole ?? null,
+                              score: deriveScoreFromAnalysis(resumeAnalysis),
+                            }),
+                          },
+                        ]);
+                      } else {
+                        setChatMessages((prev) => [
+                          ...prev,
+                          {
+                            role: "assistant",
+                            content: `Got it — running a Full Review on ${resumeFilename ?? "your resume"}.`,
+                            timestamp: now(),
+                          },
+                        ]);
+                        // Mark orchFocus so the analysis-landed watcher
+                        // (which gates on it in RB; benign in chat) sees
+                        // explicit review intent.
+                        orchFocusRef.current = "resume";
+                      }
                       return;
                     }
                     if (t === "upload a new one") {
@@ -3038,11 +3079,39 @@ export default function Page() {
                         setResumeFilename(file.display_name);
                         if (file.analysis_json) setResumeAnalysis(file.analysis_json);
                         setPendingResumeReviewSource(false);
-                        setChatMessages((prev) => [
-                          ...prev,
-                          { role: "assistant", content: `Loaded **${file.display_name}**. Running the review now.`, timestamp: now() },
-                        ]);
-                        sendMessage("Proceed with the resume review.");
+                        // Fix #3 — same as the "use current" path: skip
+                        // the synthesis round-trip that re-asks "what
+                        // kind of review?". The kickoff effect handles
+                        // the analyzer when no analysis exists; if one
+                        // was attached to the Drive file we just show it.
+                        if (file.analysis_json) {
+                          const ext = file.extraction_json;
+                          const ana = file.analysis_json;
+                          setChatMessages((prev) => [
+                            ...prev,
+                            {
+                              role: "assistant",
+                              content: `Loaded **${file.display_name}**. Pulling up the review.`,
+                              timestamp: now(),
+                              artifact: buildResumeReviewArtifact({
+                                id: `resume-review-saved-${file.id}-${Date.now()}`,
+                                candidateName: ext?.name,
+                                targetRole: ana.likelyTargetRole ?? null,
+                                score: deriveScoreFromAnalysis(ana),
+                              }),
+                            },
+                          ]);
+                        } else {
+                          setChatMessages((prev) => [
+                            ...prev,
+                            {
+                              role: "assistant",
+                              content: `Loaded **${file.display_name}**. Running a Full Review.`,
+                              timestamp: now(),
+                            },
+                          ]);
+                          orchFocusRef.current = "resume";
+                        }
                       }
                       return;
                     }
