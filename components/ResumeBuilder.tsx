@@ -15,6 +15,7 @@ import CoverLetterModal from "@/components/CoverLetterModal";
 import JDMatchModal from "@/components/JDMatchModal";
 import SideBySideCompareModal from "@/components/SideBySideCompareModal";
 import RewriteTab from "@/components/RewriteTab";
+import ChatSurface from "@/components/ChatSurface";
 import ToastStack, { useToasts } from "@/components/ToastStack";
 import ResumeReportCard from "@/components/ResumeReportCard";
 import { ChatMessage } from "@/components/Message";
@@ -2085,176 +2086,88 @@ export default function ResumeBuilder({
   // empty/loading panel that looked broken.
   const hasPanelContent = !!resumeAnalysis;
 
+
   // ── Chat panel ──────────────────────────────────────────────────
-  const chatPanel = (
-    <div
-      className={`flex flex-col min-h-0 rb-chat-panel ${isPanelOpen ? "rb-chat-panel-open" : ""} ${mobileView === "panel" ? "hidden md:flex" : "flex"}`}
-      style={{
-        // User-adjustable split — default 25/75. Disable the CSS
-        // transition while dragging so the panel tracks the cursor 1:1
-        // (without it the resize feels laggy/rubber-banded).
-        width: isPanelOpen ? `${chatPanelPct}%` : "100%",
-        transition: draggingRef.current ? "none" : "width 300ms ease",
-        minWidth: 0,
-      }}
-    >
-      {/* Mobile tab bar */}
-      {hasPanelContent && (
-        <div className="flex md:hidden bg-white px-3 pt-2 pb-1 gap-1">
-          {(["chat", "panel"] as const).map((view) => {
-            const isActive = mobileView === view;
-            const label = view === "chat" ? "Chat" : "Workspace";
-            return (
-              <button
-                key={view}
-                onClick={() => setMobileView(view)}
-                className="relative flex items-center justify-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-medium transition-all"
-                style={{
-                  background: isActive ? "#1a1a1a" : "transparent",
-                  color: isActive ? "#fff" : "#555",
-                  border: isActive ? "1px solid #2a2a2a" : "1px solid transparent",
-                  borderBottom: isActive ? "1px solid #1a1a1a" : "1px solid transparent",
-                  marginBottom: isActive ? "-1px" : "0",
-                }}
-              >
-                {label}
-                {view === "panel" && reportIsNew && mobileView !== "panel" && (
-                  <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {messages.length === 0 && !resumeText && !resumeExtraction ? (
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16 gap-6 select-none">
-          {/* Logo mark */}
-          <div
-            className="w-12 h-12 rounded-2xl flex items-center justify-center text-black text-lg font-bold animate-pulse"
-            style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)", animationDuration: "3s" }}
+  // Phase A of chat-as-chassis: the visual surface is now
+  // <ChatSurface/>. RB still owns all state and chip-routing logic —
+  // ChatSurface composes ChatWindow + ChatInput + slots (mobile tab
+  // bar, empty state, overlays). Phases B–D move shared usage into
+  // app/page.tsx.
+  const _mobileTabBar = hasPanelContent ? (
+    <div className="flex md:hidden bg-white px-3 pt-2 pb-1 gap-1">
+      {(["chat", "panel"] as const).map((view) => {
+        const isActive = mobileView === view;
+        const label = view === "chat" ? "Chat" : "Workspace";
+        return (
+          <button
+            key={view}
+            onClick={() => setMobileView(view)}
+            className="relative flex items-center justify-center gap-1.5 px-4 py-2 rounded-t-lg text-sm font-medium transition-all"
+            style={{
+              background: isActive ? "#1a1a1a" : "transparent",
+              color: isActive ? "#fff" : "#555",
+              border: isActive ? "1px solid #2a2a2a" : "1px solid transparent",
+              borderBottom: isActive ? "1px solid #1a1a1a" : "1px solid transparent",
+              marginBottom: isActive ? "-1px" : "0",
+            }}
           >
-            S
-          </div>
-          {/* Headline */}
-          <div className="text-center">
-            <h2 className="text-xl font-semibold text-gray-900 mb-2 tracking-tight">Drop your resume, get your score.</h2>
-            <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
-              Upload a PDF or DOCX below — get a full breakdown in under 30 seconds.
-            </p>
-          </div>
-          {/* Capability pills */}
-          <div className="flex flex-wrap gap-2 justify-center max-w-xs">
-            {[
-              { icon: "📊", label: "5-Category Score" },
-              { icon: "🎯", label: "Keyword Gaps" },
-              { icon: "📝", label: "Action Plan" },
-              { icon: "⚡", label: "ATS Check" },
-            ].map(({ icon, label }) => (
-              <div
-                key={label}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-xs text-gray-500"
-              >
-                <span>{icon}</span>
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
-          {/* Upload hint */}
-          <p className="text-xs text-gray-600 flex items-center gap-1.5">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path d="M6 1v7M3 4l3-3 3 3M1 10h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Use the attach button below to upload
-          </p>
-        </div>
-      ) : (
-        <ChatWindow
-          messages={messages}
-          isLoading={isLoading || isAnalyzingResume}
-          loadingLabel={isAnalyzingResume && !isLoading ? "Analysing resume" : undefined}
-          resumeAnalysis={effectiveAnalysis}
-          marketAnalysis={null}
-          resumePreview={null}
-          resumeExtraction={resumeExtraction}
-          onSend={onSendMessage}
-          onFixItem={handleFixItem}
-          onFixAll={handleFixAll}
-          completedActions={completedActions}
-          completedFixes={completedActions}
-          acceptedFixes={acceptedIndices}
-          currentFixIndex={inlineFix?.priorityIndex ?? null}
-          onOpenReport={() => { setIsPanelOpen(true); setActiveTab("report"); setReportIsNew(false); }}
-          isReportOpen={isPanelOpen && activeTab === "report"}
-          resumeScore={deriveScore(effectiveAnalysis)}
-          acceptedPoints={0}
-          resumeBuilderMode
-          onStarterPromptClick={onInputChange}
-          onChatEditPrompt={(text) => {
-            const t = text.trim().toLowerCase();
-            // Any chip that triggers a rewrite needs the right panel
-            // open — otherwise the user can't see the typewriter, the
-            // accept/reject buttons, or the live document changes. The
-            // panel was kept closed during calibration chat by design;
-            // explicit action chips override that.
-            const openPanelForAction = () => {
-              setIsPanelOpen(true);
-              setActiveTab("resume");
-            };
-            // Apply all fixes → first ask for a target JD. With a JD we
-            // can tailor the rewrite (much higher quality). Without one,
-            // we run the generic accept-all chain.
-            if (t === "apply all fixes") {
-              setJdIntakeFor("apply-all");
-              jdIntakeLastMsgIdxRef.current = messages.length;
-              onPushAssistantMessage?.(
-                "Before I rewrite, do you have a target job description? Pasting one lets me tailor the rewrite to that exact role — keywords, must-haves, the works. Otherwise I'll do a generic clean-up.",
-              );
-              onPushAssistantMessage?.("__INLINE_CHIPS__:Paste the JD|Skip — generic rewrite");
-              return;
-            }
-            if (t === "skip — generic rewrite" || t === "skip - generic rewrite") {
-              setJdIntakeFor(null);
-              openPanelForAction();
-              handleAcceptAll();
-              return;
-            }
-            if (t === "paste the jd") {
-              // Just a hint — the user's next chat message will be picked
-              // up by the intake watcher.
-              onPushAssistantMessage?.("Paste the JD text (or share the URL) in the chat below.");
-              return;
-            }
-            if (t === "walk me through fixes" || t === "guide me through fixes") {
-              openPanelForAction();
-              handleFixAll();
-              return;
-            }
-            // Context replies (chip text not matching any action) just go
-            // through chat. Rewrites only fire from explicit Fix buttons.
-            onSendMessage(text);
-          }}
-          onEditUserMessage={onEditUserMessage}
-        />
-      )}
+            {label}
+            {view === "panel" && reportIsNew && mobileView !== "panel" && (
+              <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" />
+            )}
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
 
-      {/* ── Fix Flow Overlay ──
-          The "why" intermediate panel was removed so the flow goes straight
-          from Fix click → typewriter → Accept/Rewrite/Reject. Only the
-          "loading" state remains to signal the writer call is in flight. */}
+  const _emptyState = messages.length === 0 && !resumeText && !resumeExtraction ? (
+    <div className="flex-1 flex flex-col items-center justify-center px-6 pb-16 gap-6 select-none">
+      <div
+        className="w-12 h-12 rounded-2xl flex items-center justify-center text-black text-lg font-bold animate-pulse"
+        style={{ background: "linear-gradient(135deg, #fff7ad, #ffa9f9)", animationDuration: "3s" }}
+      >
+        S
+      </div>
+      <div className="text-center">
+        <h2 className="text-xl font-semibold text-gray-900 mb-2 tracking-tight">Drop your resume, get your score.</h2>
+        <p className="text-sm text-gray-500 max-w-xs leading-relaxed">
+          Upload a PDF or DOCX below — get a full breakdown in under 30 seconds.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2 justify-center max-w-xs">
+        {[
+          { icon: "📊", label: "5-Category Score" },
+          { icon: "🎯", label: "Keyword Gaps" },
+          { icon: "📝", label: "Action Plan" },
+          { icon: "⚡", label: "ATS Check" },
+        ].map(({ icon, label }) => (
+          <div
+            key={label}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-gray-200 bg-gray-50 text-xs text-gray-500"
+          >
+            <span>{icon}</span>
+            <span>{label}</span>
+          </div>
+        ))}
+      </div>
+      <p className="text-xs text-gray-600 flex items-center gap-1.5">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M6 1v7M3 4l3-3 3 3M1 10h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Use the attach button below to upload
+      </p>
+    </div>
+  ) : null;
+
+  const _overlays = (
+    <>
       {fixFlow && fixFlow.step === "loading" && (
         <div className="mx-4 mb-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 flex items-center gap-3">
           <div className="w-4 h-4 border-2 border-[#a99af9] border-t-transparent rounded-full animate-spin flex-shrink-0" />
           <span className="text-xs text-gray-500">Generating improved version…</span>
         </div>
       )}
-
-      {/* "Fix ready" banner removed — the pinned FixProgressCard in chat with
-          its pulsing in-progress dot already signals what's happening, and the
-          section flash + scroll-into-view on the resume itself shows the
-          actual change. No need for a third signal saying the same thing. */}
-
-      {/* Score toast */}
       {scoreToast && (
         <div
           className="mx-4 mb-2 px-4 py-2.5 rounded-xl flex items-center gap-2.5 pointer-events-none relative overflow-visible"
@@ -2267,7 +2180,6 @@ export default function ResumeBuilder({
           {savedGhost && (
             <span className="ml-auto text-[10px] text-green-500/80 italic tracking-wider">· saved</span>
           )}
-          {/* First-accept confetti burst */}
           {confettiBurst && (
             <div className="absolute inset-0 pointer-events-none">
               {Array.from({ length: 18 }).map((_, i) => {
@@ -2293,157 +2205,95 @@ export default function ResumeBuilder({
           )}
         </div>
       )}
+    </>
+  );
 
-      <div className="relative px-4 pb-4 pt-2">
-        {/* Soft fade so the last message doesn't butt up against the input.
-            Was a hard dark gradient (#0d0d0d) from when the app was dark-themed —
-            that read as a black band on light bg. Now subtle white fade. */}
-        <div className="absolute inset-x-0 -top-8 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-        <ChatInput
-          value={input}
-          onChange={onInputChange}
-          onSend={onSend}
-          disabled={isLoading}
-          busy={isEditStreaming || isRewriting || editingSection !== null || isLoading || fixAllActive}
-          onStop={() => {
-            // Abort any in-flight writer call, cancel the typewriter,
-            // tear down the inline fix so the resume re-renders clean.
-            // Also break the Fix All chain so queued fixes don't fire.
-            // Also tell the parent to cancel the main chat agent if it's
-            // running (chat message send hit the orchestrate/synthesize path).
-            activeEditAbortRef.current?.abort();
-            activeEditAbortRef.current = null;
-            typewriterAbort.current = true;
-            fixAllAbortedRef.current = true;
-            setFixAllActive(false);
-            setIsEditStreaming(false);
-            setIsRewriting(false);
-            setEditingSection(null);
-            setTypewriterContent("");
-            setInlineFix(null);
-            setRewriteAttempts([]);
-            onStopAgent?.();
-          }}
-          onFileUpload={onFileUpload}
-          placeholder="Ask anything about your resume..."
-        />
-      </div>
-
-      {/* Completion modal — fires once the Fix cycle exhausts with ≥3 accepted */}
-      {coverLetterOpen && (
-        <CoverLetterModal
-          extraction={editedExtraction ?? resumeExtraction ?? null}
-          defaultRole={resumeAnalysis?.likelyTargetRole ?? null}
-          prefillCompany={coverLetterPrefill?.companyName}
-          prefillRole={coverLetterPrefill?.roleTitle}
-          prefillJobDescription={coverLetterPrefill?.jobDescription}
-          onClose={() => { setCoverLetterOpen(false); setCoverLetterPrefill(null); }}
-        />
-      )}
-
-      {jdMatchOpen && (
-        <JDMatchModal
-          extraction={editedExtraction ?? resumeExtraction ?? null}
-          onClose={() => setJdMatchOpen(false)}
-          onApplyRewrite={(sectionKey, instruction) => {
-            // Route the targeted rewrite into the existing fix flow with the
-            // section locked so the writer can't drift. Same path as the
-            // chat's "Apply in Resume Builder" sentinel.
-            runFixForAction(instruction, -1, undefined, { lockedSectionKey: sectionKey });
-          }}
-          onOpenCoverLetter={(input) => {
-            setCoverLetterPrefill(input);
-            setJdMatchOpen(false);
-            setCoverLetterOpen(true);
-          }}
-        />
-      )}
-
-      {showCompletionModal && resumeAnalysis && (
-        <ResumeCompletionModal
-          baseScore={completionBaseScore || deriveScore(resumeAnalysis)}
-          // finalScore must reflect what the user is seeing in the Edit tab
-          // banner. Two paths can move the score: (1) accepted PRIORITIES
-          // (tracked in acceptedIndices) bump the analysis directly via
-          // analysisWithAccepted, (2) any edit (priority or direct AI rewrite)
-          // adds editHistory entries and earns up to +15 from currentEditScore.
-          // Take whichever is higher so the modal never under-reports vs. the
-          // banner the user just looked at.
-          finalScore={Math.max(deriveScore(effectiveAnalysis), currentEditScore)}
-          accepted={acceptedPoints > 0 ? completedActions.size - rejectedCount : 0}
-          rejected={rejectedCount}
-          signalsHit={{
-            trust: acceptedPoints > 0,
-            voice: acceptedPoints >= 3,
-            scoreMoved: acceptedPoints >= 5,
-            targeted: !!resumeAnalysis.likelyTargetRole,
-            formatSafe: true, // PDF export works, print stylesheet in place
-            secondOpinion: false, // flips to true when peer-review link copied
-            versioned: false, // flips when Save as version fires
-          }}
-          isSaving={driveEditingState === "saving"}
-          suggestedName={(() => {
-            const role = resumeAnalysis?.likelyTargetRole?.trim();
-            const firstName = (editedExtraction?.name ?? resumeExtraction?.name ?? "").trim().split(/\s+/)[0];
-            // v-number is best-effort: if we've already finalized in this
-            // session, bump; otherwise start at v1. User can rename freely.
-            const v = lastFinalizedName ? 2 : 1;
-            if (role) return `${role} — v${v}`;
-            if (firstName) return `${firstName}'s Resume v${v}`;
-            return `Resume v${v}`;
-          })()}
-          onSaveAsVersion={async (name: string) => {
-            if (chatId && originalDriveFileId && workingCopyId && editedExtraction && resumeAnalysis) {
-              setDriveEditingState("saving");
-              const targetRole = resumeAnalysis.likelyTargetRole ?? "Edited";
-              await finalizeVersion({
-                workingCopyId,
-                extraction: editedExtraction,
-                targetRole,
-                parentId: originalDriveFileId,
-                customDisplayName: name,
-              });
-              setLastFinalizedName(name);
-              setWorkingCopyId(null);
-              setDriveEditingState("idle");
-              await refreshDriveFiles();
-            } else {
-              // Even without drive wiring, remember the name so tab label +
-              // filename + re-open greeting still reflect the user's intent.
-              setLastFinalizedName(name);
-            }
-            setHasCelebratedCompletion(true);
-            setShowCompletionModal(false);
-            onUpdateExtraction(editedExtraction ?? resumeExtraction!);
-          }}
-          onDownloadPdf={() => {
-            setShowCompletionModal(false);
-            handleDownloadResume();
-          }}
-          onCopyShareLink={() => {
-            handleShareReviewLink();
-          }}
-          onWriteCoverLetter={() => {
-            setShowCompletionModal(false);
-            setCoverLetterOpen(true);
-          }}
-          onCompareWithOriginal={resumeExtraction && editedExtraction ? () => {
-            setShowCompareModal(true);
-          } : undefined}
-          onKeepEditing={() => {
-            setShowCompletionModal(false);
-          }}
-        />
-      )}
-
-      {showCompareModal && resumeExtraction && editedExtraction && (
-        <SideBySideCompareModal
-          original={resumeExtraction}
-          working={editedExtraction}
-          onClose={() => setShowCompareModal(false)}
-        />
-      )}
-    </div>
+  const chatPanel = (
+    <ChatSurface
+      className={`rb-chat-panel ${isPanelOpen ? "rb-chat-panel-open" : ""} ${mobileView === "panel" ? "hidden md:flex" : "flex"}`}
+      style={{
+        width: isPanelOpen ? `${chatPanelPct}%` : "100%",
+        transition: draggingRef.current ? "none" : "width 300ms ease",
+        minWidth: 0,
+      }}
+      mobileTabBar={_mobileTabBar}
+      emptyState={_emptyState}
+      overlays={_overlays}
+      messages={messages}
+      isLoading={isLoading || isAnalyzingResume}
+      loadingLabel={isAnalyzingResume && !isLoading ? "Analysing resume" : undefined}
+      resumeAnalysis={effectiveAnalysis}
+      marketAnalysis={null}
+      resumePreview={null}
+      resumeExtraction={resumeExtraction}
+      onSend={onSendMessage}
+      onFixItem={handleFixItem}
+      onFixAll={handleFixAll}
+      completedActions={completedActions}
+      completedFixes={completedActions}
+      acceptedFixes={acceptedIndices}
+      currentFixIndex={inlineFix?.priorityIndex ?? null}
+      onOpenReport={() => { setIsPanelOpen(true); setActiveTab("report"); setReportIsNew(false); }}
+      isReportOpen={isPanelOpen && activeTab === "report"}
+      resumeScore={deriveScore(effectiveAnalysis)}
+      acceptedPoints={0}
+      resumeBuilderMode
+      onStarterPromptClick={onInputChange}
+      onChatEditPrompt={(text) => {
+        const t = text.trim().toLowerCase();
+        const openPanelForAction = () => {
+          setIsPanelOpen(true);
+          setActiveTab("resume");
+        };
+        if (t === "apply all fixes") {
+          setJdIntakeFor("apply-all");
+          jdIntakeLastMsgIdxRef.current = messages.length;
+          onPushAssistantMessage?.(
+            "Before I rewrite, do you have a target job description? Pasting one lets me tailor the rewrite to that exact role — keywords, must-haves, the works. Otherwise I will do a generic clean-up.",
+          );
+          onPushAssistantMessage?.("__INLINE_CHIPS__:Paste the JD|Skip — generic rewrite");
+          return;
+        }
+        if (t === "skip — generic rewrite" || t === "skip - generic rewrite") {
+          setJdIntakeFor(null);
+          openPanelForAction();
+          handleAcceptAll();
+          return;
+        }
+        if (t === "paste the jd") {
+          onPushAssistantMessage?.("Paste the JD text (or share the URL) in the chat below.");
+          return;
+        }
+        if (t === "walk me through fixes" || t === "guide me through fixes") {
+          openPanelForAction();
+          handleFixAll();
+          return;
+        }
+        onSendMessage(text);
+      }}
+      onEditUserMessage={onEditUserMessage}
+      inputValue={input}
+      onInputChange={onInputChange}
+      onInputSend={onSend}
+      inputDisabled={isLoading}
+      inputBusy={isEditStreaming || isRewriting || editingSection !== null || isLoading || fixAllActive}
+      onInputStop={() => {
+        activeEditAbortRef.current?.abort();
+        activeEditAbortRef.current = null;
+        typewriterAbort.current = true;
+        fixAllAbortedRef.current = true;
+        setFixAllActive(false);
+        setIsEditStreaming(false);
+        setIsRewriting(false);
+        setEditingSection(null);
+        setTypewriterContent("");
+        setInlineFix(null);
+        setRewriteAttempts([]);
+        onStopAgent?.();
+      }}
+      onFileUpload={onFileUpload}
+      inputPlaceholder="Ask anything about your resume..."
+    />
   );
 
   // ── Right workspace panel ────────────────────────────────────────
@@ -3024,6 +2874,107 @@ export default function ResumeBuilder({
       </div>
 
       {toggleButton}
+
+      {/* Modals — previously nested inside chatPanel const; lifted out as
+          siblings during the Phase A chat-as-chassis refactor since they
+          are visually absolute-positioned and don't belong inside the
+          chat surface JSX. Behavior unchanged. */}
+      {coverLetterOpen && (
+        <CoverLetterModal
+          extraction={editedExtraction ?? resumeExtraction ?? null}
+          defaultRole={resumeAnalysis?.likelyTargetRole ?? null}
+          prefillCompany={coverLetterPrefill?.companyName}
+          prefillRole={coverLetterPrefill?.roleTitle}
+          prefillJobDescription={coverLetterPrefill?.jobDescription}
+          onClose={() => { setCoverLetterOpen(false); setCoverLetterPrefill(null); }}
+        />
+      )}
+      {jdMatchOpen && (
+        <JDMatchModal
+          extraction={editedExtraction ?? resumeExtraction ?? null}
+          onClose={() => setJdMatchOpen(false)}
+          onApplyRewrite={(sectionKey, instruction) => {
+            runFixForAction(instruction, -1, undefined, { lockedSectionKey: sectionKey });
+          }}
+          onOpenCoverLetter={(input) => {
+            setCoverLetterPrefill(input);
+            setJdMatchOpen(false);
+            setCoverLetterOpen(true);
+          }}
+        />
+      )}
+      {showCompletionModal && resumeAnalysis && (
+        <ResumeCompletionModal
+          baseScore={completionBaseScore || deriveScore(resumeAnalysis)}
+          finalScore={Math.max(deriveScore(effectiveAnalysis), currentEditScore)}
+          accepted={acceptedPoints > 0 ? completedActions.size - rejectedCount : 0}
+          rejected={rejectedCount}
+          signalsHit={{
+            trust: acceptedPoints > 0,
+            voice: acceptedPoints >= 3,
+            scoreMoved: acceptedPoints >= 5,
+            targeted: !!resumeAnalysis.likelyTargetRole,
+            formatSafe: true,
+            secondOpinion: false,
+            versioned: false,
+          }}
+          isSaving={driveEditingState === "saving"}
+          suggestedName={(() => {
+            const role = resumeAnalysis?.likelyTargetRole?.trim();
+            const firstName = (editedExtraction?.name ?? resumeExtraction?.name ?? "").trim().split(/\s+/)[0];
+            const v = lastFinalizedName ? 2 : 1;
+            if (role) return `${role} — v${v}`;
+            if (firstName) return `${firstName}'s Resume v${v}`;
+            return `Resume v${v}`;
+          })()}
+          onSaveAsVersion={async (name: string) => {
+            if (chatId && originalDriveFileId && workingCopyId && editedExtraction && resumeAnalysis) {
+              setDriveEditingState("saving");
+              const targetRole = resumeAnalysis.likelyTargetRole ?? "Edited";
+              await finalizeVersion({
+                workingCopyId,
+                extraction: editedExtraction,
+                targetRole,
+                parentId: originalDriveFileId,
+                customDisplayName: name,
+              });
+              setLastFinalizedName(name);
+              setWorkingCopyId(null);
+              setDriveEditingState("idle");
+              await refreshDriveFiles();
+            } else {
+              setLastFinalizedName(name);
+            }
+            setHasCelebratedCompletion(true);
+            setShowCompletionModal(false);
+            onUpdateExtraction(editedExtraction ?? resumeExtraction!);
+          }}
+          onDownloadPdf={() => {
+            setShowCompletionModal(false);
+            handleDownloadResume();
+          }}
+          onCopyShareLink={() => {
+            handleShareReviewLink();
+          }}
+          onWriteCoverLetter={() => {
+            setShowCompletionModal(false);
+            setCoverLetterOpen(true);
+          }}
+          onCompareWithOriginal={resumeExtraction && editedExtraction ? () => {
+            setShowCompareModal(true);
+          } : undefined}
+          onKeepEditing={() => {
+            setShowCompletionModal(false);
+          }}
+        />
+      )}
+      {showCompareModal && resumeExtraction && editedExtraction && (
+        <SideBySideCompareModal
+          original={resumeExtraction}
+          working={editedExtraction}
+          onClose={() => setShowCompareModal(false)}
+        />
+      )}
     </>
   );
 }
