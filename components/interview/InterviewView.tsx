@@ -515,27 +515,72 @@ function ActiveSession({
       }));
     } else if (name === "start_session") {
       // The agent sometimes calls set_session_config + start_session in
-      // the same turn — read the LATEST config including any updates from
-      // the same tool batch. We snapshot from the React closure but
-      // the agent's text already has the right framing.
-      // To handle "do SQL medium 3" in one shot, peek at the most recent
-      // set_session_config call's input if present; otherwise use config.
+      // the same turn — read the LATEST config from the tool batch
+      // first, falling back to React state.
       const liveSkill = (input.skill as string) ?? config.skill;
-      const liveDiff = (input.difficulty as string) ?? config.difficulty;
+      const liveDiffRaw = (input.difficulty as string) ?? config.difficulty;
       const liveCount = (input.count as number) ?? config.count;
-      const qs = pickQuestions({
-        skill: liveSkill,
-        difficulty: (liveDiff as Difficulty | "mixed"),
-        count: liveCount,
-      });
-      if (qs.length === 0) {
-        pushAssistant("No questions for that combo yet — try a different combo?", []);
-        return;
+
+      // Welcome UI emits beginner/intermediate/advanced; the bank +
+      // API use easy/medium/hard. Map here so both worlds agree.
+      const diffMap: Record<string, Difficulty | "mixed"> = {
+        beginner: "easy",
+        intermediate: "medium",
+        advanced: "hard",
+        easy: "easy",
+        medium: "medium",
+        hard: "hard",
+        mixed: "mixed",
+      };
+      const liveDiff: Difficulty | "mixed" = diffMap[liveDiffRaw?.toLowerCase()] ?? "medium";
+
+      // Push a "Generating questions…" message so the user has feedback
+      // during the ~10s API call.
+      pushAssistant(`Generating ${liveCount} ${liveDiff} ${liveSkill} question${liveCount === 1 ? "" : "s"}…`);
+
+      try {
+        const res = await fetch("/api/agents/interview/generate-questions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            skill: liveSkill,
+            difficulty: liveDiff,
+            count: liveCount,
+            resumeContext,
+          }),
+        });
+        if (!res.ok) throw new Error(`generate-questions HTTP ${res.status}`);
+        const data = await res.json() as { questions: InterviewQuestion[] };
+        const qs = data.questions ?? [];
+        if (qs.length === 0) {
+          // Fall back to the static bank if the generator returned empty.
+          const bankFallback = pickQuestions({ skill: liveSkill, difficulty: liveDiff, count: liveCount });
+          if (bankFallback.length === 0) {
+            pushAssistant(`Couldn't generate ${liveSkill} questions. Try a different skill?`, []);
+            return;
+          }
+          setQuestions(bankFallback);
+          setQuestionIdx(0);
+          setAnswer(bankFallback[0].starterCode ?? "");
+          setPhase("running");
+          return;
+        }
+        setQuestions(qs);
+        setQuestionIdx(0);
+        setAnswer(qs[0].starterCode ?? "");
+        setPhase("running");
+      } catch (err) {
+        console.error("[start_session] generator failed, falling back to bank:", err);
+        const qs = pickQuestions({ skill: liveSkill, difficulty: liveDiff, count: liveCount });
+        if (qs.length === 0) {
+          pushAssistant(`Couldn't generate ${liveSkill} questions right now. Try again or pick a different skill?`, []);
+          return;
+        }
+        setQuestions(qs);
+        setQuestionIdx(0);
+        setAnswer(qs[0].starterCode ?? "");
+        setPhase("running");
       }
-      setQuestions(qs);
-      setQuestionIdx(0);
-      setAnswer(qs[0].starterCode ?? "");
-      setPhase("running");
     } else if (name === "next_question") {
       const next = questionIdx + 1;
       if (next >= questions.length) {
@@ -583,7 +628,15 @@ function ActiveSession({
       const res = await fetch("/api/interview/evaluate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ questionId: q.id, answer }),
+        // Dynamically-generated questions have ids prefixed "gen-" that
+        // aren't in the static bank. Send the full question inline so
+        // the evaluator can score them; static-bank questions just send
+        // the id (server looks it up).
+        body: JSON.stringify(
+          q.id.startsWith("gen-")
+            ? { question: q, answer }
+            : { questionId: q.id, answer },
+        ),
       });
       if (!res.ok) throw new Error("evaluate failed");
       const data = await res.json() as { evaluation: InterviewEvaluation };

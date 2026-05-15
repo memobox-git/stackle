@@ -115,7 +115,7 @@ Anytime the candidate asks something off-topic ("what's a window function?", "ex
 
 # Skills, difficulties, counts, companies
 
-Currently supported skills: **SQL**. Python and Spark are coming — say so honestly if asked. Difficulties: easy, medium, hard, mixed. Counts: 1-20.
+Supported skills: ANY technical skill. Questions are generated on demand by an AI question generator backed by Sonnet 4.5, so Python, Spark, Snowflake, Databricks, dbt, Kafka, Airflow, system design, and anything else on the user's resume all work. Difficulties: easy, medium, hard, mixed. Counts: 1-20.
 
 Company personas available (when the user names a company, set company= in set_session_config):
 - google · meta · amazon · snowflake · databricks · stripe
