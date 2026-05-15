@@ -4,6 +4,8 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
 import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen, Sparkles, ScrollText, BookMarked, Briefcase, Mic, FileEdit, GraduationCap } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
+import { buildResumeReviewArtifact, type Artifact } from "@/lib/artifacts";
+import { deriveScoreFromAnalysis } from "@/lib/score";
 import ChatWindow from "@/components/ChatWindow";
 import ChatInput from "@/components/ChatInput";
 import HomeInput from "@/components/HomeInput";
@@ -354,14 +356,54 @@ export default function Page() {
     setTimeout(() => sendMessageRef.current?.(newContent), 0);
   }
 
+  // Retry: find the user message that prompted this assistant response,
+  // drop the assistant response (and everything after — there usually
+  // isn't anything after, but stay defensive), then re-send the user
+  // message. Same path as edit, just with the original content.
+  function handleRetryAssistant(assistantIndex: number) {
+    setChatMessages((prev) => {
+      let userIdx = assistantIndex - 1;
+      while (userIdx >= 0) {
+        const m = prev[userIdx];
+        if (m.role === "user" && !m.content.startsWith("__FILE_UPLOAD__:") && !m.content.startsWith("__")) break;
+        userIdx--;
+      }
+      if (userIdx < 0) return prev;
+      const userContent = prev[userIdx].content;
+      // Drop the user message + everything after, then resend it so the
+      // new assistant turn appears fresh (typewriter, etc).
+      setTimeout(() => sendMessageRef.current?.(userContent), 0);
+      return prev.slice(0, userIdx);
+    });
+  }
+
   // ── Auth init ─────────────────────────────────────────
+  // CRITICAL: Supabase fires onAuthStateChange not just on sign-in/sign-out
+  // but on TOKEN_REFRESHED — which happens every time the browser tab
+  // regains focus after being backgrounded. If we naively setUser() on
+  // every event, the new user object identity ripples through any
+  // useEffect with [user] in its deps and re-fires chat-load logic,
+  // which historically stomped activeView back to "chat". Track the
+  // user ID and short-circuit when nothing actually changed.
+  const lastUserIdRef = useRef<string | null>(null);
   useEffect(() => {
     const supabase = getSupabaseClient();
     supabase.auth.getSession().then(({ data: { session } }) => {
+      lastUserIdRef.current = session?.user?.id ?? null;
       setUser(session?.user ?? null);
       setAuthLoading(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      const nextId = session?.user?.id ?? null;
+      if (nextId === lastUserIdRef.current) {
+        // Same user — token refresh, focus event, periodic check. Ignore.
+        // (Logged once for debugging; remove if too chatty.)
+        if (process.env.NODE_ENV !== "production") {
+          console.log("[auth] skip same-user event:", event, "id=", nextId);
+        }
+        return;
+      }
+      lastUserIdRef.current = nextId;
       setUser(session?.user ?? null);
       if (!session?.user) {
         // Defer the reset a tick so React commits the auth change first —
@@ -828,9 +870,52 @@ export default function Page() {
   //      after the most recent message.
   // Skip otherwise — the user might be on Interview Prep or another path
   // and dumping the report mid-conversation would be jarring.
+  // Chat-mode analyzer kickoff. The Resume Builder welcome effect already
+  // kicks off the analyzer when the user lands on that surface. But in
+  // main-chat mode (the common path for "review my resume"), nothing was
+  // calling the analyzer — the orchestrator just emitted prose via the
+  // synthesis agent and no structured `resumeAnalysis` ever existed, so
+  // the artifact card path could never fire. Fix: when the orchestrator
+  // signals focus=resume from chat AND we have an extraction but no
+  // analysis, run the analyzer in the background. The analysis-landed
+  // watcher (below) then pushes the artifact card.
+  const chatAnalysisKickoffRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (activeView !== "chat") return;
+    if (!resumeExtraction || !resumeText) return;
+    if (resumeAnalysis) return;
+    if (orchFocusRef.current !== "resume") return;
+    const analysisKey = `chat:${resumeText.length}:${resumeText.slice(0, 32)}`;
+    if (chatAnalysisKickoffRef.current.has(analysisKey)) return;
+    chatAnalysisKickoffRef.current.add(analysisKey);
+    fetch("/api/agents/resume/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        resumeText,
+        reviewType: "Full Review",
+        targetMarket: "US General",
+        seniorityLevel:
+          resumeExtraction.totalYearsExperience && resumeExtraction.totalYearsExperience >= 7
+            ? "Senior"
+            : "Mid",
+        jobDescription: "",
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((a: ResumeAnalysis | null) => { if (a) setResumeAnalysis(a); })
+      .catch(() => { /* artifact just won't render — prose still does */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, resumeExtraction, resumeText, resumeAnalysis, chatMessages.length]);
+
   const analysisLandedFiredRef = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (activeView !== "resume-builder") return;
+    // Used to be gated to activeView === "resume-builder", which meant
+    // running a resume review from the main chat surface NEVER produced
+    // an artifact card. Now: fires in both chat AND resume-builder
+    // surfaces. The artifact card is the user-visible proof that a real
+    // analysis happened — it must always appear.
+    if (activeView !== "resume-builder" && activeView !== "chat") return;
     if (!resumeAnalysis) return;
     if (!resumeExtraction) return;
     const id = activeChatId ?? "local-chat";
@@ -850,8 +935,17 @@ export default function Page() {
 
     const welcomeText = buildResumeBuilderWelcome(resumeExtraction, null, resumeAnalysis, chosenTargetRole);
     const chipLine = buildWelcomeChipsForAnalysis(resumeAnalysis);
+    // Fix 2 — artifact card as the first thing the user sees once
+    // analysis lands. Click → opens the Report tab. Card stays inline
+    // forever, so the chat timeline shows the milestone permanently.
+    const artifact = buildResumeReviewArtifact({
+      id: `resume-review-${activeChatId ?? "local"}-${Date.now()}`,
+      candidateName: resumeExtraction.name,
+      targetRole: resumeAnalysis.likelyTargetRole ?? chosenTargetRole ?? null,
+      score: deriveScoreFromAnalysis(resumeAnalysis),
+    });
     const reportBlock: ChatMessage[] = [
-      { role: "assistant", content: "Done reading. Here's where you stand:", timestamp: now() },
+      { role: "assistant", content: "Done reading. Here's your review:", timestamp: now(), artifact },
       { role: "assistant", content: welcomeText, timestamp: now() },
       { role: "assistant", content: chipLine },
     ];
@@ -1026,7 +1120,15 @@ export default function Page() {
       hasResumeAnalysis: !!chat.resume_analysis,
     });
     setChatMessages(msgs);
-    setActiveView(chat.mode === "resume_builder" ? "resume-builder" : "chat");
+    // Don't clobber the active surface if the user is on a deliberate
+    // top-level destination (Interview / Foundations / Drive). Those are
+    // surfaces, not chat modes — restoring a chat's saved mode here was
+    // bouncing the user back to Resume Builder every time the tab
+    // regained focus and Supabase re-fired the auth event.
+    setActiveView((prev) => {
+      if (prev === "interview" || prev === "learn" || prev === "drive") return prev;
+      return chat.mode === "resume_builder" ? "resume-builder" : "chat";
+    });
     setCareerGoal(chat.career_goal ?? null);
     // Only block the welcome useEffect if this chat ALREADY has messages.
     // (Earlier I always-marked here, which broke fresh chat rows: a row
@@ -2669,25 +2771,7 @@ export default function Page() {
                  with the greeting until the first message lands. */
               <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
                 <div className="w-full max-w-2xl flex flex-col items-center">
-                  {/* Resume status pill — only when a resume is loaded.
-                      Keeps the user oriented (which file is active) and
-                      gives a one-click swap via the source chooser. */}
-                  {resumeExtraction && (
-                    <button
-                      type="button"
-                      onClick={() => promptResumeSourceChoice()}
-                      className="mb-4 inline-flex items-center gap-2 text-[12px] text-gray-600 hover:text-gray-900 bg-white border border-gray-200 hover:border-gray-300 rounded-full px-3 py-1 transition-colors"
-                      title="Switch which resume Stackle uses"
-                    >
-                      <FileText className="w-3 h-3" strokeWidth={2} />
-                      <span className="truncate max-w-[280px]">
-                        Resume loaded · <strong className="font-medium text-gray-800">{resumeFilename || "your resume"}</strong>
-                      </span>
-                      <span className="text-gray-400">·</span>
-                      <span className="text-gray-500">Change</span>
-                    </button>
-                  )}
-                  {/* Greeting with sparkle. The sparkle softens the tone
+{/* Greeting with sparkle. The sparkle softens the tone
                       and gives the line a focal point (Claude does the
                       same thing with a small star glyph). */}
                   <h1 className="text-[28px] md:text-[32px] font-medium text-gray-900 tracking-tight mb-8 inline-flex items-center gap-2.5 self-center">
@@ -2791,6 +2875,16 @@ export default function Page() {
                     setActiveView("resume-builder");
                   }}
                   onEditUserMessage={handleEditUserMessage}
+                  onRetryAssistant={handleRetryAssistant}
+                  onOpenArtifact={(artifact: Artifact) => {
+                    // Per artifact.kind, route to the right preview.
+                    // resume_review → switch to Resume Builder + open Report tab.
+                    if (artifact.kind === "resume_review") {
+                      setActiveView("resume-builder");
+                      setOpenReportSignal((n) => n + 1);
+                    }
+                    // Other kinds will plug in here as they ship.
+                  }}
                   onChatEditPrompt={(prompt) => {
                     const t = prompt.trim().toLowerCase();
 
@@ -2872,66 +2966,33 @@ export default function Page() {
               </>
             )}
           </div>
-        ) : activeView === "interview" || activeView === "learn" ? (
-          // Chat-as-chassis: persistent chat panel on the left,
-          // workspace view (Interview Prep or Foundations) on the
-          // right. Chat shares the same messages state with the main
-          // chat view so the conversation is continuous across surfaces.
-          <div className="flex flex-1 min-h-0 relative overflow-hidden">
-            <AppChatPanel
-              isOpen={appChatPanelOpen}
-              onClose={() => setAppChatPanelOpen(false)}
-              messages={chatMessages}
-              isLoading={isLoading}
-              chatInput={chatInput}
-              onChatInputChange={setChatInput}
-              onSend={(text) => sendMessage(text)}
-              onStop={() => {
-                agentAbortRef.current?.abort();
-                agentAbortRef.current = null;
-                setIsLoading(false);
-              }}
-              onChatEditPrompt={(prompt) => sendMessage(prompt)}
-              onEditUserMessage={handleEditUserMessage}
-              onFileUpload={handleResumeUpload}
-              resumeText={resumeText}
-              resumeExtraction={resumeExtraction}
+        ) : activeView === "interview" ? (
+          // Interview Prep is its OWN dedicated chat surface — no main-chat overlay.
+          // The Skill Agent conversation IS the chat. Shared memory = resume only.
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            <InterviewView
+              candidateName={resumeExtraction?.name ?? null}
+              resumeSkills={(resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? [])}
+              resumeContext={
+                resumeExtraction
+                  ? {
+                      topRole: resumeExtraction.experience?.[0]?.title ?? null,
+                      topCompany: resumeExtraction.experience?.[0]?.company ?? null,
+                      yearsExperience: resumeExtraction.totalYearsExperience ?? null,
+                      experiences: (resumeExtraction.experience ?? []).slice(0, 5).map((e) => ({
+                        title: e.title,
+                        company: e.company,
+                        bullets: (e.bullets ?? []).slice(0, 3),
+                      })),
+                      topSkills: (resumeExtraction.skillGroups ?? []).flatMap((g) => g.skills ?? []).slice(0, 12),
+                    }
+                  : null
+              }
             />
-            <div className="flex-1 min-h-0 overflow-hidden">
-              {activeView === "interview" ? (
-                <InterviewView
-                  candidateName={resumeExtraction?.name ?? null}
-                  resumeSkills={(resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? [])}
-                  resumeContext={
-                    resumeExtraction
-                      ? {
-                          topRole: resumeExtraction.experience?.[0]?.title ?? null,
-                          topCompany: resumeExtraction.experience?.[0]?.company ?? null,
-                          yearsExperience: resumeExtraction.totalYearsExperience ?? null,
-                          experiences: (resumeExtraction.experience ?? []).slice(0, 5).map((e) => ({
-                            title: e.title,
-                            company: e.company,
-                            bullets: (e.bullets ?? []).slice(0, 3),
-                          })),
-                          topSkills: (resumeExtraction.skillGroups ?? []).flatMap((g) => g.skills ?? []).slice(0, 12),
-                        }
-                      : null
-                  }
-                />
-              ) : (
-                <LearnView />
-              )}
-            </div>
-            {!appChatPanelOpen && (
-              <button
-                onClick={() => setAppChatPanelOpen(true)}
-                title="Open chat"
-                className="absolute bottom-5 left-5 z-10 inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-gray-900 text-white text-[13px] font-medium hover:bg-black shadow-lg transition-colors"
-              >
-                <MessagesSquare className="w-3.5 h-3.5" strokeWidth={2} />
-                Open chat
-              </button>
-            )}
+          </div>
+        ) : activeView === "learn" ? (
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            <LearnView />
           </div>
         ) : activeView === "drive" ? (
           /* Drive view — chat-as-chassis: persistent chat on left,
@@ -2953,6 +3014,7 @@ export default function Page() {
               }}
               onChatEditPrompt={(prompt) => sendMessage(prompt)}
               onEditUserMessage={handleEditUserMessage}
+              onRetryAssistant={handleRetryAssistant}
               onFileUpload={handleResumeUpload}
               resumeText={resumeText}
               resumeExtraction={resumeExtraction}

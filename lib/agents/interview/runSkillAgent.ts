@@ -70,6 +70,18 @@ export async function runSkillAgent(input: SkillAgentInput): Promise<ReadableStr
   const encoder = new TextEncoder();
   const liveContext = renderLiveContext(input);
 
+  // When lastVerdict is present, prepend a hard directive so the agent
+  // can't ignore the adaptive-difficulty signal. The full <conversation_state>
+  // block already carries adjust_next; this short reminder amplifies it at
+  // the top of the user turn where it's most likely to be honored.
+  const verdictReminder = input.lastVerdict
+    ? `[SYSTEM REMINDER] Last verdict was ${input.lastVerdict}. ${
+        input.lastVerdict === "strong_hire" || input.lastVerdict === "hire"
+          ? "ESCALATE the next question — go harder."
+          : "EASE BACK on the next question — simpler or clarifier first."
+      }\n\n`
+    : "";
+
   const apiMessages = input.messages
     .filter((m) => m.content && m.content.trim().length > 0)
     .filter((m) => !m.content.startsWith("__"))
@@ -80,13 +92,13 @@ export async function runSkillAgent(input: SkillAgentInput): Promise<ReadableStr
     const last = apiMessages[apiMessages.length - 1];
     apiMessages[apiMessages.length - 1] = {
       role: "user",
-      content: `${liveContext}\n\n${last.content}`,
+      content: `${verdictReminder}${liveContext}\n\n${last.content}`,
     };
   } else if (apiMessages.length === 0) {
     // First turn — seed an opener.
     apiMessages.push({
       role: "user",
-      content: `${liveContext}\n\nSTART: greet me and ask what to drill.`,
+      content: `${verdictReminder}${liveContext}\n\nSTART: greet me and ask what to drill.`,
     });
   }
 

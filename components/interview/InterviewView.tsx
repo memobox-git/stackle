@@ -21,14 +21,14 @@
 //   - "report":   frozen replay of a past session
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Plus, Send, ArrowUp, FileText, RotateCcw } from "lucide-react";
-import { pickQuestions, getQuestionById } from "@/lib/agents/interview/questionBank";
+import { ChevronLeft, Send, ArrowUp } from "lucide-react";
+import { pickQuestions, getQuestionById, countQuestionsBySkill } from "@/lib/agents/interview/questionBank";
 import type { InterviewQuestion, InterviewEvaluation, Verdict, Difficulty } from "@/lib/agents/interview/questionBank/types";
 import {
-  loadSessions, saveSession, deleteSession, generateReport, buildProfileSeed,
-  type SkillSession, type ChatMsg, type SessionReport,
+  saveSession, generateReport, buildProfileSeed,
+  type SkillSession, type ChatMsg,
 } from "@/lib/interview/sessionStore";
-type View = "sessions" | "active" | "report";
+type View = "welcome" | "active";
 // Simplified phase state — only what affects UI surface visibility:
 //   "idle"        : agent collecting config or chatting; no question active
 //   "running"     : a question is live, code editor visible, timer ticking
@@ -68,28 +68,17 @@ export default function InterviewView({
     topSkills?: string[];
   } | null;
 }) {
-  const [view, setView] = useState<View>("sessions");
-  const [sessions, setSessions] = useState<SkillSession[]>([]);
+  const [view, setView] = useState<View>("welcome");
   const [activeSession, setActiveSession] = useState<SkillSession | null>(null);
-  const [reportSession, setReportSession] = useState<SkillSession | null>(null);
 
-  // Hydrate on mount.
-  useEffect(() => { setSessions(loadSessions()); }, []);
-
-  function refreshSessions() { setSessions(loadSessions()); }
-
-  function startNewSession(opts?: { skill?: string; difficulty?: "beginner" | "intermediate" | "advanced" | "mixed" }) {
+  function startNewSession(opts: { skill: string; difficulty: "beginner" | "intermediate" | "advanced" | "mixed" }) {
     const id = `session-${Date.now()}`;
     const session: SkillSession = {
       id,
       agent: "skill",
       startedAt: new Date().toISOString(),
       status: "active",
-      config: {
-        skill: opts?.skill ?? "SQL",
-        difficulty: opts?.difficulty ?? "mixed",
-        count: 3,
-      },
+      config: { skill: opts.skill, difficulty: opts.difficulty, count: 3 },
       messages: [],
       questions: [],
     };
@@ -97,65 +86,44 @@ export default function InterviewView({
     setView("active");
   }
 
-  function openReport(s: SkillSession) {
-    setReportSession(s);
-    setView("report");
-  }
-
   return (
     <div className="flex w-full h-full bg-[#fafaf7] overflow-hidden">
-      {view === "sessions" && (
-        <SessionsList
-          sessions={sessions}
+      {view === "welcome" && (
+        <WelcomeScreen
           candidateName={candidateName}
           resumeSkills={resumeSkills}
-          onNew={(opts) => startNewSession(opts)}
-          onOpen={openReport}
-          onDelete={(id) => { deleteSession(id); refreshSessions(); }}
+          onStart={(opts) => startNewSession(opts)}
         />
       )}
       {view === "active" && activeSession && (
         <ActiveSession
           session={activeSession}
-          allSessions={sessions}
+          allSessions={[]}
           candidateName={candidateName}
           resumeContext={resumeContext}
           onSessionUpdate={(s) => {
             setActiveSession(s);
             saveSession(s);
-            if (s.status === "completed") refreshSessions();
           }}
-          onExit={() => { setView("sessions"); refreshSessions(); }}
-        />
-      )}
-      {view === "report" && reportSession && (
-        <ReportView
-          session={reportSession}
-          onBack={() => setView("sessions")}
+          onExit={() => setView("welcome")}
         />
       )}
     </div>
   );
 }
 
-// ── Sessions list (ChatGPT-style) ─────────────────────────────────────────
+// ── Welcome screen ────────────────────────────────────────────────────────
+// No sessions, no history. Just a chat-style welcome message and skill
+// chips with Start buttons inline. Click Start → pick difficulty → drill.
 
-function SessionsList({
-  sessions, candidateName, resumeSkills, onNew, onOpen, onDelete,
+function WelcomeScreen({
+  candidateName, resumeSkills, onStart,
 }: {
-  sessions: SkillSession[];
   candidateName?: string | null;
   resumeSkills?: string[];
-  onNew: (opts?: { skill?: string; difficulty?: "beginner" | "intermediate" | "advanced" | "mixed" }) => void;
-  onOpen: (s: SkillSession) => void;
-  onDelete: (id: string) => void;
+  onStart: (opts: { skill: string; difficulty: "beginner" | "intermediate" | "advanced" | "mixed" }) => void;
 }) {
   const firstName = candidateName?.trim().split(/\s+/)[0] ?? "there";
-  const forecast = useMemo(() => buildFridayForecast(sessions), [sessions]);
-  // Curate the resume skills into a tight list of interview-relevant
-  // ones. We filter to canonical tech skills (anything more than 2 chars
-  // and that looks tech-y) and cap at 8. The user can still click 'New
-  // Session' for anything else.
   const suggestedSkills = useMemo(() => {
     if (!resumeSkills || resumeSkills.length === 0) return [];
     const seen = new Set<string>();
@@ -167,83 +135,90 @@ function SessionsList({
       if (seen.has(key)) continue;
       seen.add(key);
       out.push(s);
-      if (out.length >= 8) break;
+      if (out.length >= 10) break;
     }
     return out;
   }, [resumeSkills]);
-  // Which skill the user clicked → swaps the chip row into a 4-button
-  // difficulty picker for that skill. Click a difficulty → drill begins.
-  const [pickedSkill, setPickedSkill] = useState<string | null>(null);
+
+  // Persist picked skill + last-chosen difficulty across reloads so the
+  // user doesn't lose mid-flow state. Keys are namespaced so they don't
+  // collide with anything else in localStorage.
+  const [pickedSkill, setPickedSkill] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem("stackle_interview_picked_skill");
+  });
+  const [lastDifficulty, setLastDifficulty] = useState<"beginner" | "intermediate" | "advanced" | "mixed">(() => {
+    if (typeof window === "undefined") return "mixed";
+    const saved = localStorage.getItem("stackle_interview_last_difficulty");
+    return (["beginner", "intermediate", "advanced", "mixed"] as const).includes(saved as never)
+      ? (saved as "beginner" | "intermediate" | "advanced" | "mixed")
+      : "mixed";
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (pickedSkill) localStorage.setItem("stackle_interview_picked_skill", pickedSkill);
+    else localStorage.removeItem("stackle_interview_picked_skill");
+  }, [pickedSkill]);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("stackle_interview_last_difficulty", lastDifficulty);
+  }, [lastDifficulty]);
+
+  function handleStart(diff: "beginner" | "intermediate" | "advanced" | "mixed") {
+    if (!pickedSkill) return;
+    setLastDifficulty(diff);
+    onStart({ skill: pickedSkill, difficulty: diff });
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-10">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-1">Hey {firstName} — interview prep.</h1>
-        <p className="text-sm text-gray-600 mb-6">Each session is its own chat. Start a new one or revisit a past report.</p>
-
-        {/* Friday Forecast — Phase 2. Readiness % aggregated across past
-            completed sessions. Empty state nudges the first run. */}
-        <div className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4 mb-4">
-          <div className="flex items-baseline justify-between mb-1">
-            <span className="text-[10px] uppercase tracking-wider text-violet-700 font-semibold">Friday Forecast</span>
-            <span className="text-[11px] text-violet-700">{forecast.sessionCount === 0 ? "no data yet" : `${forecast.sessionCount} session${forecast.sessionCount !== 1 ? "s" : ""}`}</span>
-          </div>
-          {forecast.sessionCount === 0 ? (
-            <p className="text-[13.5px] text-violet-900 leading-relaxed">Run your first session to start tracking interview readiness — the more you drill, the sharper this gets.</p>
+      <div className="max-w-2xl mx-auto px-6 py-12">
+        {/* Welcome bubble — chat-style */}
+        <div className="text-[15px] text-gray-800 leading-relaxed mb-6">
+          Hey {firstName} — welcome to interview prep.
+          {suggestedSkills.length > 0 ? (
+            <> Based on your resume, here are skills we can drill. Pick one to start.</>
           ) : (
-            <>
-              <div className="flex items-baseline gap-3 mb-2">
-                <span className="text-3xl font-semibold text-violet-900 tabular-nums">{forecast.readiness}%</span>
-                <span className="text-[12px] text-violet-700">interview-ready</span>
-              </div>
-              <p className="text-[13px] text-violet-800 leading-relaxed">
-                {forecast.message}
-              </p>
-            </>
+            <> Upload your resume on the chat surface and I&apos;ll surface skills to drill here.</>
           )}
         </div>
 
-        {/* Skill breakdown + drill recommendations — Phase 2 + 4.
-            Surfaces only when there's enough data (1+ completed sessions).
-            Bars per skill + a punch list of "drill these next" derived
-            from weakest sub-categories across completed sessions. */}
-        {forecast.sessionCount > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-8">
-            <SkillBreakdown sessions={sessions} />
-            <DrillRecommendations sessions={sessions} />
-          </div>
-        )}
-
-        {/* Suggested-from-resume skill chips. Click a skill → swaps
-            this row into a difficulty picker → click a difficulty →
-            session starts straight on that skill. */}
         {suggestedSkills.length > 0 && !pickedSkill && (
-          <div className="mb-6">
-            <p className="text-[11px] uppercase tracking-[0.1em] text-gray-500 font-semibold mb-2">
-              Suggested for you · from your resume
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {suggestedSkills.map((skill) => (
+          <div className="flex flex-wrap gap-2 mb-6">
+            {suggestedSkills.map((skill) => {
+              const count = countQuestionsBySkill(skill);
+              return (
                 <button
                   key={skill}
                   onClick={() => setPickedSkill(skill)}
-                  className="inline-flex items-center gap-1.5 text-[13px] font-medium text-gray-800 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full px-3 py-1.5 shadow-sm transition-all"
+                  className="inline-flex items-center gap-2 text-[13px] font-medium text-gray-900 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full pl-3 pr-1 py-1 shadow-sm transition-all"
                 >
                   <span>{skill}</span>
-                  <span className="text-gray-400 text-[11px]">▸ Start</span>
+                  {count > 0 && (
+                    <span className="text-[11px] text-gray-500">· {count} q{count === 1 ? "" : "s"}</span>
+                  )}
+                  <span
+                    className="inline-flex items-center text-[12px] font-semibold text-black rounded-full px-2.5 py-0.5"
+                    style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
+                  >
+                    Start
+                  </span>
                 </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
         )}
+
         {pickedSkill && (
-          <div className="mb-6 rounded-2xl border border-violet-200 bg-violet-50 px-5 py-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-[13px] text-violet-900">
+          <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[14px] text-gray-800">
                 Drill <span className="font-semibold">{pickedSkill}</span> — pick a difficulty.
               </p>
               <button
                 onClick={() => setPickedSkill(null)}
-                className="text-[12px] text-violet-700 hover:text-violet-900"
+                className="text-[12px] text-gray-500 hover:text-gray-900"
               >
                 Cancel
               </button>
@@ -252,8 +227,10 @@ function SessionsList({
               {(["beginner", "intermediate", "advanced", "mixed"] as const).map((diff) => (
                 <button
                   key={diff}
-                  onClick={() => onNew({ skill: pickedSkill, difficulty: diff })}
-                  className="inline-flex items-center text-[13px] font-semibold text-black rounded-full px-3.5 py-1.5 hover:opacity-90 transition-opacity capitalize"
+                  onClick={() => handleStart(diff)}
+                  className={`inline-flex items-center text-[13px] font-semibold text-black rounded-full px-3.5 py-1.5 hover:opacity-90 transition-opacity capitalize ${
+                    diff === lastDifficulty ? "ring-2 ring-offset-1 ring-gray-900" : ""
+                  }`}
                   style={{ background: "linear-gradient(90deg, #fff7ad, #ffa9f9)" }}
                 >
                   {diff}
@@ -262,78 +239,9 @@ function SessionsList({
             </div>
           </div>
         )}
-
-        {/* Past sessions list. The 'New Session' button + 'No sessions
-            yet' empty card were removed — the suggested-skill chips
-            above already invite the first drill. A small secondary
-            'Pick a different skill' link appears at the bottom of the
-            list for free-form picks. */}
-        {sessions.length > 0 && (
-          <ul className="space-y-2">
-            {sessions.map((s) => (
-              <li key={s.id} className="rounded-xl border border-gray-200 bg-white px-5 py-3 flex items-center justify-between hover:border-gray-400 transition-colors">
-                <button onClick={() => onOpen(s)} className="flex-1 text-left">
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-[14px] font-semibold text-gray-900">{s.config.skill}</span>
-                    <span className="text-[11px] uppercase tracking-wider text-gray-500 font-medium">{s.config.difficulty}</span>
-                    {s.report && (
-                      <span className="text-[12px] tabular-nums" style={{ color: VERDICT_COLOURS[topVerdict(s.report.verdictDistribution)].fg }}>
-                        {s.report.averageScore}/100
-                      </span>
-                    )}
-                    <span className="text-[11px] text-gray-400 ml-auto mr-3">{relativeTime(s.completedAt ?? s.startedAt)}</span>
-                  </div>
-                  {s.report && (
-                    <p className="text-[12px] text-gray-500 mt-0.5">
-                      {Object.entries(s.report.verdictDistribution).filter(([, n]) => n > 0).map(([v, n]) => `${n} ${VERDICT_COLOURS[v as Verdict].label}`).join(" · ")}
-                      {s.report.weakestSubcategory ? ` · weakest: ${s.report.weakestSubcategory}` : ""}
-                    </p>
-                  )}
-                </button>
-                <button
-                  onClick={() => { if (confirm("Delete this session?")) onDelete(s.id); }}
-                  className="text-[11px] text-gray-400 hover:text-rose-600 px-2"
-                >
-                  Delete
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* Secondary 'Pick a different skill' link — only when there are
-            no suggestions OR the user wants something off-resume. */}
-        {(suggestedSkills.length === 0 || sessions.length > 0) && !pickedSkill && (
-          <button
-            onClick={() => onNew()}
-            className="mt-6 text-[13px] text-gray-500 hover:text-gray-900 underline-offset-2 hover:underline transition-colors"
-          >
-            Or pick a different skill
-          </button>
-        )}
       </div>
     </div>
   );
-}
-
-function topVerdict(dist: Record<Verdict, number>): Verdict {
-  const order: Verdict[] = ["strong_hire", "hire", "soft_pass", "no_hire"];
-  for (const v of order) if (dist[v] > 0) return v;
-  return "no_hire";
-}
-
-function relativeTime(iso: string): string {
-  const d = new Date(iso).getTime();
-  const now = Date.now();
-  const diff = Math.max(0, now - d);
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  const days = Math.floor(h / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
 }
 
 // ── Active session ────────────────────────────────────────────────────────
@@ -373,6 +281,17 @@ function ActiveSession({
   // question's pitch. Set after every evaluation, passed to the Skill
   // Agent on the next call.
   const [lastVerdict, setLastVerdict] = useState<Verdict | null>(null);
+  // Time pressure mode (#9). When on, the per-question timer turns amber
+  // at 80% of benchmark and red past benchmark. No hard cutoff — visible
+  // urgency only. Persisted across reloads.
+  const [timePressureOn, setTimePressureOn] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("stackle_interview_time_pressure") === "1";
+  });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("stackle_interview_time_pressure", timePressureOn ? "1" : "0");
+  }, [timePressureOn]);
 
   // Company persona — set by the Skill Agent calling
   // set_session_config({company: ...}). Passed back into sessionState
@@ -447,6 +366,22 @@ function ActiveSession({
   async function handleUserInput(text: string) {
     const t = text.trim();
     if (!t) return;
+    // #3 — Drill again chip restarts the session: exit to welcome,
+    // localStorage already has skill+difficulty so Start is one tap.
+    if (t.toLowerCase().startsWith("drill again")) {
+      onExit();
+      return;
+    }
+    // #7 — "Walk me through this answer" expands to a real prompt the
+    // Skill Agent can answer as a senior interviewer doing a post-mortem.
+    if (t.toLowerCase() === "walk me through this answer") {
+      pushUser(t);
+      await callSkillAgent([
+        ...messages,
+        { role: "user", content: "Walk me through how I should have approached this answer step by step. Cite what I missed and what the strong-hire version of this answer would look like — 4–6 sentences." },
+      ]);
+      return;
+    }
     pushUser(t);
     await callSkillAgent([...messages, { role: "user", content: t }]);
   }
@@ -648,10 +583,41 @@ function ActiveSession({
         ...(data.evaluation.whatMissed.length ? ["", "**What missed**", ...data.evaluation.whatMissed.map((s) => "• " + s)] : []),
         "",
         `**To push to Strong Hire:** ${data.evaluation.pushToStrong}`,
+        "",
+        "**How you were graded:** clarity of logic · correctness · edge cases · style.",
       ].join("\n");
+
+      // #5 — typewriter the verdict into chat instead of dropping the
+      // whole block at once. Replace the "Evaluating..." placeholder
+      // with progressively-more-text. Cadence: ~6ms/char (fast enough
+      // to feel responsive, slow enough to feel alive). The chip row
+      // ("Walk me through this answer") attaches once the text settles.
       setMessages((m) => {
         const next = m.slice(0, -1);
-        next.push({ role: "assistant", content: verdictText });
+        next.push({ role: "assistant", content: "" });
+        return next;
+      });
+      const placeholderIdx = messages.length; // after slice(-1) + push
+      const total = verdictText.length;
+      const chunkSize = Math.max(1, Math.floor(total / 80));
+      for (let i = 0; i < total; i += chunkSize) {
+        const slice = verdictText.slice(0, Math.min(total, i + chunkSize));
+        setMessages((m) => {
+          const next = [...m];
+          if (next[placeholderIdx]) next[placeholderIdx] = { role: "assistant", content: slice };
+          return next;
+        });
+        await new Promise((r) => setTimeout(r, 14));
+      }
+      setMessages((m) => {
+        const next = [...m];
+        if (next[placeholderIdx]) {
+          next[placeholderIdx] = {
+            role: "assistant",
+            content: verdictText,
+            chips: ["Walk me through this answer", "Next question"],
+          };
+        }
         return next;
       });
 
@@ -700,7 +666,7 @@ function ActiveSession({
     onSessionUpdate(finalSession);
     pushAssistant(
       `Session complete. Average ${report.averageScore}/100. ${report.weakestSubcategory ? `Weakest: ${report.weakestSubcategory}.` : ""} ${report.recommendedNext}`,
-      ["Run another", "Back to sessions"],
+      [`Drill again — ${config.skill} ${config.difficulty}`, "Try a new skill"],
     );
     setPhase("done");
   }
@@ -714,7 +680,7 @@ function ActiveSession({
       <div className="flex-1 min-w-0 flex flex-col border-r border-gray-200">
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-white">
           <button onClick={onExit} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900">
-            <ChevronLeft size={16} /> Sessions
+            <ChevronLeft size={16} /> Back
           </button>
           {phase === "running" && (
             <span className="text-[11px] uppercase tracking-wider text-violet-600 font-medium">In progress</span>
@@ -796,7 +762,29 @@ function ActiveSession({
               </div>
               <div className="flex items-center gap-3">
                 <ConfidenceMeter answer={answer} question={currentQ} />
-                <div className="text-[12px] text-gray-500 font-mono tabular-nums">
+                <button
+                  onClick={() => setTimePressureOn((v) => !v)}
+                  title="Toggle time pressure mode — timer turns red past benchmark"
+                  className={`text-[10px] uppercase tracking-wider font-semibold rounded-full px-2 py-0.5 border transition-colors ${
+                    timePressureOn
+                      ? "bg-rose-50 border-rose-300 text-rose-700"
+                      : "bg-white border-gray-200 text-gray-500 hover:border-gray-400"
+                  }`}
+                >
+                  ⏱ Pressure
+                </button>
+                <div
+                  className="text-[12px] font-mono tabular-nums"
+                  style={{
+                    color: !timePressureOn
+                      ? "#6b7280"
+                      : timer >= currentQ.timeBenchmarkSeconds
+                      ? "#dc2626"
+                      : timer >= 0.8 * currentQ.timeBenchmarkSeconds
+                      ? "#d97706"
+                      : "#6b7280",
+                  }}
+                >
                   {Math.floor(timer / 60)}:{String(timer % 60).padStart(2, "0")}
                   <span className="text-gray-300"> · bench {Math.floor(currentQ.timeBenchmarkSeconds / 60)}:{String(currentQ.timeBenchmarkSeconds % 60).padStart(2, "0")}</span>
                 </div>
@@ -805,10 +793,17 @@ function ActiveSession({
             <textarea
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
+              onKeyDown={(e) => {
+                // #4 — Cmd/Ctrl+Enter submits without leaving the keyboard.
+                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                  e.preventDefault();
+                  if (phase === "running" && answer.trim().length >= 5) submitAnswer();
+                }
+              }}
               spellCheck={false}
               disabled={phase === "evaluating"}
               className="flex-1 w-full bg-[#1a1a1a] text-emerald-100 font-mono text-[13px] leading-relaxed p-5 focus:outline-none disabled:opacity-60"
-              placeholder="Write your query here..."
+              placeholder="Write your query here…  (⌘/Ctrl+Enter to submit)"
             />
 
             {/* Helper chips — Phase 2. Free, fast assists that don't
@@ -863,70 +858,6 @@ function ActiveSession({
   );
 }
 
-// ── Frozen report view ────────────────────────────────────────────────────
-
-function ReportView({ session, onBack }: { session: SkillSession; onBack: () => void }) {
-  return (
-    <div className="flex-1 overflow-y-auto">
-      <div className="max-w-3xl mx-auto px-6 py-8">
-        <button onClick={onBack} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 mb-4">
-          <ChevronLeft size={16} /> Sessions
-        </button>
-
-        <div className="flex items-baseline gap-3 mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">{session.config.skill} · {session.config.difficulty}</h1>
-          <span className="text-[12px] text-gray-500">{relativeTime(session.completedAt ?? session.startedAt)}</span>
-        </div>
-
-        {session.report && <ReportSummary report={session.report} />}
-
-        <h2 className="text-sm font-semibold text-gray-900 mt-8 mb-3 uppercase tracking-wider">Replay</h2>
-        <div className="space-y-3">
-          {session.messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : ""}`}>
-              <div className={
-                m.role === "user"
-                  ? "max-w-[85%] rounded-2xl px-4 py-2.5 bg-gray-900 text-white text-[13px]"
-                  : "max-w-[85%] text-[13px] text-gray-700 leading-relaxed whitespace-pre-wrap rounded-2xl px-4 py-2.5 bg-white border border-gray-200"
-              }>
-                {m.role === "assistant" ? renderAssistant(m.content) : m.content}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ReportSummary({ report }: { report: SessionReport }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
-      <div className="grid grid-cols-3 gap-5">
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Average</div>
-          <div className="text-2xl font-semibold text-gray-900 tabular-nums">{report.averageScore}<span className="text-base text-gray-400">/100</span></div>
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Weakest</div>
-          <div className="text-sm font-medium text-rose-700">{report.weakestSubcategory || "—"}</div>
-        </div>
-        <div>
-          <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-1">Strongest</div>
-          <div className="text-sm font-medium text-emerald-700">{report.strongestSubcategory || "—"}</div>
-        </div>
-      </div>
-      <p className="text-[13px] text-gray-700 mt-4 italic">{report.recommendedNext}</p>
-      <div className="flex gap-2 mt-4 text-[11px]">
-        {(Object.keys(VERDICT_COLOURS) as Verdict[]).filter((v) => report.verdictDistribution[v] > 0).map((v) => (
-          <span key={v} className="px-2 py-0.5 rounded" style={{ background: VERDICT_COLOURS[v].bg, color: VERDICT_COLOURS[v].fg }}>
-            {report.verdictDistribution[v]} {VERDICT_COLOURS[v].label}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 // Confidence meter — Phase 2 closure. Heuristic, no LLM. Updates as the
 // candidate types. Three signals:
@@ -974,90 +905,9 @@ function ConfidenceMeter({ answer, question }: { answer: string; question: Inter
   );
 }
 
-// Skill breakdown — Phase 2 closure. Bars per skill the user has drilled,
-// coloured by avg score (red <60, amber 60-74, green 75+).
-function SkillBreakdown({ sessions }: { sessions: SkillSession[] }) {
-  const completed = sessions.filter((s) => s.status === "completed" && s.report);
-  // Aggregate per skill.
-  const perSkill: Record<string, { sum: number; count: number }> = {};
-  for (const s of completed) {
-    const k = s.config.skill;
-    if (!perSkill[k]) perSkill[k] = { sum: 0, count: 0 };
-    perSkill[k].sum += s.report?.averageScore ?? 0;
-    perSkill[k].count += 1;
-  }
-  const rows = Object.entries(perSkill).map(([skill, v]) => ({ skill, avg: Math.round(v.sum / v.count), count: v.count }));
-  if (rows.length === 0) return null;
-  rows.sort((a, b) => b.avg - a.avg);
-
-  function barColor(avg: number): string {
-    if (avg >= 75) return "#1D9E75";
-    if (avg >= 60) return "#BA7517";
-    return "#A32D2D";
-  }
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
-      <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-3">Skill breakdown</div>
-      <ul className="space-y-2.5">
-        {rows.map((r) => (
-          <li key={r.skill}>
-            <div className="flex items-baseline justify-between mb-1">
-              <span className="text-[13px] text-gray-800">{r.skill}</span>
-              <span className="text-[11px] text-gray-500 tabular-nums">{r.avg}/100 · {r.count} session{r.count !== 1 ? "s" : ""}</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
-              <div
-                className="h-full rounded-full"
-                style={{ width: `${r.avg}%`, background: barColor(r.avg) }}
-              />
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
 
 // Drill recommendations — Phase 4. Pulls weakest sub-categories from
 // completed sessions and produces a prioritised punch list of "drill
-// these next" items. Same data surface Friday Forecast uses, framed as
-// concrete next moves.
-function DrillRecommendations({ sessions }: { sessions: SkillSession[] }) {
-  const completed = sessions.filter((s) => s.status === "completed" && s.report);
-  // Tally weakest sub-categories by frequency.
-  const tally: Record<string, { count: number; lastSeenAt: string }> = {};
-  for (const s of completed) {
-    const k = s.report?.weakestSubcategory;
-    if (!k) continue;
-    if (!tally[k]) tally[k] = { count: 0, lastSeenAt: s.completedAt ?? s.startedAt };
-    tally[k].count += 1;
-    if ((s.completedAt ?? s.startedAt) > tally[k].lastSeenAt) tally[k].lastSeenAt = s.completedAt ?? s.startedAt;
-  }
-  const rows = Object.entries(tally)
-    .map(([sub, v]) => ({ sub, count: v.count, lastSeenAt: v.lastSeenAt }))
-    .sort((a, b) => b.count - a.count || b.lastSeenAt.localeCompare(a.lastSeenAt))
-    .slice(0, 5);
-  if (rows.length === 0) return null;
-
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
-      <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-3">Drill these next</div>
-      <ul className="space-y-2">
-        {rows.map((r, i) => (
-          <li key={r.sub} className="flex items-baseline gap-3">
-            <span className="text-[11px] text-gray-400 tabular-nums w-4">{i + 1}.</span>
-            <span className="flex-1 text-[13px] text-gray-800">{r.sub}</span>
-            <span className="text-[11px] text-rose-600">flagged {r.count}×</span>
-          </li>
-        ))}
-      </ul>
-      <p className="text-[11px] text-gray-500 mt-3 leading-relaxed">
-        Start a session and ask for these specifically — the agent will lean into them.
-      </p>
-    </div>
-  );
-}
 
 // Friday Forecast — Phase 2. Aggregates completed sessions into a single
 // readiness % the user can act on. Heuristic, not LLM:
@@ -1066,48 +916,6 @@ function DrillRecommendations({ sessions }: { sessions: SkillSession[] }) {
 //   bonus +5 if difficulty mix includes hard
 //   capped 0-100
 //
-// Returns a friendly message tailored to readiness band so the user
-// always has a clear next move.
-function buildFridayForecast(sessions: SkillSession[]): {
-  sessionCount: number;
-  readiness: number;
-  message: string;
-} {
-  const completed = sessions.filter((s) => s.status === "completed" && s.report);
-  if (completed.length === 0) {
-    return { sessionCount: 0, readiness: 0, message: "" };
-  }
-
-  // Sort newest first.
-  const sorted = completed.slice().sort((a, b) =>
-    (b.completedAt ?? b.startedAt).localeCompare(a.completedAt ?? a.startedAt),
-  );
-  const recentN = sorted.slice(0, 5);
-  const avg = Math.round(recentN.reduce((s, x) => s + (x.report?.averageScore ?? 0), 0) / recentN.length);
-
-  // Consistency bonus: 3+ sessions in last 7 days.
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const recentCount = sorted.filter((s) => new Date(s.completedAt ?? s.startedAt).getTime() >= sevenDaysAgo).length;
-  const consistencyBonus = recentCount >= 3 ? 5 : 0;
-
-  // Difficulty bonus: any hard sessions in the mix.
-  const hardBonus = completed.some((s) => s.config.difficulty === "hard") ? 5 : 0;
-
-  const readiness = Math.max(0, Math.min(100, avg + consistencyBonus + hardBonus));
-
-  let message = "";
-  if (readiness >= 85) {
-    message = "Recruiter-ready. Time to start applying — you're past the practice threshold.";
-  } else if (readiness >= 70) {
-    message = "Solid baseline. A few more hard-difficulty drills will get you to recruiter-ready.";
-  } else if (readiness >= 55) {
-    message = `Mid-pack. Drill ${recentN[0].report?.weakestSubcategory ?? "your weakest area"} — that's where you're leaking the most points.`;
-  } else {
-    message = "Early days. Consistency matters more than score right now — aim for one session a day.";
-  }
-
-  return { sessionCount: completed.length, readiness, message };
-}
 
 // Lightweight markdown render for assistant bubbles — handles **bold** only.
 function renderAssistant(text: string): React.ReactNode {

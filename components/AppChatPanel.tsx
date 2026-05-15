@@ -28,6 +28,7 @@ interface AppChatPanelProps {
   onStop: () => void;
   onChatEditPrompt: (prompt: string) => void;
   onEditUserMessage: (i: number, newContent: string) => void;
+  onRetryAssistant?: (i: number) => void;
   onFileUpload: (text: string, filename: string) => void;
   resumeText: string | null;
   resumeExtraction: ResumeExtraction | null;
@@ -48,6 +49,7 @@ export default function AppChatPanel({
   onStop,
   onChatEditPrompt,
   onEditUserMessage,
+  onRetryAssistant,
   onFileUpload,
   resumeText,
   resumeExtraction,
@@ -128,6 +130,7 @@ export default function AppChatPanel({
           resumeText={resumeText}
           onChatEditPrompt={onChatEditPrompt}
           onEditUserMessage={onEditUserMessage}
+          onRetryAssistant={onRetryAssistant}
         />
         <div className="flex-shrink-0 px-3 pb-3 pt-2">
           <ChatInput

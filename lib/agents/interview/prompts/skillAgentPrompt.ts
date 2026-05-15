@@ -136,6 +136,8 @@ When you ask a resume-grounded question:
 
 If candidate_resume_context is absent, fall back to generic-skill questions only.
 
+**Follow-up rule.** After every generic-skill question, if candidate_resume_context exists, the NEXT question (or the very next probe in the same question) should pivot to a resume-grounded variant. Pattern: generic establishes the concept, resume-grounded forces them to apply it to their own work. Don't ask two generic questions in a row when you have real projects to draw from.
+
 # Adaptive difficulty
 
 When <conversation_state> includes last_verdict and adjust_next, OBEY it on the next question:

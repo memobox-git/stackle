@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { MessageSquare, Pencil, Check, X } from "lucide-react";
+import { Pencil, Check, X, Copy, ThumbsUp, ThumbsDown, RotateCcw } from "lucide-react";
 import { useTypewriter } from "@/lib/useTypewriter";
 
 // Module-level "already typed" registry. Keyed by the message's content
@@ -23,6 +23,11 @@ export interface ChatMessage {
   // Set transiently by ChatWindow when this message just arrived in
   // the current session. Drives the typewriter reveal. Never persisted.
   __isFresh?: boolean;
+  // Fix 2 — when this message represents an artifact (resume review,
+  // tailored resume, cover letter, etc), the card is rendered inline
+  // instead of the usual prose bubble. `content` may be empty or a one-
+  // line summary the user reads alongside the card.
+  artifact?: import("@/lib/artifacts").Artifact;
 }
 
 interface MessageProps {
@@ -32,6 +37,29 @@ interface MessageProps {
   // message's content AND drop all subsequent messages (stale replies), then
   // re-run the agent against the edited content.
   onEdit?: (newContent: string) => void;
+  // Stable index in the chat thread — used by assistant hover actions to
+  // wire Retry (re-send the previous user prompt) and Edit-previous
+  // (open inline edit on the preceding user bubble).
+  messageIndex?: number;
+  // Assistant-only callbacks for the hover action row. Copy + Like/Dislike
+  // are handled locally; Retry + EditPrevious need parent state.
+  onRetry?: () => void;
+  onEditPrevious?: () => void;
+}
+
+// Local registry of Like/Dislike per message content. Lives in
+// localStorage so the signal survives reloads. We key by content rather
+// than index because indices shift when chats are switched.
+function loadFeedback(key: string): "like" | "dislike" | null {
+  if (typeof window === "undefined") return null;
+  const v = localStorage.getItem(`stackle_msg_feedback::${key}`);
+  return v === "like" || v === "dislike" ? v : null;
+}
+function saveFeedback(key: string, val: "like" | "dislike" | null) {
+  if (typeof window === "undefined") return;
+  const k = `stackle_msg_feedback::${key}`;
+  if (val === null) localStorage.removeItem(k);
+  else localStorage.setItem(k, val);
 }
 
 function inlineFormat(text: string): React.ReactNode {
@@ -267,7 +295,7 @@ function renderContent(content: string) {
   return elements;
 }
 
-export default function Message({ message, onEdit }: MessageProps) {
+export default function Message({ message, onEdit, onRetry, onEditPrevious, messageIndex }: MessageProps) {
   const isUser = message.role === "user";
   const ts = message.timestamp;
   const [editing, setEditing] = useState(false);
@@ -285,6 +313,24 @@ export default function Message({ message, onEdit }: MessageProps) {
       }
     }
   }, [editing]);
+
+  // Listen for "Edit previous" requests dispatched by an assistant
+  // hover-action button. We open edit mode when the event index matches
+  // this user message's index — no parent-state refactor needed.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!isUser || !onEdit || typeof messageIndex !== "number") return;
+    function handler(e: Event) {
+      const detail = (e as CustomEvent<{ index: number }>).detail;
+      if (detail?.index === messageIndex) {
+        setDraft(message.content);
+        setEditing(true);
+      }
+    }
+    window.addEventListener("stackle:edit-message", handler);
+    return () => window.removeEventListener("stackle:edit-message", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUser, messageIndex, message.content]);
 
   function startEdit() {
     setDraft(message.content);
@@ -382,10 +428,28 @@ export default function Message({ message, onEdit }: MessageProps) {
   // `isFresh` flag is computed by the parent (ChatWindow) — it knows
   // which message just appeared. Sentinels never animate.
   const isSentinel = message.content.startsWith("__");
-  return <AssistantBody message={message} ts={ts} isSentinel={isSentinel} isFresh={!!message.__isFresh} />;
+  return (
+    <AssistantBody
+      message={message}
+      ts={ts}
+      isSentinel={isSentinel}
+      isFresh={!!message.__isFresh}
+      onRetry={onRetry}
+      onEditPrevious={onEditPrevious}
+    />
+  );
 }
 
-function AssistantBody({ message, ts, isSentinel, isFresh }: { message: ChatMessage; ts?: string; isSentinel: boolean; isFresh: boolean }) {
+function AssistantBody({
+  message, ts, isSentinel, isFresh, onRetry, onEditPrevious,
+}: {
+  message: ChatMessage;
+  ts?: string;
+  isSentinel: boolean;
+  isFresh: boolean;
+  onRetry?: () => void;
+  onEditPrevious?: () => void;
+}) {
   const key = messageKey(message.role, message.content, ts);
   // Animate only when the parent flagged this as a freshly-arrived
   // message AND we haven't already typed it. Old history renders
@@ -399,12 +463,72 @@ function AssistantBody({ message, ts, isSentinel, isFresh }: { message: ChatMess
 
   const visible = shouldAnimate ? displayed : message.content;
 
+  // Feedback state — Like/Dislike toggles. Sentinels + streaming messages
+  // get no action row (they're not "real" assistant answers to react to).
+  const feedbackKey = messageKey(message.role, message.content, ts);
+  const [feedback, setFeedback] = useState<"like" | "dislike" | null>(null);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    setFeedback(loadFeedback(feedbackKey));
+  }, [feedbackKey]);
+
+  function handleCopy() {
+    if (typeof navigator === "undefined") return;
+    navigator.clipboard?.writeText(message.content).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    });
+  }
+  function toggleFeedback(val: "like" | "dislike") {
+    const next = feedback === val ? null : val;
+    setFeedback(next);
+    saveFeedback(feedbackKey, next);
+  }
+
+  const showActions = !isSentinel && !shouldAnimate && message.content.trim().length > 0;
+
   return (
     <div className="group flex mb-5 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
         {renderContent(visible)}
         {shouldAnimate && !done && (
           <span className="inline-block w-[2px] h-4 bg-gray-700 align-middle ml-0.5 animate-pulse" aria-hidden />
+        )}
+        {showActions && (
+          <div className="flex items-center gap-0.5 mt-1 -ml-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            <ActionBtn
+              icon={<Copy className="w-3.5 h-3.5" strokeWidth={1.75} />}
+              label={copied ? "Copied" : "Copy"}
+              active={copied}
+              onClick={handleCopy}
+            />
+            <ActionBtn
+              icon={<ThumbsUp className="w-3.5 h-3.5" strokeWidth={1.75} />}
+              label="Like"
+              active={feedback === "like"}
+              onClick={() => toggleFeedback("like")}
+            />
+            <ActionBtn
+              icon={<ThumbsDown className="w-3.5 h-3.5" strokeWidth={1.75} />}
+              label="Dislike"
+              active={feedback === "dislike"}
+              onClick={() => toggleFeedback("dislike")}
+            />
+            {onRetry && (
+              <ActionBtn
+                icon={<RotateCcw className="w-3.5 h-3.5" strokeWidth={1.75} />}
+                label="Retry"
+                onClick={onRetry}
+              />
+            )}
+            {onEditPrevious && (
+              <ActionBtn
+                icon={<Pencil className="w-3.5 h-3.5" strokeWidth={1.75} />}
+                label="Edit previous"
+                onClick={onEditPrevious}
+              />
+            )}
+          </div>
         )}
         {ts && (
           <span className="text-[10px] text-gray-600 mt-1 block opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -413,5 +537,30 @@ function AssistantBody({ message, ts, isSentinel, isFresh }: { message: ChatMess
         )}
       </div>
     </div>
+  );
+}
+
+function ActionBtn({
+  icon, label, active, onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className={`inline-flex items-center justify-center w-7 h-7 rounded-md transition-colors ${
+        active
+          ? "text-gray-900 bg-gray-100"
+          : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+      }`}
+    >
+      {icon}
+    </button>
   );
 }

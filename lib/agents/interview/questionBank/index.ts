@@ -40,3 +40,12 @@ export function listSkills(): string[] {
   const set = new Set(ALL_QUESTIONS.map((q) => q.category));
   return Array.from(set);
 }
+
+// Count questions matching a given skill (category) name. Case-insensitive.
+// Returns 0 for skills the bank doesn't cover yet — the UI uses this to
+// surface "SQL · 12 questions" next to skill chips and quietly hide the
+// count for skills with 0 (rather than discouraging the user).
+export function countQuestionsBySkill(skill: string): number {
+  const lc = skill.toLowerCase();
+  return ALL_QUESTIONS.filter((q) => q.category.toLowerCase() === lc).length;
+}

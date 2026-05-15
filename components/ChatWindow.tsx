@@ -11,6 +11,8 @@ import { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
 import { InterviewPrepPlan } from "@/lib/agents/schemas/interviewPrep";
 import ResumeWelcomeCard from "@/components/ResumeWelcomeCard";
 import FixProgressCard from "@/components/FixProgressCard";
+import ArtifactCard from "@/components/ArtifactCard";
+import type { Artifact } from "@/lib/artifacts";
 
 interface ChatWindowProps {
   messages: ChatMessage[];
@@ -54,6 +56,17 @@ interface ChatWindowProps {
   // index of the edited message + new content; parent is expected to truncate
   // the conversation from that point and resend.
   onEditUserMessage?: (index: number, newContent: string) => void;
+  // When provided, the assistant hover-action row shows Retry — re-runs the
+  // preceding user message and replaces this assistant response. The index
+  // is the assistant message being retried.
+  onRetryAssistant?: (assistantIndex: number) => void;
+  // Fix 2 — when an assistant message carries an Artifact, clicking the
+  // card calls this. The host (page.tsx) routes per artifact.kind to the
+  // right preview surface (Resume Report, future Cover Letter pane, etc).
+  onOpenArtifact?: (artifact: Artifact) => void;
+  // Which artifact is currently open in the right pane (if any). Cards
+  // flip to "Viewing" state when their id matches.
+  openArtifactId?: string | null;
 }
 
 function PrioritiesCard({
@@ -327,6 +340,40 @@ function parseOptions(text: string): { options: string[]; stripped: string } {
   return { options: [], stripped: text };
 }
 
+// Canonical question patterns — when the synthesis prompt forgets to
+// emit chips for a finite-option question, this safety net kicks in.
+// The rule from product: "Don't drop pills randomly. Consistency
+// matters." So common questions always render the same chip set.
+function canonicalChipsForQuestion(text: string): string[] {
+  const t = text.trim().toLowerCase();
+  // Only fire on the last few lines — avoids matching old prose deep in
+  // a long answer.
+  const tail = t.split("\n").slice(-3).join(" ");
+  if (!tail.includes("?")) return [];
+
+  // Resume review — "what kind of review", "which review"
+  if (/(what|which) (kind|type) of review/.test(tail) || /what review/.test(tail)) {
+    return ["Full Review", "ATS Check", "Career Fit", "Senior Level"];
+  }
+  // Target role — "what role", "which role", "what are you targeting"
+  if (/(what|which) (role|position)/.test(tail) || /(what|which) .*(targeting|target role)/.test(tail) || /what role are you/.test(tail)) {
+    return ["Data Engineer", "ML Engineer", "Data Scientist", "Other"];
+  }
+  // Seniority — "what level", "junior or senior"
+  if (/(what|which) (level|seniority)/.test(tail) || /\b(junior|mid|senior|staff)\b.*\b(or)\b.*\b(junior|mid|senior|staff)\b/.test(tail)) {
+    return ["Junior", "Mid", "Senior", "Staff+"];
+  }
+  // Goal — "what's the goal", "new job or promotion"
+  if (/(what'?s )?(the|your) goal/.test(tail) || /new job.*(promotion|switch)/.test(tail)) {
+    return ["New Job", "Promotion", "Switch Field", "Just Exploring"];
+  }
+  // Yes/no confirmations — "want me to", "should I", "shall I"
+  if (/^(want me to|should i|shall i|do you want me to)/.test(tail) || /\b(want me to|should i) .*\?$/.test(tail)) {
+    return ["Yes", "Not now"];
+  }
+  return [];
+}
+
 // Steps up to 94% — these advance during the API call
 const ANALYSIS_STEPS = [
   { label: "Reading resume sections",           pct: 7,  delay: 1200 },
@@ -539,6 +586,9 @@ export default function ChatWindow({
   onChatEditPrompt,
   onApplyInBuilder,
   onEditUserMessage,
+  onRetryAssistant,
+  onOpenArtifact,
+  openArtifactId,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -650,10 +700,25 @@ export default function ChatWindow({
     return -1;
   })();
 
-  const { options: inlineOptions, stripped: strippedContent } =
+  const { options: parsedOptions, stripped: strippedContent } =
     !isLoading && lastAssistantIdx >= 0
       ? parseOptions(messages[lastAssistantIdx].content)
       : { options: [], stripped: "" };
+  // Fix 1 — always-pills safety net. If the agent forgot to emit chips
+  // for a canonical question (review type, target role, seniority, etc),
+  // synthesize them client-side so the user never sees a discrete-choice
+  // question without pills. Only fires when parseOptions found nothing
+  // AND the next message in the thread isn't already a __INLINE_CHIPS__
+  // sentinel (avoid double-rendering when the agent did emit them).
+  const nextIsChipSentinel =
+    lastAssistantIdx >= 0 &&
+    lastAssistantIdx + 1 < messages.length &&
+    messages[lastAssistantIdx + 1].content.startsWith(INLINE_CHIPS_PREFIX);
+  const canonicalChips =
+    parsedOptions.length === 0 && !isLoading && lastAssistantIdx >= 0 && !nextIsChipSentinel
+      ? canonicalChipsForQuestion(messages[lastAssistantIdx].content)
+      : [];
+  const inlineOptions = parsedOptions.length > 0 ? parsedOptions : canonicalChips;
 
   // Detect if the user has contributed anything yet — used to decide whether
   // to show the starter prompt pills in Resume Builder mode.
@@ -698,6 +763,31 @@ export default function ChatWindow({
       className="flex-1 overflow-y-auto pt-8 pb-4 relative auto-hide-scroll"
     >
       {messages.map((msg, i) => {
+        // Fix 2 — artifact card. When a message carries an Artifact,
+        // render the card instead of (or alongside) prose. The card is
+        // self-contained: clicking opens preview, optional download
+        // surfaces here.
+        if (msg.artifact && msg.role === "assistant") {
+          return (
+            <div key={i}>
+              {msg.content.trim().length > 0 && (
+                <Message
+                  message={(() => {
+                    const isFresh = freshKeysThisRender.has(keyOf(msg));
+                    return { ...msg, __isFresh: isFresh };
+                  })()}
+                  messageIndex={i}
+                />
+              )}
+              <ArtifactCard
+                artifact={msg.artifact}
+                onOpen={onOpenArtifact}
+                isOpen={openArtifactId === msg.artifact.id}
+              />
+            </div>
+          );
+        }
+
         // File upload chip — user side
         if (msg.content.startsWith("__FILE_UPLOAD__:")) {
           const filename = msg.content.slice("__FILE_UPLOAD__:".length);
@@ -905,12 +995,60 @@ export default function ChatWindow({
                 const isFresh = freshKeysThisRender.has(keyOf(msg));
                 return { ...displayMsg, __isFresh: isFresh };
               })()}
+              messageIndex={i}
               onEdit={
                 onEditUserMessage && msg.role === "user" && !msg.content.startsWith("__FILE_UPLOAD__:")
                   ? (newContent) => onEditUserMessage(i, newContent)
                   : undefined
               }
+              onRetry={
+                onRetryAssistant && msg.role === "assistant" && !msg.content.startsWith("__")
+                  ? () => onRetryAssistant(i)
+                  : undefined
+              }
+              onEditPrevious={(() => {
+                if (msg.role !== "assistant" || !onEditUserMessage) return undefined;
+                // Find the preceding non-sentinel user message.
+                let prev = i - 1;
+                while (prev >= 0) {
+                  const m = messages[prev];
+                  if (m.role === "user" && !m.content.startsWith("__FILE_UPLOAD__:") && !SENTINELS.includes(m.content)) break;
+                  prev--;
+                }
+                if (prev < 0) return undefined;
+                return () => {
+                  // Emit a window event the user Message can pick up to enter
+                  // edit mode without a parent-state refactor. Scoped by index
+                  // so only the right bubble flips.
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("stackle:edit-message", { detail: { index: prev } }));
+                  }
+                };
+              })()}
             />
+            {/* Fix 1 — always-pills. Renders chips inferred from the
+                assistant message (either parsed from the prose or
+                synthesized from a canonical-question pattern). Only on
+                the last assistant message. */}
+            {i === lastAssistantIdx && inlineOptions.length > 0 && (
+              <div className="w-full max-w-3xl mx-auto px-4 -mt-2 mb-4">
+                <div className="flex flex-wrap gap-2">
+                  {inlineOptions.map((label, j) => (
+                    <button
+                      key={`${label}-${j}`}
+                      onClick={() => {
+                        if (onChatEditPrompt) onChatEditPrompt(label);
+                        else onStarterPromptClick?.(label);
+                      }}
+                      className="text-[12px] font-medium text-gray-800 bg-white hover:bg-gray-50 border border-gray-300 hover:border-gray-900 rounded-full px-2.5 py-1 transition-all shadow-sm hover:shadow inline-flex items-center gap-1"
+                    >
+                      <span>{chipEmoji(label)}</span>
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {applyInstruction && onApplyInBuilder && (
               <div className="w-full max-w-3xl mx-auto px-4 -mt-2 mb-4">
                 <button
