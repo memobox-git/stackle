@@ -66,22 +66,12 @@ function SidebarTooltip({ label }: { label: string }) {
   );
 }
 
-// Build the chips line for a score-led welcome message. Score < 88 →
-// surgical/commit/understand chips. Score ≥ 88 → next-level moves.
-function buildWelcomeChipsForAnalysis(analysis: ResumeAnalysis | null): string {
-  if (!analysis) return "__INLINE_CHIPS__:Walk me through the report|What's my biggest weakness?";
-  const score = analysis.scores && typeof analysis.scores.total === "number" && analysis.scores.total > 0
-    ? Math.round(Math.max(0, Math.min(100, analysis.scores.total)))
-    : null;
-  if (score !== null && score >= 88) {
-    return "__INLINE_CHIPS__:Match a job description|Prep for interviews|Draft a cover letter";
-  }
-  // Three distinct intents — never duplicate "fix" actions:
-  //   1. Walk me through fixes  → guided per-step (handleFixAll)
-  //   2. Apply all fixes        → one-shot auto-apply (handleAcceptAll)
-  //   3. Why this score?        → explanation, no mutation
-  const whyChip = score !== null ? `Why is my score ${score}?` : "Why this score?";
-  return `__INLINE_CHIPS__:Walk me through fixes|Apply all fixes|${whyChip}`;
+// Two pills after the report. User-requested simplification: the
+// report is read-only; the only forward action is to RECREATE the
+// resume — either with all the fixes the report identified, or
+// tailored to a specific JD the user pastes.
+function buildWelcomeChipsForAnalysis(_analysis: ResumeAnalysis | null): string {
+  return "__INLINE_CHIPS__:Recreate with all Fixes|Recreate with JD";
 }
 
 const SENTINELS = [

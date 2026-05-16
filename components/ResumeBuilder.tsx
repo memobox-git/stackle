@@ -2043,11 +2043,13 @@ export default function ResumeBuilder({
   const editTabLabel = lastFinalizedName
     ? lastFinalizedName.length > 22 ? `${lastFinalizedName.slice(0, 21)}…` : lastFinalizedName
     : "Edit";
+  // Tabs reduced to Resume + Report only. Edit + Rewrite hidden per
+  // user request — the report is now read-only. Underlying code for
+  // edit/rewrite remains intact (RewriteTab, EditTab components still
+  // exist) but no UI surfaces them.
   const allTabs: { key: PanelTab; label: string; icon: typeof FileText }[] = [
     ...(resumeExtraction ? [{ key: "resume" as PanelTab, label: "Resume", icon: FileText }] : []),
     ...(resumeAnalysis ? [{ key: "report" as PanelTab, label: "Report", icon: ClipboardList }] : []),
-    ...(resumeAnalysis ? [{ key: "edit" as PanelTab, label: editTabLabel, icon: Pencil }] : []),
-    ...(resumeAnalysis ? [{ key: "rewrite" as PanelTab, label: "Rewrite", icon: Sparkles }] : []),
   ];
   const availableTabs = allTabs.filter((t) => !closedTabs.has(t.key));
   const hasHiddenTabs = allTabs.length > availableTabs.length;
@@ -2559,9 +2561,15 @@ export default function ResumeBuilder({
                 <ResumeReportCard
                   analysis={effectiveAnalysis}
                   candidateName={resumeExtraction?.name}
-                  onFixItem={handleFixItem}
-                  onFixAll={handleFixAll}
-                  onAcceptAll={handleAcceptAll}
+                  // Fix/Rewrite actions removed from the Report per user
+                  // request. The report is read-only — no inline edits,
+                  // no "Fix top 3", no "Apply all fixes". Passing the
+                  // callbacks as undefined hides every conditional
+                  // button (`{onFixItem && ...}`) inside ResumeReportCard
+                  // without touching that component's code.
+                  onFixItem={undefined}
+                  onFixAll={undefined}
+                  onAcceptAll={undefined}
                   completedActions={completedActions}
                   acceptedActions={acceptedIndices}
                   isFinalized={!!lastFinalizedName}
