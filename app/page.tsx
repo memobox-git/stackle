@@ -1569,12 +1569,40 @@ export default function Page() {
   // fresh upload, or one of their saved Drive resumes. Prevents the
   // "wrong file got reviewed" failure mode entirely.
   async function promptResumeSourceChoice() {
-    // No resume loaded at all → no choice to make, just open uploader.
-    if (!resumeExtraction) {
+    // First: if we don't have a resume in memory yet, the Drive scan
+    // from sign-in may not have landed. Do an inline scan before
+    // falling back to "no resume → open uploader". Without this,
+    // returning users who clicked Review my resume too quickly got
+    // forced into a file upload despite having a perfectly good
+    // resume in Drive. Bug-from-user.
+    let extraction = resumeExtraction;
+    let filename = resumeFilename;
+    if (!extraction && user) {
+      try {
+        const driveFiles = await loadAllDriveFiles();
+        const original = driveFiles.find((f) => f.file_type === "original");
+        if (original?.extraction_json) {
+          extraction = original.extraction_json;
+          filename = original.display_name ?? "resume.pdf";
+          // Hydrate state too so subsequent operations have it.
+          setResumeExtraction(original.extraction_json);
+          setResumeFilename(filename);
+          if (original.analysis_json) setResumeAnalysis(original.analysis_json);
+          setResumeText("");
+          setOnboardingCompleted(true);
+        }
+      } catch (err) {
+        console.warn("[promptResumeSourceChoice] Drive scan failed:", err);
+      }
+    }
+
+    // Truly no resume anywhere → open uploader.
+    if (!extraction) {
       chatUploadInputRef.current?.click();
       return;
     }
-    const currentName = resumeFilename || "current resume";
+
+    const currentName = filename || "current resume";
     const labels = [
       `Use current — ${currentName}`,
       "Upload a new one",
