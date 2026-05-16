@@ -406,6 +406,7 @@ export default function Page() {
         }
         return;
       }
+      const prevId = lastUserIdRef.current;
       lastUserIdRef.current = nextId;
       setUser(session?.user ?? null);
       if (!session?.user) {
@@ -417,6 +418,17 @@ export default function Page() {
           setChatList([]);
           setActiveChatId(null);
         }, 0);
+      } else if (prevId === null && nextId !== null) {
+        // Fresh sign-in transition (null → user). Industry standard:
+        // land on a fresh chat hero, NOT on whatever surface the
+        // previous session left in localStorage. Reset activeView to
+        // "chat" + clear any stale in-memory chat thread. The boot
+        // useEffect (depends on user + authLoading) takes over from
+        // here to load sidebar chats without auto-restoring.
+        setActiveView("chat");
+        setChatMessages([]);
+        setActiveChatId(null);
+        try { localStorage.setItem("stackle_active_view", "chat"); } catch { /* ignore */ }
       }
     });
     // Check localStorage onboarding (auth-free for now)
@@ -565,35 +577,57 @@ export default function Page() {
           setChatList([newChat]);
           setActiveChatId(newChat.id);
         } else {
+          // Returning user with existing chats. Industry standard
+          // (Claude / ChatGPT): land on a FRESH chat hero — old chats
+          // are one click away in the sidebar. Do NOT auto-restore.
+          //
+          // Old behaviour was setActiveChatId(mostRecentWithResume) +
+          // restoreChatState(...). That dropped users back into a
+          // Resume Builder mid-conversation when they expected a fresh
+          // start. Now: load the sidebar list, hydrate resume context
+          // from Drive so the hero shows "Resume loaded: X" if any,
+          // and leave activeChatId null so the empty-hero renders.
           setChatList(chats);
-          // Prefer the most recent chat that already has a parsed resume
-          // attached. Falls back to the first chat. This way a returning
-          // user always lands on the chat where their work actually is,
-          // not on a blank "new chat" they happened to create last.
-          const chatWithResume = chats.find((c) => c.resume_extraction)
-            ?? chats[0];
-          setActiveChatId(chatWithResume.id);
-          restoreChatState(chatWithResume);
 
-          // Fallback: even if the chosen chat has no extraction, the
-          // user may still have one saved in Drive from earlier (e.g.
-          // they signed in fresh-device and we picked an old chat row
-          // that pre-dates the resume). Try Drive before falling back
-          // to onboarding.
-          if (user && !chatWithResume.resume_extraction) {
+          // Resume context (extraction + filename + analysis) carries
+          // forward from the most recent chat that had it, so the user
+          // doesn't have to re-upload to start a new conversation about
+          // the same resume. Drive serves as the canonical source if
+          // it exists; the chat snapshot is the fallback.
+          let hydratedFromDrive = false;
+          if (user) {
             try {
               const driveFiles = await loadAllDriveFiles();
               const original = driveFiles.find((f) => f.file_type === "original");
               if (original?.extraction_json) {
-                setResumeExtraction(original.extraction_json!);
+                setResumeExtraction(original.extraction_json);
                 setResumeText("");
                 setResumeFilename(original.display_name ?? "resume.pdf");
+                if (original.analysis_json) setResumeAnalysis(original.analysis_json);
                 setOnboardingCompleted(true);
+                hydratedFromDrive = true;
               }
             } catch (err) {
-              console.warn("[loadChats] Drive fallback check failed:", err);
+              console.warn("[loadChats] Drive scan failed:", err);
             }
           }
+          if (!hydratedFromDrive) {
+            // Drive missing or unauth — fall back to the most recent
+            // chat's snapshot for the resume bits only. We do NOT
+            // restore the message thread.
+            const chatWithResume = chats.find((c) => c.resume_extraction);
+            if (chatWithResume?.resume_extraction) {
+              setResumeExtraction(chatWithResume.resume_extraction);
+              setResumeText(chatWithResume.resume_text ?? "");
+              if (chatWithResume.resume_filename) setResumeFilename(chatWithResume.resume_filename);
+              if (chatWithResume.resume_analysis) setResumeAnalysis(chatWithResume.resume_analysis);
+              setOnboardingCompleted(true);
+            }
+          }
+
+          // activeChatId stays null. chatMessages stays []. The empty
+          // chat hero renders. First sendMessage creates a fresh chat
+          // row (via the existing local-chat fallback in persistChat).
         }
       })
       .catch((err) => {
