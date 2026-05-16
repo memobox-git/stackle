@@ -335,6 +335,25 @@ export default function Page() {
   // Same pattern for cover letter caching — generated letter stashed
   // by artifact id so onOpenArtifact can route to a preview.
   const coverLetterCacheRef = useRef<Map<string, string>>(new Map());
+  // Multi-step questionnaire state. When non-null, the engine is mid-
+  // intake: each user message is the answer to the current step, then
+  // either advances to the next step or fires the generator.
+  const [activeQuestionnaire, setActiveQuestionnaire] = useState<{
+    kind: import("@/lib/artifacts").ArtifactKind;
+    stepIdx: number;
+    answers: Record<string, string>;
+  } | null>(null);
+  // Ref that points to the per-artifact generator dispatcher. Set by
+  // commits that wire specific artifact generators (cover letter,
+  // tailored resume, etc.). The questionnaire engine calls this when
+  // all steps are answered. Null = no dispatcher wired yet.
+  const questionnaireDispatchRef = useRef<
+    | null
+    | ((
+        kind: import("@/lib/artifacts").ArtifactKind,
+        answers: Record<string, string>,
+      ) => void)
+  >(null);
 
   // ── Derived ───────────────────────────────────────────
   const isSignedUp = user !== null;
@@ -1822,6 +1841,84 @@ export default function Page() {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
 
+      // ── Active questionnaire intercept ────────────────────────
+      // If a multi-step intake is in progress (cover letter, etc.),
+      // this user message IS the answer to the current step. Record
+      // it, push the next step's question, or — if no more steps —
+      // dispatch to the generator via runQuestionnaireGenerator below.
+      // Free-text is always accepted; pill clicks come through the
+      // same handler with the pill label as text.
+      if (activeQuestionnaire) {
+        const { getQuestionnaire, resolvePills, substitutePrompt, nextStepIdx } =
+          await import("@/lib/intents/questionnaires");
+        const q = getQuestionnaire(activeQuestionnaire.kind);
+        if (!q) {
+          // Shouldn't happen — clean up.
+          setActiveQuestionnaire(null);
+        } else {
+          const currentStep = q.steps[activeQuestionnaire.stepIdx];
+          // Echo the user's answer + record it.
+          const updatedAnswers = { ...activeQuestionnaire.answers, [currentStep.key]: trimmed };
+          setChatMessages((prev) => [
+            ...prev,
+            { role: "user", content: trimmed, timestamp: now() },
+          ]);
+          const ctx = {
+            resumeFirstName: profileFirstName ?? resumeExtraction?.name?.split(" ")[0] ?? null,
+            resumeSkills: (resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? []),
+            recentChatTitles: chatList.map((c) => c.title ?? "").filter(Boolean),
+            recentCompanies: Array.from(new Set(
+              chatList
+                .map((c) => c.title ?? "")
+                .map((t) => {
+                  const m = t.match(/\bat\s+(.+?)(?:\s*—|\s*\(|$)/i);
+                  return m ? m[1].trim() : "";
+                })
+                .filter(Boolean)
+            )),
+          };
+          const nextIdx = nextStepIdx(q.steps, activeQuestionnaire.stepIdx, updatedAnswers);
+          if (nextIdx === -1) {
+            // All steps done — dispatch generator.
+            setActiveQuestionnaire(null);
+            // Generator dispatch lives in the chip handler / generator
+            // section below. For now, the intercept hands off via a
+            // sentinel message that downstream handlers (Commit B for
+            // cover letter, etc.) recognize.
+            setChatMessages((prev) => [
+              ...prev,
+              { role: "assistant", content: "Got everything I need. Building it now.", timestamp: now() },
+            ]);
+            // Queue the generator on next tick so React commits the
+            // state update first.
+            setTimeout(() => {
+              questionnaireDispatchRef.current?.(activeQuestionnaire.kind, updatedAnswers);
+            }, 0);
+          } else {
+            // Push the next step's question + its pills.
+            const nextStep = q.steps[nextIdx];
+            const promptText = substitutePrompt(nextStep.prompt, ctx);
+            const pills = resolvePills(nextStep, ctx);
+            setActiveQuestionnaire({
+              kind: activeQuestionnaire.kind,
+              stepIdx: nextIdx,
+              answers: updatedAnswers,
+            });
+            setChatMessages((prev) => {
+              const out: ChatMessage[] = [
+                ...prev,
+                { role: "assistant", content: promptText, timestamp: now() },
+              ];
+              if (pills.length > 0) {
+                out.push({ role: "assistant", content: `__INLINE_CHIPS__:${pills.join("|")}` });
+              }
+              return out;
+            });
+          }
+          return;
+        }
+      }
+
       // "Recreate with JD" intake — when this flag is set, the user's
       // next message IS the JD. Echo it, clear the flag, kick off the
       // JD-tailored rewriter, push a pending Tailored-Resume artifact.
@@ -2686,7 +2783,7 @@ export default function Page() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [messages, setMessages, isLoading, isResumeMode, resumeText, resumeFilename, resumeExtraction, resumeAnalysis, intakeData, intakeStep, intakeAnswers, marketAnalysis, analyzedMarketKey, interviewPrepPlan, pendingJDForRecreate, activeChatId]
+    [messages, setMessages, isLoading, isResumeMode, resumeText, resumeFilename, resumeExtraction, resumeAnalysis, intakeData, intakeStep, intakeAnswers, marketAnalysis, analyzedMarketKey, interviewPrepPlan, pendingJDForRecreate, activeChatId, activeQuestionnaire, chatList, profileFirstName]
   );
 
   // Keep the edit-and-resend ref current with the latest sendMessage closure.
