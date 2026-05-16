@@ -16,10 +16,12 @@
 export type ArtifactKind =
   | "resume_review"     // analysis output from runResumeAnalyzer
   | "tailored_resume"   // rewrite output from runResumeOrchestrator
-  | "cover_letter"      // (V1 Job Match — week 5)
-  | "match_report"      // (V1 Job Match — week 3)
-  | "study_plan"        // (V1 Job Match — week 6)
-  | "interview_prep";   // (V1 Job Match — week 6)
+  | "cover_letter"      // generated cover letter
+  | "match_report"      // resume × JD match verdict
+  | "study_plan"        // ordered skill list to close gaps
+  | "interview_prep"    // JD-tailored question batch
+  | "quick_questions"   // 3-question quick set, no full session
+  | "skill_assessment"; // 5-7 questions, single scored submit
 
 export interface Artifact {
   id: string;            // stable id — usually the underlying record id
@@ -161,6 +163,61 @@ export function buildInterviewPrepArtifact(opts: {
   };
 }
 
+// Build a quick-questions artifact (3-question inline set, no full
+// Interview Prep session).
+export function buildQuickQuestionsArtifact(opts: {
+  id: string;
+  skill: string;
+  count: number;
+  generatedAt?: string;
+}): Artifact {
+  return {
+    id: opts.id,
+    kind: "quick_questions",
+    title: `${opts.skill} — ${opts.count} quick question${opts.count === 1 ? "" : "s"}`,
+    subtitle: "Tap the card to view all of them",
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+  };
+}
+
+// Build a skill assessment artifact (5-7 questions, single scored
+// submit, verdict).
+export function buildSkillAssessmentArtifact(opts: {
+  id: string;
+  skill: string;
+  questionCount: number;
+  generatedAt?: string;
+  score?: number;
+}): Artifact {
+  return {
+    id: opts.id,
+    kind: "skill_assessment",
+    title: `${opts.skill} skill assessment`,
+    subtitle: `${opts.questionCount} questions · single verdict`,
+    score: opts.score,
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+  };
+}
+
+// Build a cover letter artifact.
+export function buildCoverLetterArtifact(opts: {
+  id: string;
+  company: string | null;
+  role: string | null;
+  generatedAt?: string;
+}): Artifact {
+  const role = opts.role?.trim() || "Role";
+  const company = opts.company?.trim();
+  const title = company ? `Cover letter — ${role} at ${company}` : `Cover letter — ${role}`;
+  return {
+    id: opts.id,
+    kind: "cover_letter",
+    title,
+    subtitle: "Tap to open + edit",
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+  };
+}
+
 // Pretty short relative-time string for card subtitles. Pure function,
 // safe to call on every render.
 export function relativeTime(iso: string): string {
@@ -180,23 +237,27 @@ export function relativeTime(iso: string): string {
 // styled cards without importing lucide icons inline.
 export function artifactIcon(kind: ArtifactKind): string {
   switch (kind) {
-    case "resume_review":   return "📊";
-    case "tailored_resume": return "📄";
-    case "cover_letter":    return "✉️";
-    case "match_report":    return "🎯";
-    case "study_plan":      return "📚";
-    case "interview_prep":  return "🎤";
+    case "resume_review":     return "📊";
+    case "tailored_resume":   return "📄";
+    case "cover_letter":      return "✉️";
+    case "match_report":      return "🎯";
+    case "study_plan":        return "📚";
+    case "interview_prep":    return "🎤";
+    case "quick_questions":   return "❓";
+    case "skill_assessment":  return "🧪";
   }
 }
 
 // Human-readable label for the type chip on the card.
 export function artifactTypeLabel(kind: ArtifactKind): string {
   switch (kind) {
-    case "resume_review":   return "Resume Review";
-    case "tailored_resume": return "Tailored Resume";
-    case "cover_letter":    return "Cover Letter";
-    case "match_report":    return "Match Report";
-    case "study_plan":      return "Study Plan";
-    case "interview_prep":  return "Interview Prep";
+    case "resume_review":     return "Resume Review";
+    case "tailored_resume":   return "Tailored Resume";
+    case "cover_letter":      return "Cover Letter";
+    case "match_report":      return "Match Report";
+    case "study_plan":        return "Study Plan";
+    case "interview_prep":    return "Interview Prep";
+    case "quick_questions":   return "Quick Questions";
+    case "skill_assessment":  return "Skill Assessment";
   }
 }

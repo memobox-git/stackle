@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
 import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen, Sparkles, ScrollText, BookMarked, Briefcase, Mic, FileEdit, GraduationCap } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
-import { buildResumeReviewArtifact, buildTailoredResumeArtifact, type Artifact } from "@/lib/artifacts";
+import { buildResumeReviewArtifact, buildTailoredResumeArtifact, buildQuickQuestionsArtifact, buildSkillAssessmentArtifact, buildCoverLetterArtifact, type Artifact } from "@/lib/artifacts";
 import { deriveScoreFromAnalysis } from "@/lib/score";
 import { newFlowId, flowStart, flowInfo } from "@/lib/flowLog";
 import ChatWindow from "@/components/ChatWindow";
@@ -324,6 +324,17 @@ export default function Page() {
   // True while a "Recreate with JD" intake is waiting for the user to
   // paste the JD. Next user message becomes the JD input.
   const [pendingJDForRecreate, setPendingJDForRecreate] = useState(false);
+  // Holds the most recent intent-router classification so chip click
+  // handlers (skill assessment, drill, etc.) can read detectedSkill
+  // without re-classifying. Cleared once a chip fires.
+  const intentContextRef = useRef<{ category: string; detectedSkill: string | null } | null>(null);
+  // Pending intake for "For a specific JD" / "For a company" cover
+  // letter chips — captures what we're waiting for so the next user
+  // message can be intercepted.
+  const [pendingCoverLetterIntake, setPendingCoverLetterIntake] = useState<null | "jd" | "company">(null);
+  // Same pattern for cover letter caching — generated letter stashed
+  // by artifact id so onOpenArtifact can route to a preview.
+  const coverLetterCacheRef = useRef<Map<string, string>>(new Map());
 
   // ── Derived ───────────────────────────────────────────
   const isSignedUp = user !== null;
@@ -1886,6 +1897,59 @@ export default function Page() {
           );
         }
         return;
+      }
+
+      // Dynamic intent router. Catches user messages like "python quiz",
+      // "rewrite my resume", "cover letter for Stripe" → returns a
+      // category + option chips. If a match fires, we echo the user
+      // message, push narration + chips, and return — short-circuiting
+      // the regular orchestrator/synthesis path. The chip the user
+      // clicks then dispatches the appropriate generator.
+      //
+      // Skip routing on:
+      //   - Active intake flows (e.g. JD pending for recreate) — those
+      //     have their own intercepts above.
+      //   - Active source-chooser flow.
+      //   - Chip click labels (those don't need re-routing).
+      const isChipLabel = (() => {
+        const knownChips = [
+          "use current", "upload a new one", "pick from drive", "cancel resume pick",
+          "recreate with all fixes", "recreate with jd",
+          "skill assessment", "interview drill", "quick question set",
+          "tailor to a jd", "quick polish",
+          "for a specific jd", "generic strong one", "for a company",
+        ];
+        const lcTrim = trimmed.toLowerCase();
+        return knownChips.some((c) => lcTrim === c || lcTrim.startsWith("use saved · "));
+      })();
+      if (!pendingResumeReviewSource && !isChipLabel) {
+        try {
+          const intentRes = await fetch("/api/agents/intent-router", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: trimmed }),
+          });
+          if (intentRes.ok) {
+            const { route } = await intentRes.json() as { route: { category: string; options: Array<{ label: string; key: string }>; narration: string; detectedSkill: string | null } | null };
+            if (route && route.options.length > 0) {
+              const chipLabels = route.options.map((o) => o.label).join("|");
+              setChatMessages((prev) => [
+                ...prev,
+                { role: "user", content: trimmed, timestamp: now() },
+                { role: "assistant", content: route.narration, timestamp: now() },
+                { role: "assistant", content: `__INLINE_CHIPS__:${chipLabels}` },
+              ]);
+              // Stash detected skill / category so chip handlers can use them.
+              intentContextRef.current = { category: route.category, detectedSkill: route.detectedSkill };
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch (err) {
+          // Intent routing is opportunistic — fall through to regular
+          // flow on any error.
+          console.warn("[intent-router] failed (non-blocking):", err);
+        }
       }
 
       // Client-side intent short-circuit for Interview Prep. The legacy
@@ -3504,6 +3568,265 @@ export default function Page() {
                         ...prev,
                         { role: "assistant", content: "Paste the JD text (or the URL) and I'll tailor your resume to it.", timestamp: now() },
                       ]);
+                      return;
+                    }
+
+                    // ── Dynamic intent chips (intent router output) ──
+                    // The intent classifier emits these labels via the
+                    // INTENT_REGISTRY. Each handler kicks off the right
+                    // generator and produces an artifact card. Skill
+                    // hint pulled from intentContextRef.
+
+                    // Interview category — three options.
+                    if (t === "interview drill") {
+                      const skill = intentContextRef.current?.detectedSkill;
+                      intentContextRef.current = null;
+                      // Persist the skill so InterviewView's welcome can
+                      // pre-pick it (the welcome reads pickedSkill from
+                      // localStorage).
+                      if (skill && typeof window !== "undefined") {
+                        try { localStorage.setItem("stackle_interview_picked_skill", skill); } catch {}
+                      }
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: skill ? `Opening Interview Prep for ${skill}.` : "Opening Interview Prep.", timestamp: now() },
+                      ]);
+                      setTimeout(() => setActiveView("interview"), 150);
+                      return;
+                    }
+
+                    if (t === "quick question set") {
+                      const skill = intentContextRef.current?.detectedSkill ?? "general";
+                      intentContextRef.current = null;
+                      const pendingId = `quick-questions-pending-${Date.now()}`;
+                      const pending = buildQuickQuestionsArtifact({ id: pendingId, skill, count: 3 });
+                      pending.title = `Generating 3 ${skill} questions…`;
+                      pending.pending = true;
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "On it.", timestamp: now(), artifact: pending },
+                      ]);
+                      (async () => {
+                        try {
+                          const res = await fetch("/api/agents/interview/generate-questions", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ skill, difficulty: "medium", count: 3 }),
+                          });
+                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                          const data = await res.json() as { questions: Array<{ prompt: string; subcategory: string }> };
+                          const real = buildQuickQuestionsArtifact({ id: `quick-questions-${Date.now()}`, skill, count: data.questions.length });
+                          const preview = data.questions.map((q, i) => `${i + 1}. ${q.prompt}`).join("\n\n");
+                          setChatMessages((prev) => prev.map((m) =>
+                            m.artifact?.id === pendingId
+                              ? { role: "assistant" as const, content: preview, timestamp: now(), artifact: real }
+                              : m
+                          ));
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : "Unknown error";
+                          setChatMessages((prev) => prev.map((m) =>
+                            m.artifact?.id === pendingId
+                              ? { role: "assistant" as const, content: `Couldn't generate — ${msg}.`, timestamp: now() }
+                              : m
+                          ));
+                        }
+                      })();
+                      return;
+                    }
+
+                    if (t === "skill assessment") {
+                      const skill = intentContextRef.current?.detectedSkill ?? "general";
+                      intentContextRef.current = null;
+                      const pendingId = `skill-assessment-pending-${Date.now()}`;
+                      const pending = buildSkillAssessmentArtifact({ id: pendingId, skill, questionCount: 0 });
+                      pending.title = `Building ${skill} skill assessment…`;
+                      pending.pending = true;
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "On it. 5–7 questions, single scored verdict at the end.", timestamp: now(), artifact: pending },
+                      ]);
+                      (async () => {
+                        try {
+                          const res = await fetch("/api/agents/interview/generate-questions", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ skill, difficulty: "mixed", count: 6 }),
+                          });
+                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                          const data = await res.json() as { questions: Array<{ prompt: string }> };
+                          const real = buildSkillAssessmentArtifact({ id: `skill-assessment-${Date.now()}`, skill, questionCount: data.questions.length });
+                          setChatMessages((prev) => prev.map((m) =>
+                            m.artifact?.id === pendingId
+                              ? { role: "assistant" as const, content: `${data.questions.length} ${skill} questions ready. Tap the card to start the assessment.`, timestamp: now(), artifact: real }
+                              : m
+                          ));
+                          // Stash the questions so the future assessment
+                          // surface can read them. Reuse the cover-letter
+                          // cache pattern (string for now — full handler
+                          // will be a new surface).
+                          coverLetterCacheRef.current.set(real.id, JSON.stringify(data.questions));
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : "Unknown error";
+                          setChatMessages((prev) => prev.map((m) =>
+                            m.artifact?.id === pendingId
+                              ? { role: "assistant" as const, content: `Couldn't generate — ${msg}.`, timestamp: now() }
+                              : m
+                          ));
+                        }
+                      })();
+                      return;
+                    }
+
+                    // Resume category — only "tailor to a jd" and
+                    // "quick polish" are new here. "Recreate with all
+                    // Fixes" is handled by the earlier branch above.
+                    if (t === "tailor to a jd") {
+                      // Reuse the existing JD-intake pattern.
+                      intentContextRef.current = null;
+                      if (!resumeExtraction) {
+                        setChatMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: "Upload your resume first so I can tailor it.", timestamp: now() },
+                        ]);
+                        return;
+                      }
+                      setPendingJDForRecreate(true);
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "Paste the JD text (or URL) and I'll tailor your resume to it.", timestamp: now() },
+                      ]);
+                      return;
+                    }
+
+                    if (t === "quick polish") {
+                      intentContextRef.current = null;
+                      if (!resumeExtraction || !resumeAnalysis) {
+                        setChatMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: "I need your resume + report loaded. Try 'Review my resume' first.", timestamp: now() },
+                        ]);
+                        return;
+                      }
+                      // Quick polish = run the rewriter with a tighter
+                      // styleHint so it edits without restructuring.
+                      const pendingId = `quick-polish-pending-${Date.now()}`;
+                      const pending = buildTailoredResumeArtifact({ id: pendingId, company: null, role: resumeAnalysis.likelyTargetRole ?? null });
+                      pending.title = "Quick polish in progress…";
+                      pending.subtitle = "Tightening language, no restructure.";
+                      pending.pending = true;
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "On it. Light pass — keeping your structure.", timestamp: now(), artifact: pending },
+                      ]);
+                      (async () => {
+                        try {
+                          const res = await fetch("/api/agents/resume/rewrite-all", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              extraction: resumeExtraction,
+                              analysis: resumeAnalysis,
+                              targetRole: resumeAnalysis.likelyTargetRole ?? "your target role",
+                              styleHint: "Tighten language; do NOT restructure or remove sections. Polish only.",
+                            }),
+                          });
+                          if (!res.ok) {
+                            const body = await res.json().catch(() => ({}));
+                            throw new Error(body?.error || `HTTP ${res.status}`);
+                          }
+                          const data = await res.json() as { extraction: ResumeExtraction; changedKeys: string[]; qualityWarnings?: string[] };
+                          const realId = `quick-polish-${Date.now()}`;
+                          const real = buildTailoredResumeArtifact({ id: realId, company: null, role: resumeAnalysis.likelyTargetRole ?? null });
+                          real.title = "Quick-polished resume";
+                          real.subtitle = `${data.changedKeys.length} section${data.changedKeys.length === 1 ? "" : "s"} tightened`;
+                          recreatedResumeCacheRef.current.set(realId, data.extraction);
+                          setChatMessages((prev) => prev.map((m) =>
+                            m.artifact?.id === pendingId
+                              ? { role: "assistant" as const, content: "Done. Tap the card to view.", timestamp: now(), artifact: real }
+                              : m
+                          ));
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : "Unknown error";
+                          setChatMessages((prev) => prev.map((m) =>
+                            m.artifact?.id === pendingId
+                              ? { role: "assistant" as const, content: `Polish failed — ${msg}. Try again?`, timestamp: now() }
+                              : m
+                          ));
+                        }
+                      })();
+                      return;
+                    }
+
+                    // Cover letter category.
+                    if (t === "for a specific jd") {
+                      intentContextRef.current = null;
+                      setPendingCoverLetterIntake("jd");
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "Paste the JD text (or URL) and I'll write a matched cover letter.", timestamp: now() },
+                      ]);
+                      return;
+                    }
+
+                    if (t === "for a company") {
+                      intentContextRef.current = null;
+                      setPendingCoverLetterIntake("company");
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "Which company? Just the name — I'll match the rest from your resume.", timestamp: now() },
+                      ]);
+                      return;
+                    }
+
+                    if (t === "generic strong one") {
+                      intentContextRef.current = null;
+                      if (!resumeExtraction) {
+                        setChatMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: "Upload your resume first — I need it to ground the letter.", timestamp: now() },
+                        ]);
+                        return;
+                      }
+                      const pendingId = `cover-letter-pending-${Date.now()}`;
+                      const pending = buildCoverLetterArtifact({ id: pendingId, company: null, role: resumeExtraction.experience?.[0]?.title ?? null });
+                      pending.title = "Drafting generic cover letter…";
+                      pending.pending = true;
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "On it.", timestamp: now(), artifact: pending },
+                      ]);
+                      (async () => {
+                        try {
+                          const res = await fetch("/api/agents/cover-letter", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              extraction: resumeExtraction,
+                              targetRole: resumeExtraction.experience?.[0]?.title ?? "Senior role",
+                              companyName: "",
+                              jobDescription: "",
+                            }),
+                          });
+                          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                          const data = await res.json() as { coverLetter?: string; text?: string };
+                          const letter = data.coverLetter ?? data.text ?? "";
+                          const realId = `cover-letter-${Date.now()}`;
+                          const real = buildCoverLetterArtifact({ id: realId, company: null, role: resumeExtraction.experience?.[0]?.title ?? null });
+                          coverLetterCacheRef.current.set(realId, letter);
+                          setChatMessages((prev) => prev.map((m) =>
+                            m.artifact?.id === pendingId
+                              ? { role: "assistant" as const, content: "Done. Tap the card to read.", timestamp: now(), artifact: real }
+                              : m
+                          ));
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : "Unknown error";
+                          setChatMessages((prev) => prev.map((m) =>
+                            m.artifact?.id === pendingId
+                              ? { role: "assistant" as const, content: `Couldn't draft — ${msg}.`, timestamp: now() }
+                              : m
+                          ));
+                        }
+                      })();
                       return;
                     }
 
