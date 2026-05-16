@@ -358,7 +358,7 @@ export default function Message({ message, onEdit, onRetry, onEditPrevious, mess
 
   if (isUser) {
     return (
-      <div className="group flex flex-col items-end mb-5 w-full max-w-3xl mx-auto px-4">
+      <div className="group flex flex-col items-end mb-2 w-full max-w-3xl mx-auto px-4">
         {/* Hover-only meta row — timestamp + edit. Removed the redundant
             "You" label + "U" avatar circle; the right-aligned bubble shape
             already signals user authorship. */}
@@ -510,7 +510,7 @@ function AssistantBody({
   // greeting that lands non-streamed). Capped at <200 chars so it stays
   // a quick reveal, not a slow drag through a long answer.
   return (
-    <div className="group flex mb-5 w-full max-w-3xl mx-auto px-4">
+    <div className="group flex mb-2 w-full max-w-3xl mx-auto px-4">
       <div className="flex-1 min-w-0">
         {isStreamingMessage ? (
           <p className="text-[15px] leading-[1.65] text-gray-900 whitespace-pre-wrap">

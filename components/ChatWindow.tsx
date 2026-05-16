@@ -1006,7 +1006,7 @@ export default function ChatWindow({
           if (labels.length === 0) return null;
           flowInfo("pills-render", newFlowId(), { source: "sentinel", count: labels.length, labels });
           return (
-            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-2 mb-6">
+            <div key={`chips-${i}`} className="w-full max-w-3xl mx-auto px-4 -mt-4 mb-3">
               <div className="flex flex-wrap gap-2">
                 {labels.map((label, j) => (
                   <button
