@@ -927,16 +927,57 @@ export default function Page() {
   const chatAnalysisKickoffRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (activeView !== "chat") return;
-    if (!resumeExtraction || !resumeText) return;
+    if (!resumeExtraction) return;
     if (resumeAnalysis) return;
-    const analysisKey = `chat:${resumeText.length}:${resumeText.slice(0, 32)}`;
+    // Drive-hydrated users don't have the raw resumeText — it's empty
+    // because Drive only stores the structured extraction. Synthesize
+    // a plain-text version from the extraction so the analyzer has
+    // something to chew on. The synthesized version is good enough for
+    // a Full Review: name, summary, all experience bullets, education,
+    // skills — everything the analyzer prompt actually reads.
+    const synthFromExtraction = (): string => {
+      const e = resumeExtraction;
+      const lines: string[] = [];
+      if (e.name) lines.push(e.name);
+      if (e.location) lines.push(e.location);
+      if (e.email) lines.push(e.email);
+      if (e.linkedin) lines.push(e.linkedin);
+      if (e.summary) lines.push("\nSUMMARY\n" + e.summary);
+      if (e.experience && e.experience.length > 0) {
+        lines.push("\nEXPERIENCE");
+        for (const exp of e.experience) {
+          const dur = [exp.startDate, exp.endDate ?? (exp.current ? "Present" : "")].filter(Boolean).join(" – ");
+          lines.push(`${exp.title} | ${exp.company}${dur ? ` | ${dur}` : ""}`);
+          for (const b of exp.bullets ?? []) lines.push(`  • ${b}`);
+        }
+      }
+      if (e.education && e.education.length > 0) {
+        lines.push("\nEDUCATION");
+        for (const ed of e.education) {
+          lines.push(`${ed.degree} ${ed.field ? `(${ed.field})` : ""} | ${ed.institution}`);
+        }
+      }
+      if (e.skillGroups && e.skillGroups.length > 0) {
+        lines.push("\nSKILLS");
+        for (const g of e.skillGroups) {
+          lines.push(`${g.category}: ${(g.skills ?? []).join(", ")}`);
+        }
+      }
+      return lines.join("\n");
+    };
+    const effectiveResumeText = resumeText && resumeText.trim().length > 0
+      ? resumeText
+      : synthFromExtraction();
+    if (!effectiveResumeText || effectiveResumeText.length < 80) return;
+    const analysisKey = `chat:${effectiveResumeText.length}:${effectiveResumeText.slice(0, 32)}`;
     if (chatAnalysisKickoffRef.current.has(analysisKey)) return;
     chatAnalysisKickoffRef.current.add(analysisKey);
     const flowId = newFlowId();
     const analyzeLog = flowStart("analyze", flowId, {
       from: "chat-kickoff",
       chatId: activeChatId,
-      bytes: resumeText.length,
+      bytes: effectiveResumeText.length,
+      synthesized: !resumeText || resumeText.trim().length === 0,
     });
 
     // Push a placeholder artifact card the MOMENT the analyzer fires,
@@ -968,7 +1009,7 @@ export default function Page() {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-stackle-flow-id": flowId },
       body: JSON.stringify({
-        resumeText,
+        resumeText: effectiveResumeText,
         reviewType: "Full Review",
         targetMarket: "US General",
         seniorityLevel:
@@ -3090,30 +3131,43 @@ export default function Page() {
                       if (resumeAnalysis) {
                         // Analysis already exists (returning user with
                         // pre-warmed analyzer). Show a quick artifact
-                        // pointer rather than re-running.
-                        setChatMessages((prev) => [
-                          ...prev,
-                          {
-                            role: "assistant",
-                            content: `Already have a review for ${resumeFilename ?? "your resume"}. Pulling it up.`,
-                            timestamp: now(),
-                            artifact: buildResumeReviewArtifact({
-                              id: `resume-review-existing-${activeChatId ?? "local"}-${Date.now()}`,
-                              candidateName: resumeExtraction?.name,
-                              targetRole: resumeAnalysis.likelyTargetRole ?? chosenTargetRole ?? null,
-                              score: deriveScoreFromAnalysis(resumeAnalysis),
-                            }),
-                          },
-                        ]);
+                        // pointer rather than re-running. Idempotency:
+                        // if the same "Already have a review" message
+                        // is already the last assistant push, skip.
+                        setChatMessages((prev) => {
+                          const last = prev[prev.length - 1];
+                          if (last?.content?.startsWith("Already have a review")) return prev;
+                          return [
+                            ...prev,
+                            {
+                              role: "assistant",
+                              content: `Already have a review for ${resumeFilename ?? "your resume"}. Pulling it up.`,
+                              timestamp: now(),
+                              artifact: buildResumeReviewArtifact({
+                                id: `resume-review-existing-${activeChatId ?? "local"}-${Date.now()}`,
+                                candidateName: resumeExtraction?.name,
+                                targetRole: resumeAnalysis.likelyTargetRole ?? chosenTargetRole ?? null,
+                                score: deriveScoreFromAnalysis(resumeAnalysis),
+                              }),
+                            },
+                          ];
+                        });
                       } else {
-                        setChatMessages((prev) => [
-                          ...prev,
-                          {
-                            role: "assistant",
-                            content: `Got it — running a Full Review on ${resumeFilename ?? "your resume"}.`,
-                            timestamp: now(),
-                          },
-                        ]);
+                        // Same idempotency check — never push a duplicate
+                        // "Got it — running a Full Review" line if the
+                        // handler somehow runs twice.
+                        setChatMessages((prev) => {
+                          const last = prev[prev.length - 1];
+                          if (last?.content?.startsWith("Got it — running a Full Review")) return prev;
+                          return [
+                            ...prev,
+                            {
+                              role: "assistant",
+                              content: `Got it — running a Full Review on ${resumeFilename ?? "your resume"}.`,
+                              timestamp: now(),
+                            },
+                          ];
+                        });
                         // Mark orchFocus so the analysis-landed watcher
                         // (which gates on it in RB; benign in chat) sees
                         // explicit review intent.
