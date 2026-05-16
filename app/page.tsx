@@ -112,6 +112,7 @@ export default function Page() {
   // First name from the profiles row — surfaces in greetings, header,
   // and anywhere we'd otherwise default to the resume.name.
   const [profileFirstName, setProfileFirstName] = useState<string | null>(null);
+  const [profileLastName, setProfileLastName] = useState<string | null>(null);
   // Persistent chat panel — open by default in Interview / Foundations /
   // Drive views. User can close to give the workspace full width.
   // State lives at app shell level so toggling persists across view
@@ -482,6 +483,7 @@ export default function Page() {
         const needs = !profile?.username;
         setNeedsProfileSetup(needs);
         if (profile?.first_name) setProfileFirstName(profile.first_name);
+        if (profile?.last_name) setProfileLastName(profile.last_name);
         if (needs) {
           if (typeof window !== "undefined" && window.location.pathname !== "/profile/setup") {
             window.location.href = "/profile/setup";
@@ -2493,8 +2495,21 @@ export default function Page() {
       {/* User avatar — moved from top-right header into the sidebar
           per user preference. Sits below the logo, above the New
           conversation button. Dropdown anchors top-left now so it
-          opens DOWN from the avatar inside the sidebar. */}
-      {isSignedUp && (
+          opens DOWN from the avatar inside the sidebar.
+          Label prefers profile first name (then full name) over the
+          raw email so 'Nikhil' shows instead of 'nekarne@gmail.com'. */}
+      {isSignedUp && (() => {
+        const displayName =
+          [profileFirstName, profileLastName].filter(Boolean).join(" ").trim()
+          || profileFirstName
+          || user?.email
+          || "Account";
+        const initial = (
+          profileFirstName?.[0]
+          ?? user?.email?.[0]
+          ?? "?"
+        ).toUpperCase();
+        return (
         <div className={`relative group ${expanded ? "px-3" : "px-1.5"} mb-3 flex ${expanded ? "items-center gap-2" : "justify-center"}`}>
           <button
             onClick={() => setUserMenuOpen((v) => !v)}
@@ -2502,11 +2517,11 @@ export default function Page() {
             aria-label="Account menu"
             className="w-8 h-8 rounded-full border border-gray-200 bg-white text-gray-900 hover:border-gray-400 hover:bg-gray-50 transition-colors flex items-center justify-center text-xs font-semibold flex-shrink-0"
           >
-            {(user?.email ?? "?").slice(0, 1).toUpperCase()}
+            {initial}
           </button>
           {expanded && (
             <span className="text-[12px] text-gray-700 truncate flex-1">
-              {user?.email ?? "Account"}
+              {displayName}
             </span>
           )}
           {userMenuOpen && (
@@ -2536,7 +2551,8 @@ export default function Page() {
             </>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* New conversation */}
       <div className={`${expanded ? "px-2" : "px-1.5"} mb-3`}>
