@@ -1005,9 +1005,35 @@ export default function Page() {
       ];
     });
 
+    // Helper: when analyzer fails, REPLACE the pending placeholder in
+    // chat with a real error message + retry chip. Without this the
+    // pending card sat forever ("Analyzing your resume…" / "Generating…")
+    // and the user thought the app was hung. Bug-from-user.
+    const failPendingArtifact = (msg: string) => {
+      setChatMessages((prev) => prev.map((m) => {
+        if (m.artifact?.id !== placeholderId) return m;
+        return {
+          role: "assistant" as const,
+          content: msg,
+          timestamp: now(),
+        };
+      }));
+      // Also clear the kickoff dedupe key so the user can retry by
+      // clicking "Use current" again. Otherwise the same key blocks.
+      chatAnalysisKickoffRef.current.delete(analysisKey);
+    };
+
+    // Client-side timeout — Vercel's route has maxDuration=300 but if
+    // the network drops or the route hangs past 90s, fail fast so the
+    // user isn't staring at a spinner forever.
+    const timeoutMs = 90_000;
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
+
     fetch("/api/agents/resume/analyze", {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-stackle-flow-id": flowId },
+      signal: controller.signal,
       body: JSON.stringify({
         resumeText: effectiveResumeText,
         reviewType: "Full Review",
@@ -1019,17 +1045,32 @@ export default function Page() {
         jobDescription: "",
       }),
     })
-      .then((r) => (r.ok ? r.json() : null))
+      .then(async (r) => {
+        clearTimeout(timeoutHandle);
+        if (!r.ok) {
+          const body = await r.json().catch(() => ({}));
+          const errMsg = body?.error || `HTTP ${r.status}`;
+          throw new Error(errMsg);
+        }
+        return r.json();
+      })
       .then((a: ResumeAnalysis | null) => {
         if (a) {
           analyzeLog.end({ score: deriveScoreFromAnalysis(a), priorities: a.rewritePriorities?.length ?? 0, gaps: a.keywordGaps?.length ?? 0 });
           setResumeAnalysis(a);
         } else {
           analyzeLog.err(new Error("analyze returned null"));
+          failPendingArtifact("The analyzer returned no result. Try uploading the resume again or paste the text directly.");
         }
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
+        clearTimeout(timeoutHandle);
+        const msg = err instanceof Error ? err.message : String(err);
         analyzeLog.err(err);
+        const userMsg = msg.includes("aborted") || msg.toLowerCase().includes("timeout")
+          ? "The analyzer took too long (90s+). Try again — usually faster on the second attempt."
+          : `Couldn't generate the review: ${msg}. Try again?`;
+        failPendingArtifact(userMsg);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, resumeExtraction, resumeText, resumeAnalysis, chatMessages.length]);
