@@ -5,6 +5,7 @@ import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
 import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen, Sparkles, ScrollText, BookMarked, Briefcase, Mic, FileEdit, GraduationCap } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
 import { buildResumeReviewArtifact, buildTailoredResumeArtifact, buildQuickQuestionsArtifact, buildSkillAssessmentArtifact, buildCoverLetterArtifact, type Artifact } from "@/lib/artifacts";
+import ArtifactPreviewPane from "@/components/ArtifactPreviewPane";
 import { deriveScoreFromAnalysis } from "@/lib/score";
 import { newFlowId, flowStart, flowInfo } from "@/lib/flowLog";
 import ChatWindow from "@/components/ChatWindow";
@@ -335,6 +336,9 @@ export default function Page() {
   // Same pattern for cover letter caching — generated letter stashed
   // by artifact id so onOpenArtifact can route to a preview.
   const coverLetterCacheRef = useRef<Map<string, string>>(new Map());
+  // Currently-open artifact in the right-side preview pane. Null when
+  // nothing is open. Set by the artifact card's onOpen handler.
+  const [openArtifact, setOpenArtifact] = useState<Artifact | null>(null);
   // Multi-step questionnaire state. When non-null, the engine is mid-
   // intake: each user message is the answer to the current step, then
   // either advances to the next step or fires the generator.
@@ -3417,8 +3421,10 @@ export default function Page() {
 
         {/* Content */}
         {activeView === "chat" ? (
-          /* Chat view */
-          <div className="flex flex-col flex-1 min-h-0">
+          /* Chat view — horizontal flex so the artifact preview pane
+             can sit on the right when an artifact card is opened. */
+          <div className="flex flex-1 min-h-0">
+            <div className="flex flex-col flex-1 min-h-0">
             {chatMessages.length === 0 && !isLoading ? (
               /* Empty state — Claude/ChatGPT-style. Greeting + input
                  stacked together, vertically centered in the viewport.
@@ -3551,16 +3557,10 @@ export default function Page() {
                       setActiveView("resume-builder");
                     }
                   } else if (artifact.kind === "cover_letter") {
-                    // For cover letters, "Open" just inlines the
-                    // letter as a preview message right under the
-                    // card. Lightweight; no separate panel needed.
-                    const letter = coverLetterCacheRef.current.get(artifact.id);
-                    if (letter) {
-                      setChatMessages((prev) => [
-                        ...prev,
-                        { role: "assistant", content: letter, timestamp: now() },
-                      ]);
-                    }
+                    // Open the right-side preview pane. Letter content
+                    // is in coverLetterCacheRef; the pane reads from
+                    // openArtifactContent below.
+                    setOpenArtifact(artifact);
                   }
                 }}
                 onDownloadArtifactFormat={async (format, artifact) => {
@@ -4091,6 +4091,42 @@ export default function Page() {
                 inputPlaceholder={resumeExtraction ? "Ask anything about your resume..." : "Ask anything about your career..."}
               />
             )}
+            </div>
+            {/* Right-side artifact preview pane. Renders only when an
+                artifact card has been clicked. Closes via X or ESC. */}
+            <ArtifactPreviewPane
+              artifact={openArtifact}
+              content={
+                openArtifact?.kind === "cover_letter"
+                  ? (coverLetterCacheRef.current.get(openArtifact.id) ?? null)
+                  : null
+              }
+              onClose={() => setOpenArtifact(null)}
+              onDownload={async (format, artifact) => {
+                if (artifact.kind === "cover_letter") {
+                  const letter = coverLetterCacheRef.current.get(artifact.id);
+                  if (!letter) return;
+                  const titleMatch = artifact.title.match(/Cover letter\s*—\s*(.+)$/i);
+                  const company = titleMatch ? titleMatch[1].trim() : null;
+                  const { downloadCoverLetter } = await import("@/lib/artifactExport");
+                  await downloadCoverLetter({ letter, company, format });
+                }
+              }}
+              onOpenInWorkspace={(artifact) => {
+                if (artifact.kind === "resume_review") {
+                  setOpenArtifact(null);
+                  setActiveView("resume-builder");
+                  setOpenReportSignal((n) => n + 1);
+                } else if (artifact.kind === "tailored_resume") {
+                  const tailored = recreatedResumeCacheRef.current.get(artifact.id);
+                  if (tailored) {
+                    setResumeExtraction(tailored);
+                    setOpenArtifact(null);
+                    setActiveView("resume-builder");
+                  }
+                }
+              }}
+            />
           </div>
         ) : activeView === "interview" ? (
           // Interview Prep is its OWN dedicated chat surface — no main-chat overlay.
