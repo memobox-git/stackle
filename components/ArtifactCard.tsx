@@ -11,6 +11,7 @@
 // only renders the inline summary. Cards stay in chat forever — they
 // ARE the timeline of milestones.
 
+import { useEffect, useRef, useState } from "react";
 import type { Artifact } from "@/lib/artifacts";
 import { artifactIcon, artifactTypeLabel, relativeTime } from "@/lib/artifacts";
 
@@ -26,9 +27,23 @@ interface ArtifactCardProps {
   // Optional secondary action — Download. Present for kinds that have a
   // rendered file in Drive. Card hides it when undefined.
   onDownload?: (artifact: Artifact) => void;
+  // Optional: when set, the card shows a Download menu with the listed
+  // formats. Click a format → calls onDownloadFormat(format).
+  downloadFormats?: Array<"pdf" | "docx">;
+  onDownloadFormat?: (format: "pdf" | "docx", artifact: Artifact) => void;
 }
 
-export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: ArtifactCardProps) {
+export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload, downloadFormats, onDownloadFormat }: ArtifactCardProps) {
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    function onClick(e: MouseEvent) {
+      if (!menuRef.current?.contains(e.target as Node)) setDownloadMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [downloadMenuOpen]);
   const icon = artifactIcon(artifact.kind);
   const typeLabel = artifactTypeLabel(artifact.kind);
   const score = artifact.score;
@@ -102,6 +117,38 @@ export default function ArtifactCard({ artifact, onOpen, isOpen, onDownload }: A
               >
                 Download
               </button>
+            )}
+            {downloadFormats && downloadFormats.length > 0 && !pending && (
+              <div className="relative" ref={menuRef}>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setDownloadMenuOpen((v) => !v); }}
+                  className="text-[12px] font-medium text-gray-600 hover:text-gray-900 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition-colors inline-flex items-center gap-1"
+                >
+                  Download
+                  <svg width="10" height="10" viewBox="0 0 12 12" aria-hidden>
+                    <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                  </svg>
+                </button>
+                {downloadMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 z-10 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden min-w-[110px]">
+                    {downloadFormats.map((fmt) => (
+                      <button
+                        key={fmt}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDownloadMenuOpen(false);
+                          onDownloadFormat?.(fmt, artifact);
+                        }}
+                        className="block w-full text-left text-[12px] text-gray-800 px-3 py-2 hover:bg-gray-50 transition-colors uppercase font-medium tracking-wider"
+                      >
+                        .{fmt}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
             <button
               type="button"

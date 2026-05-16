@@ -65,6 +65,9 @@ interface ChatWindowProps {
   // card calls this. The host (page.tsx) routes per artifact.kind to the
   // right preview surface (Resume Report, future Cover Letter pane, etc).
   onOpenArtifact?: (artifact: Artifact) => void;
+  // Per-format download. Wired by the host (app/page.tsx) — looks up
+  // artifact content from its cache and triggers PDF / DOCX export.
+  onDownloadArtifactFormat?: (format: "pdf" | "docx", artifact: Artifact) => void;
   // Which artifact is currently open in the right pane (if any). Cards
   // flip to "Viewing" state when their id matches.
   openArtifactId?: string | null;
@@ -639,6 +642,7 @@ export default function ChatWindow({
   onRetryAssistant,
   onOpenArtifact,
   openArtifactId,
+  onDownloadArtifactFormat,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -833,6 +837,8 @@ export default function ChatWindow({
                 artifact={msg.artifact}
                 onOpen={onOpenArtifact}
                 isOpen={openArtifactId === msg.artifact.id}
+                downloadFormats={onDownloadArtifactFormat ? ["pdf", "docx"] : undefined}
+                onDownloadFormat={onDownloadArtifactFormat}
               />
             </div>
           );

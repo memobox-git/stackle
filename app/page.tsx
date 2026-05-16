@@ -3550,7 +3550,33 @@ export default function Page() {
                       setResumeExtraction(tailored);
                       setActiveView("resume-builder");
                     }
+                  } else if (artifact.kind === "cover_letter") {
+                    // For cover letters, "Open" just inlines the
+                    // letter as a preview message right under the
+                    // card. Lightweight; no separate panel needed.
+                    const letter = coverLetterCacheRef.current.get(artifact.id);
+                    if (letter) {
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: letter, timestamp: now() },
+                      ]);
+                    }
                   }
+                }}
+                onDownloadArtifactFormat={async (format, artifact) => {
+                  // Cover letter: pull from cache + use artifactExport.
+                  if (artifact.kind === "cover_letter") {
+                    const letter = coverLetterCacheRef.current.get(artifact.id);
+                    if (!letter) return;
+                    // Pull company name from the artifact title prefix
+                    // ("Cover letter — {Company}"). Best-effort.
+                    const titleMatch = artifact.title.match(/Cover letter\s*—\s*(.+)$/i);
+                    const company = titleMatch ? titleMatch[1].trim() : null;
+                    const { downloadCoverLetter } = await import("@/lib/artifactExport");
+                    await downloadCoverLetter({ letter, company, format });
+                  }
+                  // Other artifact kinds get their download handlers
+                  // in subsequent commits.
                 }}
                   onChatEditPrompt={(prompt) => {
                     const t = prompt.trim().toLowerCase();

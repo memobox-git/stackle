@@ -76,6 +76,7 @@ export interface ChatSurfaceProps {
   onEditUserMessage?: (index: number, newContent: string) => void;
   onRetryAssistant?: (assistantIndex: number) => void;
   onOpenArtifact?: (artifact: Artifact) => void;
+  onDownloadArtifactFormat?: (format: "pdf" | "docx", artifact: Artifact) => void;
   openArtifactId?: string | null;
 
   // ── ChatInput props (forwarded) ──────────────────────────────
@@ -126,6 +127,7 @@ export default function ChatSurface({
   onRetryAssistant,
   onOpenArtifact,
   openArtifactId,
+  onDownloadArtifactFormat,
 
   // ChatInput forwarded
   inputValue,
@@ -172,6 +174,7 @@ export default function ChatSurface({
           onRetryAssistant={onRetryAssistant}
           onOpenArtifact={onOpenArtifact}
           openArtifactId={openArtifactId}
+          onDownloadArtifactFormat={onDownloadArtifactFormat}
         />
       )}
 
