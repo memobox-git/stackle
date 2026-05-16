@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { parseFile, ACCEPTED_EXTENSIONS } from "@/lib/parseFile";
 import { Plus, Home as HomeIcon, FileText, ClipboardList, Menu, X, Trash2, LogOut, Upload, FolderOpen, Download, Link2, Check, Mail, MessagesSquare, Target, Globe, GitBranch, User as UserIcon, Settings as SettingsIcon, ChevronDown, BookOpen, Sparkles, ScrollText, BookMarked, Briefcase, Mic, FileEdit, GraduationCap } from "lucide-react";
 import { downloadResumePdf, buildShareLink } from "@/lib/resumeExport";
-import { buildResumeReviewArtifact, type Artifact } from "@/lib/artifacts";
+import { buildResumeReviewArtifact, buildTailoredResumeArtifact, type Artifact } from "@/lib/artifacts";
 import { deriveScoreFromAnalysis } from "@/lib/score";
 import { newFlowId, flowStart, flowInfo } from "@/lib/flowLog";
 import ChatWindow from "@/components/ChatWindow";
@@ -316,6 +316,14 @@ export default function Page() {
   // Drive" so the chip labels and the click handler agree on the same
   // list (avoids a race if Drive refreshes mid-pick).
   const driveResumesForPickerRef = useRef<DriveFile[]>([]);
+  // Holds tailored ResumeExtraction payloads keyed by artifact id. When
+  // the user clicks "Recreate with all Fixes" or "Recreate with JD",
+  // the rewriter output is stashed here so onOpenArtifact can route to
+  // a preview without re-running the agent.
+  const recreatedResumeCacheRef = useRef<Map<string, ResumeExtraction>>(new Map());
+  // True while a "Recreate with JD" intake is waiting for the user to
+  // paste the JD. Next user message becomes the JD input.
+  const [pendingJDForRecreate, setPendingJDForRecreate] = useState(false);
 
   // ── Derived ───────────────────────────────────────────
   const isSignedUp = user !== null;
@@ -1803,6 +1811,83 @@ export default function Page() {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
 
+      // "Recreate with JD" intake — when this flag is set, the user's
+      // next message IS the JD. Echo it, clear the flag, kick off the
+      // JD-tailored rewriter, push a pending Tailored-Resume artifact.
+      if (pendingJDForRecreate) {
+        setPendingJDForRecreate(false);
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "user", content: trimmed, timestamp: now() },
+          { role: "assistant", content: "On it. Tailoring your resume to that JD.", timestamp: now() },
+        ]);
+        if (!resumeExtraction || !resumeAnalysis) {
+          setChatMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "I need the resume + report loaded first. Try 'Review my resume'.", timestamp: now() },
+          ]);
+          return;
+        }
+        const pendingId = `recreated-resume-pending-${activeChatId ?? "local"}-${Date.now()}`;
+        const pending = buildTailoredResumeArtifact({
+          id: pendingId,
+          company: null,
+          role: resumeAnalysis.likelyTargetRole ?? null,
+        });
+        pending.title = "Tailoring resume to your JD";
+        pending.subtitle = "Opus rewrites take ~60-90s. New artifact lands here.";
+        pending.pending = true;
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: "", timestamp: now(), artifact: pending },
+        ]);
+        try {
+          const res = await fetch("/api/agents/resume/rewrite-all", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              extraction: resumeExtraction,
+              analysis: resumeAnalysis,
+              targetRole: resumeAnalysis.likelyTargetRole ?? "your target role",
+              jobDescription: trimmed,
+            }),
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body?.error || `HTTP ${res.status}`);
+          }
+          const data = await res.json() as { extraction: ResumeExtraction; changedKeys: string[]; qualityWarnings?: string[] };
+          const unchanged = (data.qualityWarnings ?? []).some((w) => w.toLowerCase().includes("identical to input"));
+          if (unchanged) throw new Error("Rewriter returned the same resume — try a different JD.");
+          const realId = `recreated-resume-${activeChatId ?? "local"}-${Date.now()}`;
+          const real = buildTailoredResumeArtifact({
+            id: realId,
+            company: null,
+            role: resumeAnalysis.likelyTargetRole ?? null,
+          });
+          real.title = "Tailored resume — matched to your JD";
+          real.subtitle = `${data.changedKeys.length} section${data.changedKeys.length === 1 ? "" : "s"} rewritten for this JD`;
+          recreatedResumeCacheRef.current.set(realId, data.extraction);
+          setChatMessages((prev) =>
+            prev.map((m) =>
+              m.artifact?.id === pendingId
+                ? { role: "assistant" as const, content: "Done. Click the card to view the tailored resume.", timestamp: now(), artifact: real }
+                : m,
+            ),
+          );
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          setChatMessages((prev) =>
+            prev.map((m) =>
+              m.artifact?.id === pendingId
+                ? { role: "assistant" as const, content: `Tailor failed — ${msg}. Try again?`, timestamp: now() }
+                : m,
+            ),
+          );
+        }
+        return;
+      }
+
       // Client-side intent short-circuit for Interview Prep. The legacy
       // orchestrator on /api/orchestrate (used in chat view) doesn't
       // route to "interview" view — only the Stackle orchestrator does,
@@ -2537,7 +2622,7 @@ export default function Page() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [messages, setMessages, isLoading, isResumeMode, resumeText, resumeFilename, resumeExtraction, resumeAnalysis, intakeData, intakeStep, intakeAnswers, marketAnalysis, analyzedMarketKey, interviewPrepPlan]
+    [messages, setMessages, isLoading, isResumeMode, resumeText, resumeFilename, resumeExtraction, resumeAnalysis, intakeData, intakeStep, intakeAnswers, marketAnalysis, analyzedMarketKey, interviewPrepPlan, pendingJDForRecreate, activeChatId]
   );
 
   // Keep the edit-and-resend ref current with the latest sendMessage closure.
@@ -3173,6 +3258,16 @@ export default function Page() {
                   if (artifact.kind === "resume_review") {
                     setActiveView("resume-builder");
                     setOpenReportSignal((n) => n + 1);
+                  } else if (artifact.kind === "tailored_resume") {
+                    // Route the recreated resume into Resume Builder so
+                    // the user can view + download it. The tailored
+                    // extraction was stashed in recreatedResumeCacheRef
+                    // when the agent returned.
+                    const tailored = recreatedResumeCacheRef.current.get(artifact.id);
+                    if (tailored) {
+                      setResumeExtraction(tailored);
+                      setActiveView("resume-builder");
+                    }
                   }
                 }}
                   onChatEditPrompt={(prompt) => {
@@ -3311,6 +3406,103 @@ export default function Page() {
                       setChatMessages((prev) => [
                         ...prev,
                         { role: "assistant", content: "No worries — what would you like to do instead?", timestamp: now() },
+                      ]);
+                      return;
+                    }
+
+                    // ── Recreate-resume chips ────────────────────────
+                    // "Recreate with all Fixes" — runs the full Opus
+                    // rewriter using the report's priorities, pushes a
+                    // pending Tailored-Resume artifact card, swaps in
+                    // the real one when done. No right-pane required;
+                    // the artifact card lives in chat permanently.
+                    if (t === "recreate with all fixes") {
+                      if (!resumeExtraction || !resumeAnalysis) {
+                        setChatMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: "I need the resume + report loaded to recreate. Try 'Review my resume' first.", timestamp: now() },
+                        ]);
+                        return;
+                      }
+                      const pendingId = `recreated-resume-pending-${activeChatId ?? "local"}-${Date.now()}`;
+                      const pending = buildTailoredResumeArtifact({
+                        id: pendingId,
+                        company: null,
+                        role: resumeAnalysis.likelyTargetRole ?? null,
+                      });
+                      pending.title = "Recreating your resume — applying all fixes";
+                      pending.subtitle = "Opus rewrites take ~60-90s. New artifact lands here.";
+                      pending.pending = true;
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "On it. Recreating now.", timestamp: now(), artifact: pending },
+                      ]);
+                      (async () => {
+                        try {
+                          const res = await fetch("/api/agents/resume/rewrite-all", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              extraction: resumeExtraction,
+                              analysis: resumeAnalysis,
+                              targetRole: resumeAnalysis.likelyTargetRole ?? "your target role",
+                            }),
+                          });
+                          if (!res.ok) {
+                            const body = await res.json().catch(() => ({}));
+                            throw new Error(body?.error || `HTTP ${res.status}`);
+                          }
+                          const data = await res.json() as { extraction: ResumeExtraction; changedKeys: string[]; qualityWarnings?: string[] };
+                          const unchanged = (data.qualityWarnings ?? []).some((w) => w.toLowerCase().includes("identical to input"));
+                          if (unchanged) {
+                            throw new Error("Rewriter returned the same resume — try again with a JD.");
+                          }
+                          const realId = `recreated-resume-${activeChatId ?? "local"}-${Date.now()}`;
+                          const real = buildTailoredResumeArtifact({
+                            id: realId,
+                            company: null,
+                            role: resumeAnalysis.likelyTargetRole ?? null,
+                          });
+                          real.title = "Recreated resume — all fixes applied";
+                          real.subtitle = `${data.changedKeys.length} section${data.changedKeys.length === 1 ? "" : "s"} rewritten`;
+                          recreatedResumeCacheRef.current.set(realId, data.extraction);
+                          setChatMessages((prev) =>
+                            prev.map((m) =>
+                              m.artifact?.id === pendingId
+                                ? { role: "assistant" as const, content: "Done. Click the card to view the recreated resume.", timestamp: now(), artifact: real }
+                                : m,
+                            ),
+                          );
+                        } catch (err) {
+                          const msg = err instanceof Error ? err.message : "Unknown error";
+                          setChatMessages((prev) =>
+                            prev.map((m) =>
+                              m.artifact?.id === pendingId
+                                ? { role: "assistant" as const, content: `Recreate failed — ${msg}. Try again?`, timestamp: now() }
+                                : m,
+                            ),
+                          );
+                        }
+                      })();
+                      return;
+                    }
+
+                    // "Recreate with JD" — set the intake flag and ask
+                    // for the JD. Next user message becomes the JD,
+                    // intercepted in sendMessage's pendingJDForRecreate
+                    // branch (see below).
+                    if (t === "recreate with jd") {
+                      if (!resumeExtraction) {
+                        setChatMessages((prev) => [
+                          ...prev,
+                          { role: "assistant", content: "Upload your resume first so I can tailor it.", timestamp: now() },
+                        ]);
+                        return;
+                      }
+                      setPendingJDForRecreate(true);
+                      setChatMessages((prev) => [
+                        ...prev,
+                        { role: "assistant", content: "Paste the JD text (or the URL) and I'll tailor your resume to it.", timestamp: now() },
                       ]);
                       return;
                     }
