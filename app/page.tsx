@@ -929,6 +929,16 @@ export default function Page() {
     if (activeView !== "chat") return;
     if (!resumeExtraction) return;
     if (resumeAnalysis) return;
+    // CRITICAL gate — only fire when the user has EXPLICITLY asked for
+    // a review. Earlier this gate was removed with the misguided
+    // reasoning that "resume is the heart, analyze on sight." That made
+    // every sign-in auto-trigger an analyzer call, burning Anthropic
+    // calls and confusing the user ("why is it analyzing? I didn't ask").
+    //
+    // The "Use current" handler in the source-chooser flow sets
+    // orchFocusRef.current = "resume". Nothing else should set it.
+    // Sign-in, page-refresh, tab-focus — none of those fire this kickoff.
+    if (orchFocusRef.current !== "resume") return;
     // Drive-hydrated users don't have the raw resumeText — it's empty
     // because Drive only stores the structured extraction. Synthesize
     // a plain-text version from the extraction so the analyzer has
@@ -1418,6 +1428,13 @@ export default function Page() {
     setDriveFiles([]);
     setOriginalDriveFileId(null);
     setOpenReportSignal(0);
+    // Clear the "explicitly asked for review" intent so a fresh sign-in
+    // doesn't auto-fire the analyzer kickoff from a stale ref.
+    setOrchFocus(null);
+    orchFocusRef.current = null;
+    // Also clear the analyzer dedupe set so a re-attempt isn't blocked
+    // by a stale key.
+    chatAnalysisKickoffRef.current.clear();
   }
 
   function persistChat(
