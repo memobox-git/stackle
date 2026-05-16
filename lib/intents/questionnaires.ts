@@ -133,3 +133,29 @@ export function nextStepIdx(
   }
   return -1;
 }
+
+// Given the current answers and the step index we're about to show,
+// return { position, total } describing where the user is in the
+// EFFECTIVE flow — only counting steps that won't be skipped.
+//
+// Position is 1-indexed for display. Total is the count of steps the
+// user will actually be asked given their answers so far. We compute
+// total optimistically (only steps known-skippable get excluded) so
+// later branching may shrink the total when the user picks a path
+// that triggers a skipWhen — that's fine, the next prompt's
+// "Step 3/3" will reflect it.
+export function progressFor(
+  steps: QuestionnaireStep[],
+  stepIdx: number,
+  answers: Record<string, string>,
+): { position: number; total: number } {
+  let position = 0;
+  let total = 0;
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    if (step.skipWhen && step.skipWhen(answers)) continue;
+    total++;
+    if (i <= stepIdx) position++;
+  }
+  return { position, total };
+}

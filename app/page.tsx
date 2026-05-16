@@ -1922,7 +1922,7 @@ export default function Page() {
       // Free-text is always accepted; pill clicks come through the
       // same handler with the pill label as text.
       if (activeQuestionnaire) {
-        const { getQuestionnaire, resolvePills, substitutePrompt, nextStepIdx } =
+        const { getQuestionnaire, resolvePills, substitutePrompt, nextStepIdx, progressFor } =
           await import("@/lib/intents/questionnaires");
         const q = getQuestionnaire(activeQuestionnaire.kind);
         if (!q) {
@@ -1972,6 +1972,8 @@ export default function Page() {
             const nextStep = q.steps[nextIdx];
             const promptText = substitutePrompt(nextStep.prompt, ctx);
             const pills = resolvePills(nextStep, ctx);
+            const { position, total } = progressFor(q.steps, nextIdx, updatedAnswers);
+            const numbered = total > 1 ? `${position}/${total} — ${promptText}` : promptText;
             setActiveQuestionnaire({
               kind: activeQuestionnaire.kind,
               stepIdx: nextIdx,
@@ -1980,7 +1982,7 @@ export default function Page() {
             setChatMessages((prev) => {
               const out: ChatMessage[] = [
                 ...prev,
-                { role: "assistant", content: promptText, timestamp: now() },
+                { role: "assistant", content: numbered, timestamp: now() },
               ];
               if (pills.length > 0) {
                 out.push({ role: "assistant", content: `__INLINE_CHIPS__:${pills.join("|")}` });
@@ -2106,7 +2108,7 @@ export default function Page() {
               // kick that off instead of showing the 3 generic options.
               // Claude-style: ask clarifying questions, collect answers,
               // THEN generate.
-              const { getQuestionnaire, resolvePills, substitutePrompt } =
+              const { getQuestionnaire, resolvePills, substitutePrompt, progressFor } =
                 await import("@/lib/intents/questionnaires");
               const kindMap: Record<string, import("@/lib/artifacts").ArtifactKind | null> = {
                 cover_letter: "cover_letter",
@@ -2135,6 +2137,8 @@ export default function Page() {
                 const firstStep = questionnaire.steps[0];
                 const promptText = substitutePrompt(firstStep.prompt, ctx);
                 const pills = resolvePills(firstStep, ctx);
+                const { position, total } = progressFor(questionnaire.steps, 0, {});
+                const numbered = total > 1 ? `${position}/${total} — ${promptText}` : promptText;
                 setActiveQuestionnaire({ kind: kind!, stepIdx: 0, answers: {} });
                 setChatMessages((prev) => {
                   const out: ChatMessage[] = [
@@ -2144,7 +2148,7 @@ export default function Page() {
                   if (questionnaire.intro) {
                     out.push({ role: "assistant", content: questionnaire.intro, timestamp: now() });
                   }
-                  out.push({ role: "assistant", content: promptText, timestamp: now() });
+                  out.push({ role: "assistant", content: numbered, timestamp: now() });
                   if (pills.length > 0) {
                     out.push({ role: "assistant", content: `__INLINE_CHIPS__:${pills.join("|")}` });
                   }
