@@ -355,6 +355,75 @@ export default function Page() {
       ) => void)
   >(null);
 
+  // Register the dispatcher. Each artifact kind has its own generator
+  // that turns the collected answers into a real artifact card.
+  useEffect(() => {
+    questionnaireDispatchRef.current = async (kind, answers) => {
+      if (kind === "cover_letter") {
+        const company = answers.company === "No specific company" ? "" : (answers.company ?? "");
+        const tone = answers.tone ?? "Warm + professional";
+        const jdText = answers.jdSource === "Paste the JD" ? (answers.jdText ?? "") : "";
+        const pendingId = `cover-letter-pending-${Date.now()}`;
+        const pending = buildCoverLetterArtifact({
+          id: pendingId,
+          company: company || null,
+          role: resumeExtraction?.experience?.[0]?.title ?? null,
+        });
+        pending.title = company ? `Drafting cover letter — ${company}` : "Drafting cover letter";
+        pending.subtitle = `${tone} · ${jdText ? "JD-tuned" : "resume-grounded"}`;
+        pending.pending = true;
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "assistant" as const, content: "", timestamp: now(), artifact: pending },
+        ]);
+        try {
+          if (!resumeExtraction) throw new Error("Upload your resume first.");
+          const res = await fetch("/api/agents/cover-letter", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              extraction: resumeExtraction,
+              targetRole: resumeExtraction.experience?.[0]?.title ?? "Senior role",
+              companyName: company,
+              jobDescription: jdText,
+              tone, // pass through; route may or may not honor it
+            }),
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body?.error || `HTTP ${res.status}`);
+          }
+          const data = await res.json() as { coverLetter?: string; text?: string };
+          const letter = data.coverLetter ?? data.text ?? "";
+          if (!letter) throw new Error("Empty cover letter returned.");
+          const realId = `cover-letter-${Date.now()}`;
+          const real = buildCoverLetterArtifact({
+            id: realId,
+            company: company || null,
+            role: resumeExtraction.experience?.[0]?.title ?? null,
+          });
+          real.title = company ? `Cover letter — ${company}` : "Cover letter";
+          real.subtitle = `${tone} · ${jdText ? "JD-tuned" : "resume-grounded"} · Tap to read`;
+          coverLetterCacheRef.current.set(realId, letter);
+          setChatMessages((prev) => prev.map((m) =>
+            m.artifact?.id === pendingId
+              ? { role: "assistant" as const, content: "Done.", timestamp: now(), artifact: real }
+              : m
+          ));
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "Unknown error";
+          setChatMessages((prev) => prev.map((m) =>
+            m.artifact?.id === pendingId
+              ? { role: "assistant" as const, content: `Couldn't draft — ${msg}.`, timestamp: now() }
+              : m
+          ));
+        }
+      }
+      // Other artifact kinds wire their dispatchers in subsequent
+      // commits. Unknown kind → noop (defensive).
+    };
+  }, [resumeExtraction]);
+
   // ── Derived ───────────────────────────────────────────
   const isSignedUp = user !== null;
   // isResumeMode kept for callers that want to know which panel is open
@@ -2029,6 +2098,59 @@ export default function Page() {
           if (intentRes.ok) {
             const { route } = await intentRes.json() as { route: { category: string; options: Array<{ label: string; key: string }>; narration: string; detectedSkill: string | null } | null };
             if (route && route.options.length > 0) {
+              // If this category has a multi-step questionnaire defined,
+              // kick that off instead of showing the 3 generic options.
+              // Claude-style: ask clarifying questions, collect answers,
+              // THEN generate.
+              const { getQuestionnaire, resolvePills, substitutePrompt } =
+                await import("@/lib/intents/questionnaires");
+              const kindMap: Record<string, import("@/lib/artifacts").ArtifactKind | null> = {
+                cover_letter: "cover_letter",
+                // Future: resume → "tailored_resume", interview → ...
+                resume: null,
+                interview: null,
+                unknown: null,
+              };
+              const kind = kindMap[route.category] ?? null;
+              const questionnaire = kind ? getQuestionnaire(kind) : null;
+              if (questionnaire && questionnaire.steps.length > 0) {
+                const ctx = {
+                  resumeFirstName: profileFirstName ?? resumeExtraction?.name?.split(" ")[0] ?? null,
+                  resumeSkills: (resumeExtraction?.skillGroups ?? []).flatMap((g) => g.skills ?? []),
+                  recentChatTitles: chatList.map((c) => c.title ?? "").filter(Boolean),
+                  recentCompanies: Array.from(new Set(
+                    chatList
+                      .map((c) => c.title ?? "")
+                      .map((t) => {
+                        const m = t.match(/\bat\s+(.+?)(?:\s*—|\s*\(|$)/i);
+                        return m ? m[1].trim() : "";
+                      })
+                      .filter(Boolean)
+                  )),
+                };
+                const firstStep = questionnaire.steps[0];
+                const promptText = substitutePrompt(firstStep.prompt, ctx);
+                const pills = resolvePills(firstStep, ctx);
+                setActiveQuestionnaire({ kind: kind!, stepIdx: 0, answers: {} });
+                setChatMessages((prev) => {
+                  const out: ChatMessage[] = [
+                    ...prev,
+                    { role: "user", content: trimmed, timestamp: now() },
+                  ];
+                  if (questionnaire.intro) {
+                    out.push({ role: "assistant", content: questionnaire.intro, timestamp: now() });
+                  }
+                  out.push({ role: "assistant", content: promptText, timestamp: now() });
+                  if (pills.length > 0) {
+                    out.push({ role: "assistant", content: `__INLINE_CHIPS__:${pills.join("|")}` });
+                  }
+                  return out;
+                });
+                setIsLoading(false);
+                return;
+              }
+              // No questionnaire for this category — fall through to
+              // the legacy 3-option chip flow.
               const chipLabels = route.options.map((o) => o.label).join("|");
               setChatMessages((prev) => [
                 ...prev,
@@ -2036,7 +2158,6 @@ export default function Page() {
                 { role: "assistant", content: route.narration, timestamp: now() },
                 { role: "assistant", content: `__INLINE_CHIPS__:${chipLabels}` },
               ]);
-              // Stash detected skill / category so chip handlers can use them.
               intentContextRef.current = { category: route.category, detectedSkill: route.detectedSkill };
               setIsLoading(false);
               return;
