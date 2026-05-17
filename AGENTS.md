@@ -85,3 +85,38 @@ If the user asks to delete a test account, the path is:
 2. `DELETE FROM auth.users WHERE id = '<id>';`
 
 Run via the Supabase MCP `execute_sql`. Don't run `DELETE FROM auth.users` first — there's no `ON DELETE CASCADE` on `drive_files`.
+
+## End-to-end smoke test
+
+The repo ships with a Playwright smoke test at `tests/e2e/full-journey.spec.ts`. It walks the full user journey: signup → resume upload → analysis → ArtifactCard → refresh persists → sign out → sign in → data restored.
+
+Runs in GitHub Actions on every push to `dev` and `main` + every PR to `main`. If the test fails, the PR's "e2e / smoke" status check fails → merge blocks → no deploy of broken code.
+
+**Required GitHub secrets** (Repo → Settings → Secrets → Actions):
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` (admin — only used in test setup to create + delete test users)
+- `ANTHROPIC_API_KEY`
+
+**One-time branch protection** (Repo → Settings → Branches → `main`):
+- ☑ Require status checks to pass before merging
+- Required status check: `e2e / smoke`
+- ☑ Require branches to be up to date before merging
+
+**Running locally**:
+```bash
+npm run test:e2e          # headless
+npm run test:e2e:headed   # watch the browser
+npm run test:e2e:ui       # interactive debugger
+```
+
+**Adding new smoke checks**:
+- Extend `tests/e2e/full-journey.spec.ts` to cover new critical paths (cover letter generation, JD tailoring, etc).
+- Always create + delete test users via the helpers in `tests/helpers/supabaseAdmin.ts`. Never leave test users in the DB.
+- Test users use the email pattern `smoke-{ts}-{rand}@stackle-test.com` — namespaced for easy cleanup.
+- The test must always tear down its own data (drive_files, chats, profiles, auth user) in `afterEach`.
+
+**When the smoke test fails**:
+- The failing job uploads the Playwright HTML report as an artifact.
+- Download it from the Actions tab to see screenshots + trace + video of the failure.
+- Don't disable the test to make CI green. Fix the regression.

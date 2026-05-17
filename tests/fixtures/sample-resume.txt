@@ -1,0 +1,32 @@
+Alex Chen
+San Francisco, CA · alex.chen@example.com · 555-0123 · linkedin.com/in/alex-chen-de
+
+SUMMARY
+Senior Data Engineer with 7 years building scalable data pipelines at high-growth startups. Specialized in real-time streaming with Kafka, batch processing with Spark, and orchestration with Airflow. Led the platform migration from on-prem Hadoop to Snowflake at Acme, processing 50M events/day.
+
+EXPERIENCE
+
+Senior Data Engineer | Acme Corp | Mar 2020 - Present
+- Led migration from on-prem Hadoop to Snowflake, processing 50M events/day, cutting infra cost by 40%.
+- Built real-time fraud detection pipeline in Kafka + Flink, reducing fraud loss from 2.1% to 0.3% in 6 months.
+- Mentored 5 mid-level engineers; promoted 2 to senior in the last 18 months.
+- Owned the data quality framework across 30+ pipelines using Great Expectations.
+
+Data Engineer | BigCo | Jul 2017 - Feb 2020
+- Designed dbt-based analytics layer serving 200+ stakeholders; cut report latency from 24h to 15min.
+- Wrote and maintained 80+ Airflow DAGs, monitored via custom Grafana dashboards.
+- Built data integration framework for 12 source systems using Python and SQL.
+
+Junior Data Engineer | StartupXYZ | Jun 2015 - Jun 2017
+- Built ETL pipelines in Python/PostgreSQL for early product analytics.
+- Implemented warehouse star schema; supported analytics team SQL training.
+
+EDUCATION
+M.S. Computer Science (Data Systems) | Stanford University | 2015
+B.S. Computer Engineering | UC Berkeley | 2013
+
+SKILLS
+Languages: Python, SQL, Scala, Go, Java
+Data: Spark, Snowflake, BigQuery, dbt, Kafka, Flink, Airflow, Great Expectations
+Cloud: AWS (S3, EMR, Glue, Lambda), GCP (BigQuery, Dataflow, Cloud Storage)
+Tools: Docker, Kubernetes, Terraform, Git, Tableau, Looker
