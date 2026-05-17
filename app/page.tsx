@@ -2500,7 +2500,13 @@ export default function Page() {
       // chat is the steering wheel. Route through Sonnet 4.5 with tool use
       // — the orchestrator drives the panel via tools and narrates every
       // action. Bypasses the orchestrate→analyze→synthesize chain entirely.
-      if (isResumeMode && resumeAnalysis && intakeStep >= 5) {
+      // intakeStep >= 5 used to gate this branch — that gate was a relic
+      // of the now-disabled intake cascade. Since the cascade can no
+      // longer run, intakeStep is permanently 0 for fresh users and the
+      // URL-fast-path got silently disabled. Bug-from-user: LinkedIn
+      // URLs (and any URL) stopped triggering the JD tailor flow. Gate
+      // is gone now — Resume Builder + analysis loaded is enough.
+      if (isResumeMode && resumeAnalysis) {
         // FAST-PATH: deterministic URL detection. Sonnet has a baked-in prior
         // ("AI assistants can't fetch URLs") that occasionally beats out the
         // tool instruction — model says "Got it, let me pull that..." but
