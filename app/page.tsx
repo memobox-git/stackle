@@ -3279,13 +3279,13 @@ export default function Page() {
           The currently-active chat is exempted from the filter so it
           stays visible while you're composing your first message. */}
       {expanded && (() => {
-        const userTouchedChats = chatList.filter((c) => {
-          if (c.id === activeChatId) return true;
-          const realMessages = (c.messages ?? []).filter(
-            (m) => m.role === "user" && !m.content.startsWith("__"),
-          );
-          return realMessages.length > 0;
-        });
+        // Show every chat the user has. No filter — empty chats from
+        // clicking + New Conversation also appear, so the user can tell
+        // their click produced a real row. Previously we hid chats with
+        // no "real" user messages, which made + New Conversation feel
+        // broken when the new empty row vanished as soon as you clicked
+        // anywhere else.
+        const userTouchedChats = chatList;
         if (userTouchedChats.length === 0) return null;
         return (
         <div className="flex-1 overflow-y-auto px-2">
@@ -3538,7 +3538,7 @@ export default function Page() {
                  stacked together, vertically centered in the viewport.
                  No second input at the bottom; the input lives here
                  with the greeting until the first message lands. */
-              <div className="flex-1 flex flex-col items-center justify-center px-4 -mt-12">
+              <div className="flex-1 flex flex-col items-center justify-center px-4 pb-[18vh]">
                 <div className="w-full max-w-2xl flex flex-col items-center">
 {/* Greeting with sparkle. The sparkle softens the tone
                       and gives the line a focal point (Claude does the
