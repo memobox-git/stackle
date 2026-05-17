@@ -2368,6 +2368,48 @@ export default function Page() {
       const controller = new AbortController();
       agentAbortRef.current = controller;
 
+      // ── URL FAST-PATH (top priority in Resume Builder) ──────────
+      // If the user pastes a JD URL inside Resume Builder, scrape it
+      // immediately. Sits ABOVE both the Stackle calibration branch
+      // and the Resume Orchestrator branch so the URL never reaches
+      // an LLM that would say "I can't fetch URLs."
+      //
+      // Regression context: the URL detection used to live further
+      // down, after the calibration branch. When the user is in
+      // Resume Builder with extraction but no analysis (Drive-
+      // hydrated resume that hasn't had a review run yet), the
+      // calibration branch consumed the URL and sent it to Sonnet,
+      // which apologized politely. Now URLs win regardless of
+      // analysis state.
+      if (isResumeMode && resumeExtraction) {
+        const urlMatchPre = trimmed.match(/\bhttps?:\/\/[^\s)]+/i);
+        if (urlMatchPre) {
+          const url = urlMatchPre[0].replace(/[.,);]+$/, "");
+          // Echo the user's message + show what we're doing.
+          setChatMessages((prev) => [
+            ...prev,
+            { role: "user", content: trimmed, timestamp: now() },
+            { role: "assistant", content: `Fetching the JD from ${new URL(url).hostname}…`, timestamp: now() },
+          ]);
+          if (!resumeAnalysis) {
+            // No analysis loaded — tailor needs one. Tell the user.
+            setChatMessages((prev) => [
+              ...prev,
+              {
+                role: "assistant",
+                content: "Need a resume review first so I can tailor against your scores. Click 'Review my resume' to run one, then paste the URL again.",
+                timestamp: now(),
+              },
+            ]);
+            setIsLoading(false);
+            return;
+          }
+          setIsLoading(false);
+          setPendingChatTool({ ts: Date.now(), name: "tailor_for_jd_url", input: { url } });
+          return;
+        }
+      }
+
       // ── PHASE B: Stackle Top-Level Orchestrator (analysis still running) ──
       // Resume Builder mode + extraction present + no analysis yet.
       // The Stackle Orchestrator (Sonnet 4.5) handles the calibration
