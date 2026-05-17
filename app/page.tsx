@@ -690,47 +690,67 @@ export default function Page() {
           // start. Now: load the sidebar list, hydrate resume context
           // from Drive so the hero shows "Resume loaded: X" if any,
           // and leave activeChatId null so the empty-hero renders.
-          setChatList(chats);
-
           // Resume context (extraction + filename + analysis) carries
           // forward from the most recent chat that had it, so the user
           // doesn't have to re-upload to start a new conversation about
           // the same resume. Drive serves as the canonical source if
-          // it exists; the chat snapshot is the fallback.
-          let hydratedFromDrive = false;
+          // it exists; the chat snapshot is the fallback. We collect
+          // the resolved values into local vars so the seed-chat call
+          // below can use them WITHOUT racing the React state setters.
+          let resolvedExtraction: typeof resumeExtraction = null;
+          let resolvedText = "";
+          let resolvedFilename: string | null = null;
+          let resolvedAnalysis: typeof resumeAnalysis = null;
           if (user) {
             try {
               const driveFiles = await loadAllDriveFiles();
               const original = driveFiles.find((f) => f.file_type === "original");
               if (original?.extraction_json) {
-                setResumeExtraction(original.extraction_json);
-                setResumeText("");
-                setResumeFilename(original.display_name ?? "resume.pdf");
-                if (original.analysis_json) setResumeAnalysis(original.analysis_json);
-                setOnboardingCompleted(true);
-                hydratedFromDrive = true;
+                resolvedExtraction = original.extraction_json;
+                resolvedFilename = original.display_name ?? "resume.pdf";
+                resolvedAnalysis = original.analysis_json ?? null;
               }
             } catch (err) {
               console.warn("[loadChats] Drive scan failed:", err);
             }
           }
-          if (!hydratedFromDrive) {
-            // Drive missing or unauth — fall back to the most recent
-            // chat's snapshot for the resume bits only. We do NOT
-            // restore the message thread.
+          if (!resolvedExtraction) {
             const chatWithResume = chats.find((c) => c.resume_extraction);
             if (chatWithResume?.resume_extraction) {
-              setResumeExtraction(chatWithResume.resume_extraction);
-              setResumeText(chatWithResume.resume_text ?? "");
-              if (chatWithResume.resume_filename) setResumeFilename(chatWithResume.resume_filename);
-              if (chatWithResume.resume_analysis) setResumeAnalysis(chatWithResume.resume_analysis);
-              setOnboardingCompleted(true);
+              resolvedExtraction = chatWithResume.resume_extraction;
+              resolvedText = chatWithResume.resume_text ?? "";
+              if (chatWithResume.resume_filename) resolvedFilename = chatWithResume.resume_filename;
+              if (chatWithResume.resume_analysis) resolvedAnalysis = chatWithResume.resume_analysis;
             }
           }
+          if (resolvedExtraction) {
+            setResumeExtraction(resolvedExtraction);
+            setResumeText(resolvedText);
+            if (resolvedFilename) setResumeFilename(resolvedFilename);
+            if (resolvedAnalysis) setResumeAnalysis(resolvedAnalysis);
+            setOnboardingCompleted(true);
+          }
 
-          // activeChatId stays null. chatMessages stays []. The empty
-          // chat hero renders. First sendMessage creates a fresh chat
-          // row (via the existing local-chat fallback in persistChat).
+          // Seed a fresh chat row so persistChat has somewhere to
+          // write when the user types their first message. Without
+          // this, activeChatId stays null → persistChat skips →
+          // messages live only in React state → on reload, gone →
+          // the Recent sidebar list eventually loses everything
+          // because no new chats accumulate user messages.
+          //
+          // chatMessages stays []. The empty chat hero still renders.
+          // The fresh chat appears in chatList immediately so the
+          // sidebar Recent shows past chats (and this new empty one,
+          // once the user types their first message — filter hides
+          // empty chats until they have at least one user msg).
+          const seedChat = await createChat("chat", {
+            resumeText: resolvedText,
+            resumeFilename: resolvedFilename,
+            resumeExtraction: resolvedExtraction,
+            resumeAnalysis: resolvedAnalysis,
+          });
+          setActiveChatId(seedChat.id);
+          setChatList([seedChat, ...chats]);
         }
       })
       .catch((err) => {
