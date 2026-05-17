@@ -21,6 +21,19 @@ Drive writes (originals, working copies, versions, reports) require an authentic
 
 These are non-negotiable. The user has burned hours catching me violating them; if you find yourself rationalizing why "just this one time" is OK, stop and re-read.
 
+## Resume format specification (mandatory)
+
+The canonical Stackle Resume Format Spec v1 lives in two places that MUST stay in sync:
+
+- **Human contract**: `docs/stackle-resume-format-spec-v1.md` — full prose spec (section order by experience level, header rules, summary 50-80 words / 3rd person, 8-category skills taxonomy, XYZ bullet formula, banned phrases, action verb pool, formatting / ATS rules, traceability rule, JD-tailoring rules).
+- **Machine contract**: `lib/resumeFormatSpec.ts` — exported constants (`SKILL_CATEGORIES_8`, `POWER_VERBS`, `ALL_POWER_VERBS`, `BANNED_BULLET_STARTERS`, `BANNED_SUMMARY_OPENERS`, `BANNED_SUMMARY_PHRASES`, `WORD_COUNTS`, `SECTION_ORDER_BY_LEVEL`).
+
+Every generator that produces resume content (rewriter, JD-tailor, cover letter, fix flow, single-section writers) MUST import banned phrases / power verbs / word counts from `lib/resumeFormatSpec.ts` rather than re-listing them. Validators (`lib/agents/validation/rewriteValidator.ts`, `traceabilityCheck.ts`) read from the same source so a regex change propagates everywhere.
+
+**Traceability rule (critical)**: every fact in a rewritten resume must trace to the original. Never invent metrics, technologies, dates, titles, or companies. JD-tailoring may reorder + reframe but never fabricate. The traceability validator runs on every rewrite output and regenerates with fabricated data stripped — save the round-trip and don't invent.
+
+**Schema mapping note**: the spec's JSON shape uses `skills` (8 named categories); our `ResumeExtraction` uses `skillGroups[{ category, skills }]`. The rewriter prompt enforces the 8 canonical category names directly inside `skillGroups`. Treat `skillGroups` as the canonical storage shape; the spec's flat `skills` object is a rendering view only.
+
 ## Resume handling
 
 - **Drive resume = primary resume, always.** If a resume exists in Drive (`drive_files` with `file_type='original'`), that IS the user's resume. Never ask "do you have a resume" when one exists. Hydrate `resumeExtraction` from Drive on sign-in BEFORE the user can interact.

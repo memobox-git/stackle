@@ -5,8 +5,21 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { ResumeExtraction } from "@/lib/agents/schemas/resumeExtraction";
 import { rateLimit } from "@/lib/rateLimit";
+import {
+  BANNED_SUMMARY_OPENERS,
+  BANNED_SUMMARY_PHRASES,
+} from "@/lib/resumeFormatSpec";
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+// Banned-phrase list lifted from the Stackle Resume Format Spec v1 so cover
+// letters honor the same "no clichés, no buzzword soup" bar as resume bullets.
+const BANNED_PHRASES_PROMPT_LINE = [
+  ...BANNED_SUMMARY_OPENERS,
+  ...BANNED_SUMMARY_PHRASES,
+]
+  .map((re) => re.source.replace(/^\\b|\\b$/g, "").replace(/\\/g, ""))
+  .join(" / ");
 
 const SYSTEM_PROMPT = `You are a senior recruiter who has read 10,000+ cover letters and knows which ones get replied to.
 
@@ -32,11 +45,12 @@ STRUCTURE:
 TONE: when a tone is specified ("Formal" / "Warm + professional" / "Confident + direct"), MATCH IT. Default to warm + professional.
 
 DO NOT:
-- "I am a results-driven professional"
-- "I would be thrilled to"
-- Buzzword soup
-- Markdown, bold, headers, asterisks
+- Use any banned phrase from the Stackle Resume Format Spec v1 (these are auto-rejected by the validator): ${BANNED_PHRASES_PROMPT_LINE}
+- "I would be thrilled to" / "I would love the opportunity" / any plea framing
+- Buzzword soup, vague generalities
+- Markdown, bold, headers, asterisks, bullet points
 - "Dear Hiring Manager" — use "Hiring Manager" only
+- Open with "I am writing to apply for..." or any other templated opener
 
 Output ONLY the letter. No preamble, no commentary.`;
 
