@@ -109,6 +109,11 @@ interface ResumeBuilderProps {
   // Push a non-synthesis assistant message directly into the Resume Builder
   // chat (used for skills-gap surfacing and similar system prompts).
   onPushAssistantMessage?: (text: string) => void;
+  // Push a chat message AND attach an Artifact card. Used by the
+  // tailor-for-JD flow to emit a tailored_resume artifact card in
+  // chat once the rewrite finishes. The host stashes the tailored
+  // extraction in its cache so onOpenArtifact can route to it.
+  onPushAssistantArtifact?: (text: string, artifact: import("@/lib/artifacts").Artifact, tailored: import("@/lib/agents/schemas/resumeExtraction").ResumeExtraction) => void;
   onFileUpload: (text: string, filename: string) => void;
   onUpdateExtraction: (updated: ResumeExtraction) => void;
   // Drive props
@@ -142,6 +147,7 @@ export default function ResumeBuilder({
   onRejectFixSignal,
   onEditUserMessage,
   onPushAssistantMessage,
+  onPushAssistantArtifact,
   onFileUpload,
   onUpdateExtraction,
   chatId,
@@ -1643,16 +1649,30 @@ export default function ResumeBuilder({
     persistWorkingCopy(tailored);
     onUpdateExtraction(tailored);
 
-    // 5. Narrate what changed in chat.
+    // 5. Emit a tailored_resume artifact card in chat. Replaces the
+    //    previous behaviour (text narration + inline chip row) so the
+    //    output matches the Claude-style artifact pattern the user
+    //    expects. The card click routes to Resume Builder.
     const changeCount = (changedKeys ?? []).length;
-    const summaryLines = [
-      `Done — saved as **${displayName}** in your Drive.`,
-      changeCount > 0 ? `Tailored ${changeCount} section${changeCount !== 1 ? "s" : ""} for the ${roleLabel} role.` : "Resume is now tuned for this JD.",
-      "",
-      `__INLINE_CHIPS__:Open in Editor|Download PDF|Tailor another JD`,
-    ];
-    onPushAssistantMessage?.(summaryLines.slice(0, 2).join("\n\n"));
-    onPushAssistantMessage?.(summaryLines[3]);
+    if (onPushAssistantArtifact) {
+      const { buildTailoredResumeArtifact } = await import("@/lib/artifacts");
+      const artifactId = `tailored-resume-${chatId ?? "local"}-${Date.now()}`;
+      const artifact = buildTailoredResumeArtifact({
+        id: artifactId,
+        company: analysis.company,
+        role: roleLabel,
+      });
+      artifact.title = analysis.company
+        ? `Tailored resume — ${roleLabel} at ${analysis.company}`
+        : `Tailored resume — ${roleLabel}`;
+      artifact.subtitle = changeCount > 0
+        ? `${changeCount} section${changeCount !== 1 ? "s" : ""} rewritten · saved to Drive as ${displayName}`
+        : `Tuned for this JD · saved to Drive as ${displayName}`;
+      onPushAssistantArtifact("Done.", artifact, tailored);
+    } else {
+      // Fallback if host hasn't wired the artifact callback.
+      onPushAssistantMessage?.(`Done — saved as **${displayName}** in your Drive. ${changeCount > 0 ? `Tailored ${changeCount} section${changeCount !== 1 ? "s" : ""}.` : ""}`);
+    }
     setActiveTab("rewrite");
   }
 

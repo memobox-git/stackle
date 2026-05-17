@@ -4467,6 +4467,15 @@ export default function Page() {
               }));
             }}
             onEditUserMessage={handleEditUserMessage}
+            onPushAssistantArtifact={(text, artifact, tailored) => {
+              // Stash the tailored extraction so onOpenArtifact can
+              // route to it (open in Resume Builder).
+              recreatedResumeCacheRef.current.set(artifact.id, tailored);
+              setChatMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: text, timestamp: now(), artifact },
+              ]);
+            }}
             onPushAssistantMessage={(text) => {
               const ts = now();
               setChatMessages((prev) => {
