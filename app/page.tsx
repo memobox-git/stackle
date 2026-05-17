@@ -3588,39 +3588,11 @@ export default function Page() {
                     ))}
                   </div>
 
-                  {/* Recent chats strip — only when there's history. The
-                      sidebar already lists everything; this gives a quick
-                      jump-back affordance in the empty hero. */}
-                  {(() => {
-                    const recents = chatList
-                      .filter((c) => c.id !== activeChatId)
-                      .filter((c) => (c.messages ?? []).some((m) => m.role === "user" && !m.content.startsWith("__")))
-                      .slice(0, 3);
-                    if (recents.length === 0) return null;
-                    return (
-                      <div className="w-full mt-10">
-                        <p className="text-[11px] uppercase tracking-[0.1em] text-gray-400 text-center mb-3">Recently</p>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          {recents.map((chat) => {
-                            const firstUserMsg = (chat.messages ?? []).find(
-                              (m) => m.role === "user" && !m.content.startsWith("__"),
-                            );
-                            const preview = firstUserMsg?.content.slice(0, 60) ?? chat.title ?? "Untitled chat";
-                            return (
-                              <button
-                                key={chat.id}
-                                type="button"
-                                onClick={() => handleSwitchChat(chat.id)}
-                                className="text-left bg-white border border-gray-200 hover:border-gray-300 rounded-xl px-3 py-2.5 transition-colors"
-                              >
-                                <p className="text-[13px] text-gray-900 line-clamp-2 leading-snug">{preview}</p>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })()}
+                  {/* In-hero "Recently" strip removed — the sidebar
+                      already shows every chat in the Recent list, so a
+                      duplicate floating in the centre of the empty hero
+                      just adds clutter. Clean hero = greeting + input +
+                      launcher chips only, like ChatGPT / Claude. */}
                 </div>
               </div>
             ) : (
