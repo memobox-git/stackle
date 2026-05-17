@@ -21,7 +21,8 @@ export type ArtifactKind =
   | "study_plan"        // ordered skill list to close gaps
   | "interview_prep"    // JD-tailored question batch
   | "quick_questions"   // 3-question quick set, no full session
-  | "skill_assessment"; // 5-7 questions, single scored submit
+  | "skill_assessment"  // 5-7 questions, single scored submit
+  | "jd_snapshot";      // scraped/parsed JD — preview before tailor
 
 export interface Artifact {
   id: string;            // stable id — usually the underlying record id
@@ -163,6 +164,30 @@ export function buildInterviewPrepArtifact(opts: {
   };
 }
 
+// Build a JD-snapshot artifact (the scraped JD before the tailor
+// fires). User can preview the parsed JD content + raw text + the
+// company / role / seniority extraction before triggering the
+// rewrite. Click → opens the right preview pane.
+export function buildJDSnapshotArtifact(opts: {
+  id: string;
+  company: string | null;
+  role: string;
+  seniority?: string | null;
+  sourcePlatform?: string | null;
+  charCount: number;
+  generatedAt?: string;
+}): Artifact {
+  const where = opts.company ? `${opts.role} at ${opts.company}` : opts.role;
+  const platform = opts.sourcePlatform ? `${opts.sourcePlatform} · ` : "";
+  return {
+    id: opts.id,
+    kind: "jd_snapshot",
+    title: where,
+    subtitle: `${platform}${opts.charCount.toLocaleString()} chars`,
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+  };
+}
+
 // Build a quick-questions artifact (3-question inline set, no full
 // Interview Prep session).
 export function buildQuickQuestionsArtifact(opts: {
@@ -245,6 +270,7 @@ export function artifactIcon(kind: ArtifactKind): string {
     case "interview_prep":    return "🎤";
     case "quick_questions":   return "❓";
     case "skill_assessment":  return "🧪";
+    case "jd_snapshot":       return "📋";
   }
 }
 
@@ -259,5 +285,6 @@ export function artifactTypeLabel(kind: ArtifactKind): string {
     case "interview_prep":    return "Interview Prep";
     case "quick_questions":   return "Quick Questions";
     case "skill_assessment":  return "Skill Assessment";
+    case "jd_snapshot":       return "JD Snapshot";
   }
 }

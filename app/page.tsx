@@ -336,6 +336,17 @@ export default function Page() {
   // Same pattern for cover letter caching — generated letter stashed
   // by artifact id so onOpenArtifact can route to a preview.
   const coverLetterCacheRef = useRef<Map<string, string>>(new Map());
+  // Cache for jd_snapshot artifacts. Holds the raw JD text + parsed
+  // analysis, keyed by snapshot artifact id. Two consumers:
+  //   - ArtifactPreviewPane: reads content (JSON-encoded) to render
+  //     the parsed JD body.
+  //   - "Tailor my resume to this" chip handler: reads jdText and
+  //     dispatches tailor_for_jd_confirmed back into ResumeBuilder.
+  const jdSnapshotCacheRef = useRef<Map<string, { jdText: string; analysis: Record<string, unknown> }>>(new Map());
+  // Latest snapshot id — the chip handler doesn't know which card the
+  // user is responding to, so we default to "most recent snapshot."
+  // Updated in the onPushJDSnapshot callback.
+  const lastJDSnapshotIdRef = useRef<string | null>(null);
   // Currently-open artifact in the right-side preview pane. Null when
   // nothing is open. Set by the artifact card's onOpen handler.
   const [openArtifact, setOpenArtifact] = useState<Artifact | null>(null);
@@ -2388,6 +2399,31 @@ export default function Page() {
       const controller = new AbortController();
       agentAbortRef.current = controller;
 
+      // ── "Tailor my resume to this" chip ─────────────────────────
+      // Emitted by the jd_snapshot artifact card. Looks up the cached
+      // JD text + analysis (stashed in jdSnapshotCacheRef by the
+      // snapshot dispatch) and fires the actual rewrite via the
+      // tailor_for_jd_confirmed dispatcher in ResumeBuilder.
+      if (trimmed.toLowerCase() === "tailor my resume to this") {
+        const snapshotId = lastJDSnapshotIdRef.current;
+        const cached = snapshotId ? jdSnapshotCacheRef.current.get(snapshotId) : undefined;
+        if (!cached) {
+          setChatMessages((prev) => [
+            ...prev,
+            { role: "user", content: trimmed, timestamp: now() },
+            { role: "assistant", content: "I lost the JD reference. Paste the JD again and I'll tailor from there.", timestamp: now() },
+          ]);
+          return;
+        }
+        setChatMessages((prev) => [
+          ...prev,
+          { role: "user", content: trimmed, timestamp: now() },
+        ]);
+        setIsLoading(false);
+        setPendingChatTool({ ts: Date.now(), name: "tailor_for_jd_confirmed", input: { jd_text: cached.jdText } });
+        return;
+      }
+
       // ── URL FAST-PATH (top priority in Resume Builder) ──────────
       // If the user pastes a JD URL inside Resume Builder, scrape it
       // immediately. Sits ABOVE both the Stackle calibration branch
@@ -3633,6 +3669,10 @@ export default function Page() {
                     // is in coverLetterCacheRef; the pane reads from
                     // openArtifactContent below.
                     setOpenArtifact(artifact);
+                  } else if (artifact.kind === "jd_snapshot") {
+                    // Same — opens the preview pane with parsed JD
+                    // content (must-haves, responsibilities, raw text).
+                    setOpenArtifact(artifact);
                   }
                 }}
                 onDownloadArtifactFormat={async (format, artifact) => {
@@ -4168,11 +4208,18 @@ export default function Page() {
                 artifact card has been clicked. Closes via X or ESC. */}
             <ArtifactPreviewPane
               artifact={openArtifact}
-              content={
-                openArtifact?.kind === "cover_letter"
-                  ? (coverLetterCacheRef.current.get(openArtifact.id) ?? null)
-                  : null
-              }
+              content={(() => {
+                if (!openArtifact) return null;
+                if (openArtifact.kind === "cover_letter") {
+                  return coverLetterCacheRef.current.get(openArtifact.id) ?? null;
+                }
+                if (openArtifact.kind === "jd_snapshot") {
+                  const cached = jdSnapshotCacheRef.current.get(openArtifact.id);
+                  if (!cached) return null;
+                  return JSON.stringify({ analysis: cached.analysis, rawText: cached.jdText });
+                }
+                return null;
+              })()}
               onClose={() => setOpenArtifact(null)}
               onDownload={async (format, artifact) => {
                 if (artifact.kind === "cover_letter") {
@@ -4494,6 +4541,22 @@ export default function Page() {
               setChatMessages((prev) => [
                 ...prev,
                 { role: "assistant", content: text, timestamp: now(), artifact },
+              ]);
+            }}
+            onPushJDSnapshot={(text, artifact, payload) => {
+              // Cache jdText + analysis so the preview pane can render
+              // and so the "Tailor my resume to this" chip handler can
+              // dispatch the rewrite without re-scraping.
+              jdSnapshotCacheRef.current.set(artifact.id, payload);
+              lastJDSnapshotIdRef.current = artifact.id;
+              setChatMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: text, timestamp: now(), artifact },
+                {
+                  role: "assistant",
+                  content: "__INLINE_CHIPS__:Tailor my resume to this",
+                  timestamp: now(),
+                },
               ]);
             }}
             onPushAssistantMessage={(text) => {

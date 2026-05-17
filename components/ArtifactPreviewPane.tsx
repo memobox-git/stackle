@@ -183,6 +183,106 @@ function renderBody({ artifact, content, onOpenInWorkspace }: {
     );
   }
 
+  // JD Snapshot — parsed JD content + collapsible raw text.
+  // The content prop is a JSON-encoded string containing both the
+  // analysis (must-haves, responsibilities, etc) and the raw text.
+  // Host serializes it; we parse and render.
+  if (artifact.kind === "jd_snapshot") {
+    if (!content) {
+      return <p className="text-[13px] text-gray-500 italic">JD content isn&apos;t available — it may have been deleted from the chat history.</p>;
+    }
+    let parsed: { analysis?: Record<string, unknown>; rawText?: string } = {};
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      // Old-format string content — render as raw.
+      return (
+        <article className="text-[13px] leading-[1.65] text-gray-800 whitespace-pre-wrap">{content}</article>
+      );
+    }
+    const a = parsed.analysis ?? {};
+    const role = typeof a.role === "string" ? a.role : null;
+    const company = typeof a.company === "string" ? a.company : null;
+    const seniority = typeof a.seniority === "string" ? a.seniority : null;
+    const years = typeof a.yearsRequired === "number" ? a.yearsRequired : null;
+    const mustHaves = Array.isArray(a.mustHaveSkills) ? a.mustHaveSkills.filter((s) => typeof s === "string") : [];
+    const niceToHaves = Array.isArray(a.niceToHaveSkills) ? a.niceToHaveSkills.filter((s) => typeof s === "string") : [];
+    const responsibilities = Array.isArray(a.responsibilities) ? a.responsibilities.filter((s) => typeof s === "string") : [];
+    const techStack = Array.isArray(a.techStack) ? a.techStack.filter((s) => typeof s === "string") : [];
+    const rawText = parsed.rawText ?? "";
+
+    return (
+      <div className="space-y-5 text-[14px] leading-[1.55] text-gray-900">
+        {/* Header block */}
+        <div>
+          <p className="text-[15px] font-semibold">{role ?? "Role unknown"}{company ? ` at ${company}` : ""}</p>
+          {(seniority || years) && (
+            <p className="text-[12px] text-gray-500 mt-0.5">
+              {seniority ?? ""}{years ? ` · ${years}+ yrs` : ""}
+            </p>
+          )}
+        </div>
+
+        {mustHaves.length > 0 && (
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Must-haves</p>
+            <div className="flex flex-wrap gap-1.5">
+              {mustHaves.map((s, i) => (
+                <span key={i} className="text-[12px] px-2 py-0.5 rounded-full border border-gray-300 bg-white text-gray-800">{s}</span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {niceToHaves.length > 0 && (
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Nice-to-haves</p>
+            <div className="flex flex-wrap gap-1.5">
+              {niceToHaves.map((s, i) => (
+                <span key={i} className="text-[12px] px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-700">{s}</span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {techStack.length > 0 && (
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">Tech stack</p>
+            <div className="flex flex-wrap gap-1.5">
+              {techStack.map((s, i) => (
+                <span key={i} className="text-[12px] px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-700">{s}</span>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {responsibilities.length > 0 && (
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-gray-500 font-semibold mb-2">What they want you to do</p>
+            <ul className="space-y-1.5 list-disc list-inside pl-1">
+              {responsibilities.slice(0, 6).map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {rawText && (
+          <section>
+            <details className="group">
+              <summary className="cursor-pointer text-[11px] uppercase tracking-wider text-gray-500 font-semibold hover:text-gray-900">
+                Raw JD text (click to expand)
+              </summary>
+              <pre className="mt-2 text-[12px] leading-[1.55] text-gray-700 whitespace-pre-wrap font-sans border border-gray-200 rounded-md bg-gray-50 p-3 max-h-[280px] overflow-y-auto">
+                {rawText}
+              </pre>
+            </details>
+          </section>
+        )}
+      </div>
+    );
+  }
+
   // Generic fallback — for kinds we don't render here yet.
   return (
     <div className="text-[13px] text-gray-700 space-y-3">

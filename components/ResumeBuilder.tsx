@@ -114,6 +114,15 @@ interface ResumeBuilderProps {
   // chat once the rewrite finishes. The host stashes the tailored
   // extraction in its cache so onOpenArtifact can route to it.
   onPushAssistantArtifact?: (text: string, artifact: import("@/lib/artifacts").Artifact, tailored: import("@/lib/agents/schemas/resumeExtraction").ResumeExtraction) => void;
+  // Same shape but for jd_snapshot artifacts. The host caches the
+  // raw JD text + structured analysis so the preview pane can render
+  // the parsed content AND the "Tailor my resume to this" chip
+  // handler can dispatch the actual rewrite without re-scraping.
+  onPushJDSnapshot?: (
+    text: string,
+    artifact: import("@/lib/artifacts").Artifact,
+    payload: { jdText: string; analysis: Record<string, unknown> },
+  ) => void;
   onFileUpload: (text: string, filename: string) => void;
   onUpdateExtraction: (updated: ResumeExtraction) => void;
   // Drive props
@@ -148,6 +157,7 @@ export default function ResumeBuilder({
   onEditUserMessage,
   onPushAssistantMessage,
   onPushAssistantArtifact,
+  onPushJDSnapshot,
   onFileUpload,
   onUpdateExtraction,
   chatId,
@@ -1495,20 +1505,34 @@ export default function ResumeBuilder({
           break;
         }
         case "tailor_for_jd": {
-          // JD-to-Resume Phase 1. Two-step pipeline:
-          // 1) Haiku JD Analyzer extracts {company, role, seniority, ...}
-          // 2) Opus rewrite-all generates the tailored extraction with the
-          //    JD passed as jobDescription
-          // Result saved to Drive as a 'version' file named "{Company}_{Role}.docx"
-          // and surfaced in chat with download chips.
+          // Step 1 of the JD-paste flow: emit a jd_snapshot artifact
+          // so the user can review the parsed JD before the rewrite
+          // fires. The actual rewrite happens after the user clicks
+          // the "Tailor my resume to this" chip (dispatched as
+          // tailor_for_jd_confirmed below).
           const jdText = (input.jd_text as string | undefined) ?? "";
           if (!jdText.trim() || !resumeExtraction) {
             toasts.push({ kind: "warn", text: "Need both a resume and a JD to tailor." });
             break;
           }
-          if (onPushAssistantMessage) onPushAssistantMessage("Reading the JD…");
-          tailorForJD(jdText).catch((err) => {
+          emitJDSnapshot(jdText).catch((err) => {
             console.error("[tailor_for_jd]", err);
+            if (onPushAssistantMessage) onPushAssistantMessage("Hit a snag reading that JD. Try again?");
+          });
+          break;
+        }
+        case "tailor_for_jd_confirmed": {
+          // Step 2 of the JD-paste flow: user has clicked the
+          // "Tailor my resume to this" chip on the jd_snapshot
+          // artifact. Run the actual Opus rewrite now.
+          const jdText = (input.jd_text as string | undefined) ?? "";
+          if (!jdText.trim() || !resumeExtraction) {
+            toasts.push({ kind: "warn", text: "JD text missing — re-paste the JD to retry." });
+            break;
+          }
+          if (onPushAssistantMessage) onPushAssistantMessage("Tailoring your resume now — ~30-60s.");
+          tailorForJD(jdText).catch((err) => {
+            console.error("[tailor_for_jd_confirmed]", err);
             if (onPushAssistantMessage) onPushAssistantMessage("Hit a snag generating the tailored version. Try again?");
           });
           break;
@@ -1703,7 +1727,59 @@ export default function ResumeBuilder({
 
     const cachedTag = data.cached ? " (cached)" : "";
     onPushAssistantMessage?.(`Got it from ${data.sourcePlatform}${cachedTag}. Reading the JD…`);
-    return tailorForJD(data.jdText);
+    return emitJDSnapshot(data.jdText, data.sourcePlatform);
+  }
+
+  // Emit a jd_snapshot artifact card BEFORE running the rewrite.
+  // User-requested: paste JD → see what was scraped → confirm via the
+  // "Tailor my resume to this" chip → then the rewriter fires.
+  //
+  // Runs runJDAnalyzer (Haiku, ~3s) to parse the JD, builds the card,
+  // pushes it via onPushJDSnapshot (host caches the JD text + analysis),
+  // then pushes the confirmation chip. The chip click is handled in
+  // app/page.tsx and dispatches back into tailorForJD with the cached
+  // JD text.
+  async function emitJDSnapshot(jdText: string, sourcePlatform?: string) {
+    if (!resumeExtraction) {
+      onPushAssistantMessage?.("Upload your resume first so I can tailor it.");
+      return;
+    }
+    onPushAssistantMessage?.("Reading the JD…");
+    const aRes = await fetch("/api/agents/jd/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jdText }),
+    });
+    if (!aRes.ok) {
+      onPushAssistantMessage?.("Couldn't read the JD. Try pasting more text or check the formatting.");
+      return;
+    }
+    const { analysis } = await aRes.json() as { analysis: {
+      company: string | null;
+      role: string;
+      seniority: string;
+      yearsRequired?: number | null;
+      mustHaveSkills?: string[];
+      niceToHaveSkills?: string[];
+      techStack?: string[];
+      responsibilities?: string[];
+      redFlags?: string[];
+    } };
+    const roleLabel = analysis.role || "Role";
+    const { buildJDSnapshotArtifact } = await import("@/lib/artifacts");
+    const artifactId = `jd-snapshot-${chatId ?? "local"}-${Date.now()}`;
+    const artifact = buildJDSnapshotArtifact({
+      id: artifactId,
+      company: analysis.company,
+      role: roleLabel,
+      seniority: analysis.seniority,
+      sourcePlatform: sourcePlatform ?? null,
+      charCount: jdText.length,
+    });
+    onPushJDSnapshot?.("Here's what I found in the JD. Click the card to review, then confirm to recreate the resume.", artifact, {
+      jdText,
+      analysis: analysis as unknown as Record<string, unknown>,
+    });
   }
 
   // ── JD intake watcher ─────────────────────────────────────────────
@@ -1741,12 +1817,14 @@ export default function ResumeBuilder({
       return;
     }
     // Plain JD text — needs at least 100 chars to be plausible.
+    // Emits a JD snapshot artifact for the user to review BEFORE the
+    // rewrite kicks off. Confirmation chip handler dispatches the
+    // actual tailor.
     if (raw.length >= 100) {
       setJdIntakeFor(null);
       setIsPanelOpen(true);
       setActiveTab("resume");
-      onPushAssistantMessage?.("Reading the JD…");
-      tailorForJD(raw).catch((err) => {
+      emitJDSnapshot(raw).catch((err) => {
         console.error("[jd-intake-text]", err);
         onPushAssistantMessage?.("Hit a snag reading that JD. Try again?");
       });
