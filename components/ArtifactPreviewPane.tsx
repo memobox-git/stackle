@@ -283,6 +283,43 @@ function renderBody({ artifact, content, onOpenInWorkspace }: {
     );
   }
 
+  // Skill assessment + Quick questions — render the question list.
+  // Content is a JSON-stringified array of { prompt, difficulty?,
+  // expectedTopics? } objects. We parse + render as a numbered list.
+  if (artifact.kind === "skill_assessment" || artifact.kind === "quick_questions") {
+    if (!content) {
+      return <p className="text-[13px] text-gray-500 italic">Questions aren&apos;t available — the generation may have failed.</p>;
+    }
+    let questions: Array<{ prompt: string; difficulty?: string; expectedTopics?: string[] }> = [];
+    try {
+      questions = JSON.parse(content);
+    } catch {
+      return <article className="text-[13px] leading-[1.65] text-gray-800 whitespace-pre-wrap">{content}</article>;
+    }
+    if (!Array.isArray(questions) || questions.length === 0) {
+      return <p className="text-[13px] text-gray-500 italic">No questions in this set.</p>;
+    }
+    return (
+      <ol className="space-y-4 text-[14px] leading-[1.6] text-gray-900 list-decimal list-inside pl-1">
+        {questions.map((q, i) => (
+          <li key={i} className="pl-1">
+            <span className="font-medium">{q.prompt}</span>
+            {(q.difficulty || (q.expectedTopics && q.expectedTopics.length > 0)) && (
+              <div className="mt-1 ml-1 flex flex-wrap gap-1.5">
+                {q.difficulty && (
+                  <span className="text-[11px] uppercase tracking-wider text-gray-500 px-1.5 py-0.5 rounded border border-gray-200 bg-gray-50">{q.difficulty}</span>
+                )}
+                {q.expectedTopics?.map((topic, j) => (
+                  <span key={j} className="text-[11px] text-gray-600 px-1.5 py-0.5 rounded-full border border-gray-200">{topic}</span>
+                ))}
+              </div>
+            )}
+          </li>
+        ))}
+      </ol>
+    );
+  }
+
   // Generic fallback — for kinds we don't render here yet.
   return (
     <div className="text-[13px] text-gray-700 space-y-3">

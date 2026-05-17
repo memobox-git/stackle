@@ -3645,6 +3645,12 @@ export default function Page() {
                     // Same — opens the preview pane with parsed JD
                     // content (must-haves, responsibilities, raw text).
                     setOpenArtifact(artifact);
+                  } else if (artifact.kind === "skill_assessment" || artifact.kind === "quick_questions") {
+                    // Open the question list in the right-side preview
+                    // pane. The questions array is JSON-stringified into
+                    // coverLetterCacheRef (cache is generic, name is
+                    // legacy from the cover-letter-only era).
+                    setOpenArtifact(artifact);
                   }
                 }}
                 onDownloadArtifactFormat={async (format, artifact) => {
@@ -4189,6 +4195,11 @@ export default function Page() {
                   const cached = jdSnapshotCacheRef.current.get(openArtifact.id);
                   if (!cached) return null;
                   return JSON.stringify({ analysis: cached.analysis, rawText: cached.jdText });
+                }
+                if (openArtifact.kind === "skill_assessment" || openArtifact.kind === "quick_questions") {
+                  // JSON-stringified [{prompt, ...}] array stashed at
+                  // generation time. ArtifactPreviewPane parses + renders.
+                  return coverLetterCacheRef.current.get(openArtifact.id) ?? null;
                 }
                 return null;
               })()}
