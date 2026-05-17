@@ -1673,7 +1673,12 @@ export default function ResumeBuilder({
       // Fallback if host hasn't wired the artifact callback.
       onPushAssistantMessage?.(`Done — saved as **${displayName}** in your Drive. ${changeCount > 0 ? `Tailored ${changeCount} section${changeCount !== 1 ? "s" : ""}.` : ""}`);
     }
-    setActiveTab("rewrite");
+    // Switch to Resume tab so the user immediately sees the tailored
+    // content. Was "rewrite" — that tab was removed earlier this
+    // session; setting to it left activeTab in a state with no
+    // matching tab content, falling back to Report which showed the
+    // OLD analysis instead of the new resume.
+    setActiveTab("resume");
   }
 
   // JD-to-Resume Phase 2 — fetch URL → extract JD text → fall through to tailorForJD.
